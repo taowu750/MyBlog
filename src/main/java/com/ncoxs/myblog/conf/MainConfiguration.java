@@ -4,6 +4,8 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.task.AsyncTaskExecutor;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
+import org.springframework.util.ReflectionUtils;
 
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -12,6 +14,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class MainConfiguration {
 
     private AtomicInteger asyncThreadId = new AtomicInteger();
+
+    private AtomicInteger timeTaskThreadId = new AtomicInteger();
+
 
     @Bean
     public AsyncTaskExecutor asyncTaskExecutor() {
@@ -27,5 +32,18 @@ public class MainConfiguration {
         async.afterPropertiesSet();
 
         return async;
+    }
+
+    @Bean
+    public ThreadPoolTaskScheduler threadPoolTaskScheduler() {
+        int cpu = Runtime.getRuntime().availableProcessors();
+        ThreadPoolTaskScheduler scheduler = new ThreadPoolTaskScheduler();
+        scheduler.setPoolSize(cpu + 1);
+        scheduler.setAwaitTerminationSeconds(10 * 60);
+        scheduler.setThreadFactory(r -> new Thread(r, "time-task-pool-" + timeTaskThreadId.getAndIncrement()));
+        scheduler.setErrorHandler(ReflectionUtils::rethrowRuntimeException);
+        scheduler.afterPropertiesSet();
+
+        return scheduler;
     }
 }

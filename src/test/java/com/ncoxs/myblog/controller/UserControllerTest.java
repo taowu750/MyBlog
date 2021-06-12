@@ -91,7 +91,7 @@ public class UserControllerTest {
         user.setEmail("wutaoyx163@163.com");
         user.setPassword("12345");
 
-        GenericResult<Object> result = userController.register(user);
+        GenericResult<Object> result = userController.register(1, user);
         assertEquals(ResultCode.SUCCESS.getCode(), result.getCode());
 
         List<UserIdentity> identities = userIdentityDao.selectByUserName(user.getName());

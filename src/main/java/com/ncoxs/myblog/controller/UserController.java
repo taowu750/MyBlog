@@ -2,6 +2,7 @@ package com.ncoxs.myblog.controller;
 
 import com.ncoxs.myblog.constant.ParamValidateMsg;
 import com.ncoxs.myblog.constant.ParamValidateRule;
+import com.ncoxs.myblog.constant.RequestAttributeConst;
 import com.ncoxs.myblog.constant.ResultCode;
 import com.ncoxs.myblog.model.dto.GenericResult;
 import com.ncoxs.myblog.model.dto.UserAndIdentity;
@@ -35,7 +36,8 @@ public class UserController {
 
     @PutMapping("/{name}")
     @ResponseBody
-    public GenericResult<Object> register(User user) throws MessagingException {
+    public GenericResult<Object> register(@RequestAttribute(RequestAttributeConst.REQUEST_FLOW_ID) int requestFlowId,
+                                          User user) throws MessagingException {
         int exists = userService.existsUser(user.getName(), user.getEmail());
         if (exists == 0 && userService.registerUser(user)) {
             return GenericResult.success();
@@ -57,7 +59,8 @@ public class UserController {
     }
 
     @GetMapping("/account-activate/{identity}")
-    public ModelAndView accountActivate(@PathVariable("identity")
+    public ModelAndView accountActivate(@RequestAttribute(RequestAttributeConst.REQUEST_FLOW_ID) int requestFlowId,
+                                        @PathVariable("identity")
                                         @NotBlank(message = ParamValidateMsg.USER_ACTIVATE_IDENTITY_BLANK)
                                                 String identity) {
         User user = userService.activateUser(identity);
@@ -78,7 +81,8 @@ public class UserController {
 
     @GetMapping("/name/{name}")
     @ResponseBody
-    public GenericResult<UserAndIdentity> loginByName(@NotBlank(message = ParamValidateMsg.USER_NAME_BLANK)
+    public GenericResult<UserAndIdentity> loginByName(@RequestAttribute(RequestAttributeConst.REQUEST_FLOW_ID) int requestFlowId,
+                                                      @NotBlank(message = ParamValidateMsg.USER_NAME_BLANK)
                                                       @Pattern(regexp = ParamValidateRule.NAME_REGEX,
                                                               message = ParamValidateMsg.USER_NAME_FORMAT)
                                                       @PathVariable("name")
@@ -101,7 +105,8 @@ public class UserController {
 
     @GetMapping("/email/{email}")
     @ResponseBody
-    public GenericResult<UserAndIdentity> loginByEmail(@NotBlank(message = ParamValidateMsg.USER_NAME_BLANK)
+    public GenericResult<UserAndIdentity> loginByEmail(@RequestAttribute(RequestAttributeConst.REQUEST_FLOW_ID) int requestFlowId,
+                                                       @NotBlank(message = ParamValidateMsg.USER_NAME_BLANK)
                                                            @Pattern(regexp = ParamValidateRule.NAME_REGEX,
                                                                    message = ParamValidateMsg.USER_NAME_FORMAT)
                                                            @PathVariable("email")
