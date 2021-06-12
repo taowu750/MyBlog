@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ncoxs.myblog.dao.mysql.UserIdentityDao">
+
+    <resultMap id="BaseResultMap" type="com.ncoxs.myblog.model.pojo.UserIdentity">
+        <id column="id" jdbcType="INTEGER" property="id"/>
+        <result column="user_id" jdbcType="INTEGER" property="userId"/>
+        <result column="identity" jdbcType="VARCHAR" property="identity"/>
+        <result column="type" jdbcType="TINYINT" property="type"/>
+        <result column="source" jdbcType="VARCHAR" property="source"/>
+        <result column="expire" jdbcType="TIMESTAMP" property="expire"/>
+        <result column="create_time" jdbcType="TIMESTAMP" property="createTime"/>
+    </resultMap>
+
+    <sql id="AllColumns">
+        id, user_id, `identity`, `type`, `source`, expire, create_time
+    </sql>
+
+    <select id="selectById" parameterType="java.lang.Integer" resultMap="BaseResultMap">
+        select
+        <include refid="AllColumns"/>
+        from user_identity
+        where id = #{id,jdbcType=INTEGER}
+    </select>
+
+    <select id="selectByUserId" resultType="com.ncoxs.myblog.model.pojo.UserIdentity">
+        select <include refid="AllColumns"/>
+        from user_identity
+        where user_id=#{userId}
+    </select>
+
+    <select id="selectByIdentity" resultType="com.ncoxs.myblog.model.pojo.UserIdentity">
+        select <include refid="AllColumns"/>
+        from user_identity
+        where identity=#{identity} and source=#{source}
+    </select>
+
+    <select id="selectByUserName" resultType="com.ncoxs.myblog.model.pojo.UserIdentity">
+        select <include refid="AllColumns"/>
+        from user_identity ui join user u on u.id = ui.user_id
+        where u.name=#{username}
+    </select>
+
+    <insert id="insert" keyColumn="id" keyProperty="id" parameterType="com.ncoxs.myblog.model.pojo.UserIdentity"
+            useGeneratedKeys="true">
+        insert into user_identity (user_id, `identity`, `type`, <if test="source != null">`source`,</if> expire, create_time)
+        values (#{userId,jdbcType=INTEGER}, #{identity,jdbcType=VARCHAR}, #{type,jdbcType=TINYINT},
+        <if test="source != null">#{source,jdbcType=VARCHAR},</if> #{expire,jdbcType=TIMESTAMP}, #{createTime,jdbcType=TIMESTAMP})
+    </insert>
+
+    <update id="updateByIdSelective" parameterType="com.ncoxs.myblog.model.pojo.UserIdentity">
+        update user_identity
+        <set>
+            <if test="userId != null">
+                user_id = #{userId,jdbcType=INTEGER},
+            </if>
+            <if test="identity != null">
+                `identity` = #{identity,jdbcType=VARCHAR},
+            </if>
+            <if test="type != null">
+                `type` = #{type,jdbcType=TINYINT},
+            </if>
+            <if test="source != null">
+                `source` = #{source,jdbcType=VARCHAR},
+            </if>
+            <if test="expire != null">
+                `expire` = #{expire,jdbcType=TIMESTAMP},
+            </if>
+            <if test="createTime != null">
+                create_time = #{createTime,jdbcType=TIMESTAMP},
+            </if>
+        </set>
+        where id = #{id,jdbcType=INTEGER}
+    </update>
+
+    <delete id="deleteById" parameterType="java.lang.Integer">
+        delete
+        from user_identity
+        where id = #{id,jdbcType=INTEGER}
+    </delete>
+
+    <delete id="deleteByUserId">
+        delete from user_identity where user_id=#{userId}
+    </delete>
+
+    <delete id="deleteByIdentity">
+        delete from user_identity where identity=#{identity}
+    </delete>
+
+    <delete id="deleteByUserIdAndSource">
+        delete from user_identity where user_id=#{userId} and source=#{source}
+    </delete>
+</mapper>

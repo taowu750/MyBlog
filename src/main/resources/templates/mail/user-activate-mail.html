@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="zh" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8"/>
+  <title>账号激活</title>
+</head>
+<body>
+<p>
+  亲爱的<span th:text="${username}">用户</span>，您的账号还需要激活才能正常使用。
+</p>
+<p>
+  请点击下方链接快速激活，或者将网址复制到浏览器地址栏回车后激活：
+</p>
+<a th:text="${activateUrl}" th:href="${activateUrl}"></a>
+
+</body>
+</html>

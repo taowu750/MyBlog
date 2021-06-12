@@ -1,0 +1,45 @@
+spring:
+  mvc:
+    servlet:
+      path: /my-blog
+  freemarker:
+    suffix: .html
+  redis:
+    jedis:
+      pool:
+        max-idle: 10
+        max-active: -1
+        max-wait: 20000
+  datasource:
+    type: com.alibaba.druid.pool.DruidDataSource
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://localhost:3306/my_blog?allowMultiQueries=true
+    username: root
+    password: wtdsg
+  mail:
+    protocol: smtp
+    host: smtp.qq.com
+    port: 587
+    username: 2691320794@qq.com
+    password: suqgitaxurehdgaj
+    test-connection: false
+    properties:
+      mail:
+        smtp:
+          auth: false
+        debug: false
+        mime:
+          splitlongparameters: false
+    default-encoding: UTF-8
+
+mybatis:
+  mapper-locations: classpath:/mappers/*.xml
+  type-aliases-package: com.wutaodsg.redisdemo.model
+  configuration:
+    map-underscore-to-camel-case: true
+    use-actual-param-name: true
+
+# 显示 dao 执⾏ sql 语句
+logging:
+  level:
+    com.wutaodsg.redisdemo.dao: debug

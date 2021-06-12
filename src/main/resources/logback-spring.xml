@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- scan:当此属性设置为true时，配置文件如果发生改变，将会被重新加载，默认值为true。 -->
+<!-- scanPeriod:设置监测配置文件是否有修改的时间间隔，如果没有给出时间单位，默认单位是毫秒。 -->
+<!-- debug:当此属性设置为true时，将打印出logback内部日志信息，实时查看logback运行状态。默认值为false。 -->
+<configuration scan="true" scanPeriod="5 minutes" debug="false">
+
+    <property name="logdir" value="/home/wutao/log/my_blog"/>
+    <property name="appname" value="my_blog"/>
+
+    <!--输出到控制台 ConsoleAppender-->
+    <appender name="consoleLog" class="ch.qos.logback.core.ConsoleAppender">
+        <!--展示格式 layout-->
+        <layout class="ch.qos.logback.classic.PatternLayout">
+            <pattern>%d{yyyy-MM-dd HH:mm:ss} %highlight(%-5level) %magenta(${PID:-}) %white(---) %-20(%yellow([%20.20thread])) %-55(%cyan(%.32logger{30}:%L)) %highlight(- %msg%n)</pattern>
+        </layout>
+    </appender>
+
+    <appender name="fileLog" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <!-- 企业中一般是放在一起的，通过日期切割。这样方便查看上下文，并且可以统一处理 -->
+        <!-- 只记录 Info 级别的日志
+        <filter class="ch.qos.logback.classic.filter.LevelFilter">
+            &lt;!&ndash;过滤 INFO&ndash;&gt;
+            <level>INFO</level>
+            &lt;!&ndash;匹配到就允许&ndash;&gt;
+            <onMatch>ACCEPT</onMatch>
+            &lt;!&ndash;没有匹配到就禁止&ndash;&gt;
+            <onMismatch>DENY</onMismatch>
+        </filter>-->
+        <!--日志名称，如果没有File 属性，那么只会使用FileNamePattern的文件路径规则
+            如果同时有<File>和<FileNamePattern>，那么当天日志是<File>，明天会自动把今天
+            的日志改名为今天的日期。即，<File> 的日志都是当天的。
+        -->
+        <File>${logdir}/${appname}.log</File>
+        <!--滚动策略，按照时间滚动 TimeBasedRollingPolicy-->
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <!--文件路径,定义了日志的切分方式——把每一天的日志归档到一个文件中,以防止日志填满整个磁盘空间-->
+            <FileNamePattern>${logdir}/${appname}.%d{yyyy-MM-dd}.log</FileNamePattern>
+            <!--只保留最近90天的日志-->
+            <maxHistory>90</maxHistory>
+            <!--用来指定日志文件的上限大小，那么到了这个值，就会删除旧的日志-->
+            <totalSizeCap>1GB</totalSizeCap>
+        </rollingPolicy>
+        <!--日志输出编码格式化-->
+        <encoder>
+            <charset>UTF-8</charset>
+            <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <!--  <logger>用来设置某一个包或者具体的某一个类的日志打印级别、以及指定<appender>  -->
+    <!--  name:用来指定受此logger约束的某一个包或者具体的某一个类。  -->
+    <!--  level:用来设置打印级别，大小写无关  -->
+    <!--  additivity:是否向上级logger传递打印信息。默认是true。  -->
+    <logger name="com.ncoxs.myblog.dao.mysql" level="DEBUG" additivity="false">
+        <appender-ref ref="consoleLog"/>
+    </logger>
+
+    <!--指定最基础的日志输出级别-->
+    <root level="INFO">
+        <appender-ref ref="consoleLog"/>
+        <appender-ref ref="fileLog"/>
+    </root>
+
+</configuration>
