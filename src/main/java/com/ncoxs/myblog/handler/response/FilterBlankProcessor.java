@@ -82,7 +82,6 @@ public class FilterBlankProcessor {
                 FieldFilter[] fieldFilters = doProcess(value);
                 if (fieldFilters != null) {
                     FieldFilter filter = new ObjectFieldFilter(field, finalUsedFilter, fieldFilters);
-                    filter.filter(value);
                     filters.add(filter);
                 }
             } else if (finalUsedFilter != null) {
@@ -186,12 +185,18 @@ public class FilterBlankProcessor {
 
         FieldFilter(Field field, FilterBlank filterBlank) {
             this.field = field;
-            this.alwaysNull = filterBlank.alwaysNull();
+            if (filterBlank != null) {
+                this.alwaysNull = filterBlank.alwaysNull();
+            }
         }
 
         protected abstract void doFilter(Object obj) throws IllegalAccessException;
 
         void filter(Object obj) throws IllegalAccessException {
+            if (obj == null) {
+                return;
+            }
+
             field.setAccessible(true);
             if (alwaysNull) {
                 field.set(obj, null);
@@ -290,8 +295,11 @@ public class FilterBlankProcessor {
 
         @Override
         protected void doFilter(Object obj) throws IllegalAccessException {
-            for (FieldFilter fieldFilter : fieldFilters) {
-                fieldFilter.filter(obj);
+            Object value = field.get(obj);
+            if (value != null) {
+                for (FieldFilter fieldFilter : fieldFilters) {
+                    fieldFilter.filter(value);
+                }
             }
         }
     }
@@ -307,7 +315,7 @@ public class FilterBlankProcessor {
 
         @Override
         protected void doFilter(Object obj) throws IllegalAccessException {
-            Collection<?> collection = (Collection<?>) obj;
+            Collection<?> collection = (Collection<?>) field.get(obj);
             for (FieldFilter elementFilter : elementFilters) {
                 elementFilter.field.setAccessible(true);
                 for (Object o : collection) {
@@ -334,7 +342,7 @@ public class FilterBlankProcessor {
 
         @Override
         protected void doFilter(Object obj) throws IllegalAccessException {
-            Date date = (Date) obj;
+            Date date = (Date) field.get(obj);
             if (date != null) {
                 for (Date blankDate : blankDates) {
                     if (blankDate.equals(date)) {
