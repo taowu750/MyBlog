@@ -34,7 +34,7 @@ public class UserController {
     }
 
 
-    @PutMapping("/{name}")
+    @PutMapping("/register/{name}")
     @ResponseBody
     public GenericResult<Object> register(@RequestAttribute(RequestAttributeConst.REQUEST_FLOW_ID) int requestFlowId,
                                           User user) throws MessagingException {
@@ -92,13 +92,15 @@ public class UserController {
                                                               message = ParamValidateMsg.USER_PASSWORD_FORMAT)
                                                       @RequestParam("password")
                                                               String password,
+                                                      @RequestParam(required = false)
                                                       @Min(value = ParamValidateRule.LOGIN_REMEMBER_DAYS_MIN,
                                                               message = ParamValidateMsg.USER_LOGIN_REMEMBER_DAYS_MIN)
                                                       @Max(value = ParamValidateRule.LOGIN_REMEMBER_DAYS_MAX,
                                                               message = ParamValidateMsg.USER_LOGIN_REMEMBER_DAYS_MAX)
-                                                              int rememberDays,
-                                                      @NotBlank(message = ParamValidateMsg.USER_IDENTITY_SOURCE_BLANK)
-                                                              String source) {
+                                                              Integer rememberDays,
+                                                      @RequestParam(required = false) String source) {
+        rememberDays = rememberDays != null ? rememberDays : 0;
+        source = source != null ? source : "";
         UserAndIdentity userAndIdentity = userService.loginUserByName(name, password, rememberDays, source);
         return checkUserAndIdentity(userAndIdentity);
     }
@@ -107,22 +109,24 @@ public class UserController {
     @ResponseBody
     public GenericResult<UserAndIdentity> loginByEmail(@RequestAttribute(RequestAttributeConst.REQUEST_FLOW_ID) int requestFlowId,
                                                        @NotBlank(message = ParamValidateMsg.USER_NAME_BLANK)
-                                                           @Pattern(regexp = ParamValidateRule.NAME_REGEX,
-                                                                   message = ParamValidateMsg.USER_NAME_FORMAT)
-                                                           @PathVariable("email")
-                                                                   String email,
+                                                       @Pattern(regexp = ParamValidateRule.EMAIL_REGEX,
+                                                               message = ParamValidateMsg.USER_EMAIL_FORMAT)
+                                                       @PathVariable("email")
+                                                               String email,
                                                        @NotBlank(message = ParamValidateMsg.USER_PASSWORD_BLANK)
-                                                           @Pattern(regexp = ParamValidateRule.PASSWORD_REGEX,
-                                                                   message = ParamValidateMsg.USER_PASSWORD_FORMAT)
-                                                           @RequestParam("password")
-                                                                   String password,
+                                                       @Pattern(regexp = ParamValidateRule.PASSWORD_REGEX,
+                                                               message = ParamValidateMsg.USER_PASSWORD_FORMAT)
+                                                       @RequestParam("password")
+                                                               String password,
+                                                       @RequestParam(required = false)
                                                        @Min(value = ParamValidateRule.LOGIN_REMEMBER_DAYS_MIN,
                                                                message = ParamValidateMsg.USER_LOGIN_REMEMBER_DAYS_MIN)
-                                                           @Max(value = ParamValidateRule.LOGIN_REMEMBER_DAYS_MAX,
-                                                                   message = ParamValidateMsg.USER_LOGIN_REMEMBER_DAYS_MAX)
-                                                                   int rememberDays,
-                                                       @NotBlank(message = ParamValidateMsg.USER_IDENTITY_SOURCE_BLANK)
-                                                                   String source) {
+                                                       @Max(value = ParamValidateRule.LOGIN_REMEMBER_DAYS_MAX,
+                                                               message = ParamValidateMsg.USER_LOGIN_REMEMBER_DAYS_MAX)
+                                                               Integer rememberDays,
+                                                       @RequestParam(required = false) String source) {
+        rememberDays = rememberDays != null ? rememberDays : 0;
+        source = source != null ? source : "";
         UserAndIdentity userAndIdentity = userService.loginUserByEmail(email, password, rememberDays, source);
         return checkUserAndIdentity(userAndIdentity);
     }

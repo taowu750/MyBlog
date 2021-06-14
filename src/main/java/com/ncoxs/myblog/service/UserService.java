@@ -68,10 +68,6 @@ public class UserService {
     }
 
 
-    public static final User USER_ACTIVATED = new User();
-    public static final User USER_EXPIRED = new User();
-
-
     /**
      * 判断用户信息是否存在。
      * - 返回 0 表示用户名和邮箱都不存在
@@ -129,6 +125,9 @@ public class UserService {
         return true;
     }
 
+    public static final User USER_ACTIVATED = new User();
+    public static final User USER_EXPIRED = new User();
+
     /**
      * 激活具有指定标识的用户。
      */
@@ -169,6 +168,7 @@ public class UserService {
         // 将已激活的用户缓存到 redis 中
         user.setState(UserState.NORMAL.getState());
         user.setStateNote(UserState.NORMAL.getStateNote());
+        user.setLimitTime(TimeUtil.EMPTY_DATE);
         redisUserDao.setUser(user);
 
         return user;
@@ -232,7 +232,7 @@ public class UserService {
         if (actualPassword.equals(user.getPassword())) {
             result.setUser(user);
             // 如果登录时选择了“记住我”的选项，则删除上一个登录标识，插入新的登录标识
-            if (rememberDays > 0) {
+            if (rememberDays > 0 && StringUtils.hasText(source)) {
                 UserIdentity userIdentity = newLoginIdentity(user, rememberDays, source);
                 String identity = userIdentity.getIdentity();
                 result.setIdentity(identity);
