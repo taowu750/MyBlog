@@ -1,8 +1,11 @@
 package com.ncoxs.myblog.conf;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.task.AsyncTaskExecutor;
+import org.springframework.http.converter.json.Jackson2ObjectMapperBuilder;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 import org.springframework.util.ReflectionUtils;
@@ -45,5 +48,14 @@ public class MainConfiguration {
         scheduler.afterPropertiesSet();
 
         return scheduler;
+    }
+
+    @Bean
+    public ObjectMapper jacksonObjectMapper(Jackson2ObjectMapperBuilder builder) {
+        ObjectMapper objectMapper = builder.createXmlMapper(false).build();
+        // 不序列化 null 和 ""
+        objectMapper.setSerializationInclusion(JsonInclude.Include.NON_EMPTY);
+
+        return objectMapper;
     }
 }
