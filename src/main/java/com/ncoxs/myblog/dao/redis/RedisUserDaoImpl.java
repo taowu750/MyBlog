@@ -202,4 +202,21 @@ public class RedisUserDaoImpl extends AbstractRedisDao<Object> implements RedisU
             unbindConnection();
         }
     }
+
+    @Override
+    @RedisMethod(returnKeyId = 1)
+    @RedisKey(prefix = {KEY_DOMAIN, KEY_NAME2ID}, key = "#name")
+    public User deleteUserByName(String name) {
+        bindConnection();
+        try {
+            Integer id = (Integer) invoke("deleteUserByName", name);
+            if (id != null) {
+                return deleteUserById(id);
+            }
+
+            return null;
+        } finally {
+            unbindConnection();
+        }
+    }
 }

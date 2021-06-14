@@ -89,4 +89,10 @@ public interface RedisUserDao {
      * 存在的话返回用户对象，否则返回 null
      */
     User deleteUserByIdentity(String identity, String source);
+
+    /**
+     * 根据用户名称删除此用户的所有缓存数据，包括 id、name、email、identity 键值对。
+     * 存在的话返回用户对象，否则返回 null
+     */
+    User deleteUserByName(String name);
 }
