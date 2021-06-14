@@ -17,6 +17,14 @@ public class GenericResult<T> implements Serializable {
     private T data;
 
 
+    /**
+     * 此构造器是为了测试是能从 json 字符串反序列化回来。
+     */
+    public GenericResult() {
+        code = ResultCode.SUCCESS.getCode();
+        message = ResultCode.SUCCESS.getMessage();
+    }
+
     public GenericResult(ResultCode resultCode) {
         code = resultCode.getCode();
         message = resultCode.getMessage();
