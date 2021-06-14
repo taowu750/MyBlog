@@ -46,7 +46,7 @@ public class ControllerLogAspect {
 
         StringBuilder logStr = new StringBuilder();
         if (requestFlowIdParamIdx == -1) {
-            logStr.append(className).append('.').append(methodName).append(" enter ==> ");
+            logStr.append(className).append('.').append(methodName).append("() ==> ");
             for (int i = 0; i < parameterNames.length; i++) {
                 logStr.append(parameterNames[i]).append('=').append(args[i]);
                 if (i != parameterNames.length - 1) {
@@ -55,7 +55,7 @@ public class ControllerLogAspect {
             }
         } else {
             logStr.append("requestFlowId(").append(args[requestFlowIdParamIdx]).append(") ")
-                    .append(className).append('.').append(methodName).append(" enter ==> ");
+                    .append(className).append('.').append(methodName).append("() ==> ");
             for (int i = 0; i < parameterNames.length; i++) {
                 if (i != requestFlowIdParamIdx) {
                     logStr.append(parameterNames[i]).append('=').append(args[i]);
@@ -76,7 +76,7 @@ public class ControllerLogAspect {
         String className = joinPoint.getTarget().getClass().getName();
         String methodName = methodSignature.getName();
 
-        String info = className + "." + methodName + " exit <== " + result;
+        String info = className + "." + methodName + "() <== " + result;
         if (requestFlowIdParamIdx == -1) {
             log.info(info);
         } else {
