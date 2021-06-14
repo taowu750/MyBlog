@@ -24,6 +24,8 @@ public interface UserIdentityDao {
 
     int deleteByUserId(int userId);
 
+    int deleteByUsername(String username);
+
     boolean deleteByIdentity(String identity);
 
     boolean deleteByUserIdAndSource(int userId, String source);

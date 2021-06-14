@@ -17,6 +17,10 @@ public interface UserDao {
 
     User selectByEmail(String email);
 
+    /**
+     * 根据 identity 和 source 选择 user。
+     * 如果参数 source 为 null，则不使用此参数。
+     */
     User selectByIdentity(String identity, String source);
 
     boolean existsName(String name);

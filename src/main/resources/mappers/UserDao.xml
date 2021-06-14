@@ -49,7 +49,7 @@
     <select id="selectByIdentity" resultType="com.ncoxs.myblog.model.pojo.User">
         select <include refid="AllColumns"/>
         from user
-        where id=(select user_id from user_identity where identity=#{identity} and source=#{source})
+        where id=(select user_id from user_identity where identity=#{identity}<if test="source != null"> and source=#{source}</if>)
     </select>
 
     <select id="selectByEmail" resultType="com.ncoxs.myblog.model.pojo.User">

@@ -36,7 +36,7 @@
     </select>
 
     <select id="selectByUserName" resultType="com.ncoxs.myblog.model.pojo.UserIdentity">
-        select <include refid="AllColumns"/>
+        select ui.id, user_id, `identity`, `type`, `source`, expire, ui.create_time
         from user_identity ui join user u on u.id = ui.user_id
         where u.name=#{username}
     </select>
@@ -89,5 +89,9 @@
 
     <delete id="deleteByUserIdAndSource">
         delete from user_identity where user_id=#{userId} and source=#{source}
+    </delete>
+
+    <delete id="deleteByUsername">
+        delete from ui USING user_identity ui, user u where ui.user_id=u.id and name=#{username}
     </delete>
 </mapper>
