@@ -24,8 +24,7 @@ import org.springframework.web.servlet.ModelAndView;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -54,7 +53,7 @@ public class UserControllerTest {
 
     @Test
     public void testRegister() throws Exception {
-        mockMvc.perform(put("/user/register/{name}", "test")
+        mockMvc.perform(post("/user/register/{name}", "test")
                 .param("email", "wutaoyx163@163.com")
                 .param("password", "12345")
                 .accept(MediaType.APPLICATION_JSON_UTF8_VALUE))
@@ -63,7 +62,7 @@ public class UserControllerTest {
                 .andExpect(jsonPath("$.code").value(ResultCode.SUCCESS.getCode()))
                 .andDo(print());
 
-        mockMvc.perform(put("/user/register/{name}", "test")
+        mockMvc.perform(post("/user/register/{name}", "test")
                 .param("email", "wutaoyx163@163.com")
                 .param("password", "12345")
                 .accept(MediaType.APPLICATION_JSON_UTF8_VALUE))
@@ -97,7 +96,7 @@ public class UserControllerTest {
         user.setEmail("wutaoyx163@163.com");
         user.setPassword("12345");
 
-        mockMvc.perform(put("/user/register/{name}", "test")
+        mockMvc.perform(post("/user/register/{name}", "test")
                 .param("email", "wutaoyx163@163.com")
                 .param("password", "12345"))
                 .andExpect(jsonPath("$.code").value(ResultCode.SUCCESS.getCode()));
@@ -164,7 +163,7 @@ public class UserControllerTest {
             registerTestUser();
             activateTestUser();
 
-            MvcResult mvcResult = mockMvc.perform(get("/user/name/{name}", "test")
+            MvcResult mvcResult = mockMvc.perform(post("/user/login/name/{name}", "test")
                     .param("password", "12345")
                     .accept(MediaType.APPLICATION_JSON_UTF8))
                     .andExpect(status().isOk())
@@ -182,7 +181,7 @@ public class UserControllerTest {
             assertEquals("test", userAndIdentity.getUser().getName());
             assertNull(userAndIdentity.getUser().getPassword());
 
-            mvcResult = mockMvc.perform(get("/user/email/{email}", "wutaoyx163@163.com")
+            mvcResult = mockMvc.perform(post("/user/login/email/{email}", "wutaoyx163@163.com")
                     .param("password", "12345")
                     .param("rememberDays", String.valueOf(10))
                     .param("source", "source")

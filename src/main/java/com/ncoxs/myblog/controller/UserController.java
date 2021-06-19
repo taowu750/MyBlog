@@ -35,7 +35,7 @@ public class UserController {
     }
 
 
-    @PutMapping("/register/{name}")
+    @PostMapping("/register/{name}")
     @ResponseBody
     public GenericResult<Object> register(@RequestAttribute(RequestAttributeConst.REQUEST_FLOW_ID) int requestFlowId,
                                           User user) throws MessagingException {
@@ -98,7 +98,7 @@ public class UserController {
         public String source;
     }
 
-    @GetMapping("/name/{name}")
+    @PostMapping("/login/name/{name}")
     @ResponseBody
     public GenericResult<UserAndIdentity> loginByName(@RequestAttribute(RequestAttributeConst.REQUEST_FLOW_ID) int requestFlowId,
                                                       LoginByNameReq loginByNameReq) {
@@ -127,7 +127,7 @@ public class UserController {
         public String source;
     }
 
-    @GetMapping("/email/{email}")
+    @PostMapping("/login/email/{email}")
     @ResponseBody
     public GenericResult<UserAndIdentity> loginByEmail(@RequestAttribute(RequestAttributeConst.REQUEST_FLOW_ID) int requestFlowId,
                                                        LoginByEmailReq loginByEmailReq) {
