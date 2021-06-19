@@ -13,6 +13,7 @@ public interface ParamValidateMsg {
     String USER_PASSWORD_BLANK = "user.password.blank:密码不能为空";
     String USER_PASSWORD_FORMAT = "user.password.format:密码格式错误";
 
+    String USER_EMAIL_BLANK = "user.password.blank:邮箱不能为空";
     String USER_EMAIL_FORMAT = "user.email.format:邮箱格式错误";
 
     String USER_ACTIVATE_IDENTITY_BLANK = "user.activate_identity.blank:用户激活标识不能为空";

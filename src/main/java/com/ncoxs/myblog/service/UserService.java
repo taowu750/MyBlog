@@ -177,10 +177,10 @@ public class UserService {
     /**
      * 根据用户名和密码进行登录。如果选择了“记住我”，则还会返回新的登录标识。
      *
-     * @param name 用户名
-     * @param password 密码
+     * @param name         用户名
+     * @param password     密码
      * @param rememberDays 记住多少天
-     * @param source 客户端标识
+     * @param source       客户端标识
      * @return User 对象和登录标识
      */
     @Transactional(isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
@@ -203,10 +203,10 @@ public class UserService {
     /**
      * 根据用户邮箱和密码进行登录。如果选择了“记住我”，则还会返回新的登录标识。
      *
-     * @param email 邮箱
-     * @param password 密码
+     * @param email        邮箱
+     * @param password     密码
      * @param rememberDays 记住多少天
-     * @param source 客户端标识
+     * @param source       客户端标识
      * @return User 对象和登录标识
      */
     @Transactional(isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
@@ -254,7 +254,8 @@ public class UserService {
                 return null;
             }
             // 过期则删除并返回 null
-            if (userIdentity.getExpire().getTime() > System.currentTimeMillis()) {
+            if (!userIdentity.getExpire().equals(TimeUtil.EMPTY_DATE)
+                    && userIdentity.getExpire().getTime() < System.currentTimeMillis()) {
                 userIdentityDao.deleteByIdentity(loginIdentity);
                 return null;
             }
@@ -308,9 +309,9 @@ public class UserService {
     /**
      * 创建一个用户登录标识对象。
      *
-     * @param user 用户对象
+     * @param user         用户对象
      * @param rememberDays 登录标识过期时间（天）
-     * @param source 登录客户端来源
+     * @param source       登录客户端来源
      * @return UserIdentity 对象
      */
     public UserIdentity newLoginIdentity(User user, int rememberDays, String source) {
