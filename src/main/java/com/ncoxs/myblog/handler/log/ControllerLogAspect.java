@@ -10,6 +10,8 @@ import org.aspectj.lang.annotation.Pointcut;
 import org.aspectj.lang.reflect.MethodSignature;
 import org.springframework.stereotype.Component;
 import org.springframework.web.bind.annotation.RequestAttribute;
+import org.springframework.web.context.request.RequestAttributes;
+import org.springframework.web.context.request.RequestContextHolder;
 
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
@@ -36,6 +38,8 @@ public class ControllerLogAspect {
 
     @Before("controllerMethodPointCut()")
     public void enterLog(JoinPoint joinPoint) {
+        Long requestFlowId = (Long) RequestContextHolder.currentRequestAttributes()
+                .getAttribute(RequestAttributeConst.REQUEST_FLOW_ID, RequestAttributes.SCOPE_REQUEST);
         MethodSignature methodSignature = (MethodSignature) joinPoint.getSignature();
         int requestFlowIdParamIdx = getRequestFlowIdParamIdx(methodSignature.getMethod());
 
@@ -45,8 +49,13 @@ public class ControllerLogAspect {
         Object[] args = joinPoint.getArgs();
 
         StringBuilder logStr = new StringBuilder();
-        if (requestFlowIdParamIdx == -1) {
+        if (requestFlowId == null) {
             logStr.append(className).append('.').append(methodName).append("() ==> ");
+        } else {
+            logStr.append("requestFlowId(").append(requestFlowId).append(") ")
+                    .append(className).append('.').append(methodName).append("() ==> ");
+        }
+        if (requestFlowIdParamIdx == -1) {
             for (int i = 0; i < parameterNames.length; i++) {
                 logStr.append(parameterNames[i]).append('=').append(args[i]);
                 if (i != parameterNames.length - 1) {
@@ -54,8 +63,6 @@ public class ControllerLogAspect {
                 }
             }
         } else {
-            logStr.append("requestFlowId(").append(args[requestFlowIdParamIdx]).append(") ")
-                    .append(className).append('.').append(methodName).append("() ==> ");
             for (int i = 0; i < parameterNames.length; i++) {
                 if (i != requestFlowIdParamIdx) {
                     logStr.append(parameterNames[i]).append('=').append(args[i]);
@@ -70,17 +77,17 @@ public class ControllerLogAspect {
 
     @AfterReturning(returning = "result", pointcut = "controllerMethodPointCut()")
     public void exitLog(JoinPoint joinPoint, Object result) {
+        Long requestFlowId = (Long) RequestContextHolder.currentRequestAttributes()
+                .getAttribute(RequestAttributeConst.REQUEST_FLOW_ID, RequestAttributes.SCOPE_REQUEST);
         MethodSignature methodSignature = (MethodSignature) joinPoint.getSignature();
-        int requestFlowIdParamIdx = getRequestFlowIdParamIdx(methodSignature.getMethod());
-
         String className = joinPoint.getTarget().getClass().getName();
         String methodName = methodSignature.getName();
 
         String info = className + "." + methodName + "() <== " + result;
-        if (requestFlowIdParamIdx == -1) {
+        if (requestFlowId == null) {
             log.info(info);
         } else {
-            log.info("requestFlowId(" + joinPoint.getArgs()[requestFlowIdParamIdx] + ") " + info);
+            log.info("requestFlowId(" + requestFlowId + ") " + info);
         }
     }
 
