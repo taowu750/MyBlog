@@ -1,20 +1,35 @@
 package com.ncoxs.myblog.util.general;
 
-import org.springframework.util.FastByteArrayOutputStream;
-
-import java.io.*;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.stream.Collectors;
 
 public class ResourceUtil {
 
-    private static final byte[] BYTES = new byte[1024];
-
     public static String classpath() {
-        return ResourceUtil.class.getClassLoader().getResource("").getPath();
+        return classpath("");
+    }
+
+    public static String classpath(String subPath) {
+        return ResourceUtil.class.getClassLoader().getResource(subPath).getPath();
     }
 
     public static InputStream load(String classpath) {
         return ResourceUtil.class.getClassLoader().getResourceAsStream(classpath);
+    }
+
+    public static InputStream loanByCreate(String classpath) throws IOException {
+        Path path = Paths.get(classpath(), classpath);
+        if (!Files.isRegularFile(path)) {
+            Files.createFile(path);
+        }
+
+        return load(classpath);
     }
 
     public static String loadString(String classpath) {
@@ -23,13 +38,6 @@ public class ResourceUtil {
     }
 
     public static byte[] loadBytes(String classpath) throws IOException {
-        try (FastByteArrayOutputStream buffer = new FastByteArrayOutputStream();
-             InputStream in = load(classpath)) {
-            int count;
-            while ((count = in.read(BYTES)) > 0) {
-                buffer.write(BYTES, 0, count);
-            }
-            return buffer.toByteArray();
-        }
+        return IOUtil.toByteArray(load(classpath));
     }
 }

@@ -1,6 +1,6 @@
 package com.ncoxs.myblog.handler.log;
 
-import com.ncoxs.myblog.constant.RequestAttributeConst;
+import com.ncoxs.myblog.constant.RequestAttributeKey;
 import com.ncoxs.myblog.util.general.ResourceUtil;
 import org.springframework.beans.factory.DisposableBean;
 import org.springframework.beans.factory.InitializingBean;
@@ -24,7 +24,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * 此拦截器为每个 request 定义一个流水号，方便后续在日志中标识哪些日志属于一个请求。
- * 流水号保存在 request 的 {@link RequestAttributeConst#REQUEST_FLOW_ID} 属性中。
+ * 流水号保存在 request 的 {@link RequestAttributeKey#REQUEST_FLOW_ID} 属性中。
  *
  * 流水号分配类似于数据库的自增主键，它会按照配置文件中的保存策略进行保存。
  */
@@ -118,7 +118,7 @@ public class RequestFLowIdInterceptor implements HandlerInterceptor, Initializin
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
         long flowId = requestFlowId.getAndIncrement();
-        request.setAttribute(RequestAttributeConst.REQUEST_FLOW_ID, flowId);
+        request.setAttribute(RequestAttributeKey.REQUEST_FLOW_ID, flowId);
         if (writePerRequest) {
             saveRequestFlowId(flowId);
         }

@@ -1,6 +1,6 @@
 package com.ncoxs.myblog.handler.log;
 
-import com.ncoxs.myblog.constant.RequestAttributeConst;
+import com.ncoxs.myblog.constant.RequestAttributeKey;
 import lombok.extern.slf4j.Slf4j;
 import org.aspectj.lang.JoinPoint;
 import org.aspectj.lang.annotation.AfterReturning;
@@ -26,7 +26,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class ControllerLogAspect {
 
     /**
-     * 保存每个方法参数中 {@link RequestAttributeConst#REQUEST_FLOW_ID} 的下标，
+     * 保存每个方法参数中 {@link RequestAttributeKey#REQUEST_FLOW_ID} 的下标，
      * 不存在则为 -1。
      */
     private ConcurrentHashMap<Method, Integer> CACHE = new ConcurrentHashMap<>();
@@ -39,7 +39,7 @@ public class ControllerLogAspect {
     @Before("controllerMethodPointCut()")
     public void enterLog(JoinPoint joinPoint) {
         Long requestFlowId = (Long) RequestContextHolder.currentRequestAttributes()
-                .getAttribute(RequestAttributeConst.REQUEST_FLOW_ID, RequestAttributes.SCOPE_REQUEST);
+                .getAttribute(RequestAttributeKey.REQUEST_FLOW_ID, RequestAttributes.SCOPE_REQUEST);
         MethodSignature methodSignature = (MethodSignature) joinPoint.getSignature();
         int requestFlowIdParamIdx = getRequestFlowIdParamIdx(methodSignature.getMethod());
 
@@ -78,7 +78,7 @@ public class ControllerLogAspect {
     @AfterReturning(returning = "result", pointcut = "controllerMethodPointCut()")
     public void exitLog(JoinPoint joinPoint, Object result) {
         Long requestFlowId = (Long) RequestContextHolder.currentRequestAttributes()
-                .getAttribute(RequestAttributeConst.REQUEST_FLOW_ID, RequestAttributes.SCOPE_REQUEST);
+                .getAttribute(RequestAttributeKey.REQUEST_FLOW_ID, RequestAttributes.SCOPE_REQUEST);
         MethodSignature methodSignature = (MethodSignature) joinPoint.getSignature();
         String className = joinPoint.getTarget().getClass().getName();
         String methodName = methodSignature.getName();
@@ -102,8 +102,8 @@ public class ControllerLogAspect {
             for (int i = 0; i < parameters.length; i++) {
                 RequestAttribute[] requestAttribute = parameters[i].getAnnotationsByType(RequestAttribute.class);
                 if (requestAttribute.length > 0
-                        && (requestAttribute[0].value().equals(RequestAttributeConst.REQUEST_FLOW_ID)
-                        || requestAttribute[0].name().equals(RequestAttributeConst.REQUEST_FLOW_ID))) {
+                        && (requestAttribute[0].value().equals(RequestAttributeKey.REQUEST_FLOW_ID)
+                        || requestAttribute[0].name().equals(RequestAttributeKey.REQUEST_FLOW_ID))) {
                     requestFlowIdParamIdx = i;
                     break;
                 }
