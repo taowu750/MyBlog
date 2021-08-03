@@ -56,7 +56,7 @@ public class RSAUtil {
         return new Keys((RSAPublicKey) publicKey, (RSAPrivateKey) privateKey);
     }
 
-    public static byte[] encrypt(Keys keys, byte[] data)
+    public static byte[] encryptByPublic(Keys keys, byte[] data)
             throws InvalidKeySpecException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException, NoSuchPaddingException, NoSuchAlgorithmException {
         X509EncodedKeySpec x509EncodedKeySpec = new X509EncodedKeySpec(keys.publicKey.getEncoded());
         PublicKey publicKey = KEY_FACTORY.get().generatePublic(x509EncodedKeySpec);
@@ -66,12 +66,32 @@ public class RSAUtil {
         return cipher.doFinal(data);
     }
 
-    public static byte[] decrypt(Keys keys, byte[] data)
+    public static byte[] decryptByPrivate(Keys keys, byte[] data)
             throws InvalidKeySpecException, IllegalBlockSizeException, BadPaddingException, InvalidKeyException, NoSuchPaddingException, NoSuchAlgorithmException {
         PKCS8EncodedKeySpec pkcs8KeySpec = new PKCS8EncodedKeySpec(keys.privateKey.getEncoded());
         PrivateKey privateKey = KEY_FACTORY.get().generatePrivate(pkcs8KeySpec);
         Cipher cipher = Cipher.getInstance("RSA");
         cipher.init(Cipher.DECRYPT_MODE, privateKey);
+
+        return cipher.doFinal(data);
+    }
+
+    public static byte[] encryptByPrivate(Keys keys, byte[] data)
+            throws InvalidKeySpecException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException, NoSuchPaddingException, NoSuchAlgorithmException {
+        PKCS8EncodedKeySpec pkcs8KeySpec = new PKCS8EncodedKeySpec(keys.privateKey.getEncoded());
+        PrivateKey privateKey = KEY_FACTORY.get().generatePrivate(pkcs8KeySpec);
+        Cipher cipher = Cipher.getInstance("RSA");
+        cipher.init(Cipher.ENCRYPT_MODE, privateKey);
+
+        return cipher.doFinal(data);
+    }
+
+    public static byte[] decryptByPublic(Keys keys, byte[] data)
+            throws InvalidKeySpecException, IllegalBlockSizeException, BadPaddingException, InvalidKeyException, NoSuchPaddingException, NoSuchAlgorithmException {
+        X509EncodedKeySpec x509EncodedKeySpec = new X509EncodedKeySpec(keys.publicKey.getEncoded());
+        PublicKey publicKey = KEY_FACTORY.get().generatePublic(x509EncodedKeySpec);
+        Cipher cipher = Cipher.getInstance("RSA");
+        cipher.init(Cipher.DECRYPT_MODE, publicKey);
 
         return cipher.doFinal(data);
     }

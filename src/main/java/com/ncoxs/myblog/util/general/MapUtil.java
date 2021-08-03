@@ -1,8 +1,9 @@
 package com.ncoxs.myblog.util.general;
 
-import java.util.*;
-
-import static java.util.Arrays.asList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 
 public class MapUtil {
 
@@ -24,6 +25,39 @@ public class MapUtil {
         return new Pair<>(k, v);
     }
 
+    public static <K, V> Map<K, V> mp(Pair<K, V> p1) {
+        Objects.requireNonNull(p1);
+
+        Map<K, V> result = ofCap(1);
+        result.put(p1.key, p1.value);
+
+        return result;
+    }
+
+    public static <K, V> Map<K, V> mp(Pair<K, V> p1, Pair<K, V> p2) {
+        Objects.requireNonNull(p1);
+        Objects.requireNonNull(p2);
+
+        Map<K, V> result = ofCap(2);
+        result.put(p1.key, p1.value);
+        result.put(p2.key, p2.value);
+
+        return result;
+    }
+
+    public static <K, V> Map<K, V> mp(Pair<K, V> p1, Pair<K, V> p2, Pair<K, V> p3) {
+        Objects.requireNonNull(p1);
+        Objects.requireNonNull(p2);
+        Objects.requireNonNull(p3);
+
+        Map<K, V> result = ofCap(3);
+        result.put(p1.key, p1.value);
+        result.put(p2.key, p2.value);
+        result.put(p3.key, p3.value);
+
+        return result;
+    }
+
     public static <K, V> Map<K, V> mp(Pair<K, V>... pairs) {
         if (pairs.length == 0) {
             return new HashMap<>();
@@ -38,11 +72,25 @@ public class MapUtil {
     }
 
     public static <K, V> Map<K, V> mp(K key, V value) {
-        Objects.requireNonNull(key);
-        Objects.requireNonNull(value);
-
-        Map<K, V> result = new HashMap<>(2);
+        Map<K, V> result = ofCap(1);
         result.put(key, value);
+
+        return result;
+    }
+
+    public static <K, V> Map<K, V> mp(K k1, K k2, V v1, V v2) {
+        Map<K, V> result = ofCap(2);
+        result.put(k1, v1);
+        result.put(k2, v2);
+
+        return result;
+    }
+
+    public static <K, V> Map<K, V> mp(K k1, K k2, K k3, V v1, V v2, V v3) {
+        Map<K, V> result = ofCap(3);
+        result.put(k1, v1);
+        result.put(k2, v2);
+        result.put(k3, v3);
 
         return result;
     }
@@ -64,13 +112,5 @@ public class MapUtil {
             throw new IllegalArgumentException("There are duplicate keys");
 
         return result;
-    }
-
-    public static <K, V> Map<K, V> mp(K k1, K k2, V v1, V v2) {
-        return mp(asList(k1, k2), asList(v1, v2));
-    }
-
-    public static <K, V> Map<K, V> mp(K k1, K k2, K k3, V v1, V v2, V v3) {
-        return mp(asList(k1, k2, k3), asList(v1, v2, v3));
     }
 }

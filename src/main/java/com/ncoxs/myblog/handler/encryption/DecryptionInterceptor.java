@@ -11,7 +11,6 @@ import com.ncoxs.myblog.model.dto.GenericResult;
 import com.ncoxs.myblog.util.general.AESUtil;
 import com.ncoxs.myblog.util.general.RSAUtil;
 import com.ncoxs.myblog.util.general.ResourceUtil;
-import com.ncoxs.myblog.util.general.StringUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.PropertySource;
@@ -26,11 +25,23 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
 import java.security.spec.InvalidKeySpecException;
+import java.util.Base64;
 import java.util.Properties;
 
 
 /**
  * 对客户端请求数据解密。
+ *
+ * 加解密流程：
+ * 1. 客户端请求服务器的 RSA 公钥并保存。
+ * 2. 客户端 --> 服务器
+ * - 客户端使用 AES 加密数据，然后用 RSA 公钥加密 AES 秘钥后将其放在请求头中。
+ * - 服务器使用 RSA 私钥解密 AES 秘钥，然后用它解密数据
+ * 3. 服务器 --> 客户端
+ * - 服务器使用 AES 加密数据，然后用 RSA 私钥加密 AES 秘钥后将其放在响应头中。
+ * - 客户端使用 RSA 公钥解密 AES 秘钥，然后用它解密数据
+ *
+ * 注意 RSA 具有过期时间，返回 RSA 解密失败时，客户端需要重新请求 RSA 公钥。
  */
 @Component
 @PropertySource("classpath:app-props.properties")
@@ -53,52 +64,61 @@ public class DecryptionInterceptor implements HandlerInterceptor {
     }
 
 
-    private static final String RSA_PROP_PUBLIC_KEY = "public-key";
-    private static final String RSA_PROP_PRIVATE_KEY = "private-key";
-    private static final String RSA_PROP_EXPIRE = "expire";
+    private static final String PROP_RSA_PUBLIC_KEY = "public-key";
+    private static final String PROP_RSA_PRIVATE_KEY = "private-key";
+    private static final String PROP_RSA_EXPIRE = "expire";
+    private static final String REQUEST_ATTR_RSA_KEY = DecryptionInterceptor.class.getSimpleName() + ".rsaKeys";
 
 
-    private RSAUtil.Keys rsaKeys;
-    private long rsaKeysExpireTime;
+    private volatile RSAUtil.Keys rsaKeys;
+    private volatile long rsaKeysExpireTime;
     private Properties rsaProperties;
 
 
     /**
      * 获取 RSA 秘钥。
      */
-    public synchronized RSAUtil.Keys getRsaKeys() {
+    public RSAUtil.Keys getRsaKeys() {
         // 秘钥不存在
         if (rsaKeys == null) {
-            // 先从文件中获取
-            rsaProperties = new Properties();
-            try {
-                rsaProperties.load(ResourceUtil.loanByCreate(rsaKeysFilePath));
-            } catch (IOException e) {
-                throw new ImpossibleError(e);
-            }
-            // 文件中存在并且没有过期
-            if (rsaProperties.containsKey(RSA_PROP_PUBLIC_KEY)
-                    && (rsaKeysExpireTime = Long.parseLong(rsaProperties.getProperty(RSA_PROP_EXPIRE))) >= System.currentTimeMillis()) {
-                try {
-                    rsaKeys = RSAUtil.loadKeys(StringUtil.fromHexString(rsaProperties.getProperty(RSA_PROP_PUBLIC_KEY)),
-                            StringUtil.fromHexString(rsaProperties.getProperty(RSA_PROP_PRIVATE_KEY)));
-                } catch (InvalidKeySpecException e) {
-                    throw new ImpossibleError(e);
+            synchronized (this) {
+                if (rsaKeys == null) {
+                    // 先从文件中获取
+                    rsaProperties = new Properties();
+                    try {
+                        rsaProperties.load(ResourceUtil.loanByCreate(rsaKeysFilePath));
+                    } catch (IOException e) {
+                        throw new ImpossibleError(e);
+                    }
+                    // 文件中存在并且没有过期
+                    if (rsaProperties.containsKey(PROP_RSA_PUBLIC_KEY)
+                            && (rsaKeysExpireTime = Long.parseLong(rsaProperties.getProperty(PROP_RSA_EXPIRE))) >= System.currentTimeMillis()) {
+                        try {
+                            rsaKeys = RSAUtil.loadKeys(Base64.getDecoder().decode(rsaProperties.getProperty(PROP_RSA_PUBLIC_KEY)),
+                                    Base64.getDecoder().decode(rsaProperties.getProperty(PROP_RSA_PRIVATE_KEY)));
+                        } catch (InvalidKeySpecException e) {
+                            throw new ImpossibleError(e);
+                        }
+                    }
                 }
             }
         }
         // 秘钥已经过期，生成新的秘钥
         if (rsaKeys == null || rsaKeysExpireTime < System.currentTimeMillis()) {
-            rsaKeys = RSAUtil.generateKeys();
-            rsaKeysExpireTime = System.currentTimeMillis() + rsaKeysExpire;
-            // 保存秘钥到文件中
-            rsaProperties.setProperty(RSA_PROP_PUBLIC_KEY, StringUtil.toHexString(rsaKeys.publicKey.getEncoded()));
-            rsaProperties.setProperty(RSA_PROP_PRIVATE_KEY, StringUtil.toHexString(rsaKeys.privateKey.getEncoded()));
-            rsaProperties.setProperty(RSA_PROP_EXPIRE, String.valueOf(rsaKeysExpireTime));
-            try {
-                rsaProperties.store(new FileOutputStream(ResourceUtil.classpath(rsaKeysFilePath)), null);
-            } catch (IOException e) {
-                throw new ImpossibleError(e);
+            synchronized (this) {
+                if (rsaKeys == null || rsaKeysExpireTime < System.currentTimeMillis()) {
+                    rsaKeys = RSAUtil.generateKeys();
+                    rsaKeysExpireTime = System.currentTimeMillis() + rsaKeysExpire;
+                    // 保存秘钥到文件中
+                    rsaProperties.setProperty(PROP_RSA_PUBLIC_KEY, Base64.getEncoder().encodeToString(rsaKeys.publicKey.getEncoded()));
+                    rsaProperties.setProperty(PROP_RSA_PRIVATE_KEY, Base64.getEncoder().encodeToString(rsaKeys.privateKey.getEncoded()));
+                    rsaProperties.setProperty(PROP_RSA_EXPIRE, String.valueOf(rsaKeysExpireTime));
+                    try {
+                        rsaProperties.store(new FileOutputStream(ResourceUtil.classpath(rsaKeysFilePath)), null);
+                    } catch (IOException e) {
+                        throw new ImpossibleError(e);
+                    }
+                }
             }
         }
 
@@ -156,10 +176,11 @@ public class DecryptionInterceptor implements HandlerInterceptor {
             return false;
         }
 
-        // 使用 RSA 解密 AES 秘钥
+        // 使用 RSA 私钥解密 AES 秘钥
         byte[] aesKey;
         try {
-            aesKey = RSAUtil.decrypt(rsaKeys, encryptedAESKey.getBytes());
+            // TODO: 注意秘钥可能突然过期，导致解密失败
+            aesKey = RSAUtil.decryptByPrivate(getRsaKeys(), encryptedAESKey.getBytes());
         } catch (GeneralSecurityException e) {
             response.setStatus(403);
             response.getWriter().print(objectMapper.writeValueAsString(
@@ -188,8 +209,15 @@ public class DecryptionInterceptor implements HandlerInterceptor {
             }
 
             response.setHeader(HttpHeaderKey.ENCRYPTION_MODE, HttpHeaderConst.ENCRYPTION_MODE_FULL);
-            response.setHeader(HttpHeaderKey.REQUEST_ENCRYPTED_AES_KEY,
-                    StringUtil.toHexString(RSAUtil.encrypt(rsaKeys, aesKey)));
+            try {
+                // 使用 RSA 私钥加密 AES 秘钥
+                response.setHeader(HttpHeaderKey.REQUEST_ENCRYPTED_AES_KEY, Base64.getEncoder().encodeToString(
+                        RSAUtil.encryptByPrivate(getRsaKeys(), aesKey)));
+            } catch (GeneralSecurityException e) {
+                response.setStatus(403);
+                response.getWriter().print(objectMapper.writeValueAsString(
+                        GenericResult.error(ResultCode.REQUEST_RSA_ERROR)));
+            }
         } else {
             response.setHeader(HttpHeaderKey.ENCRYPTION_MODE, HttpHeaderConst.ENCRYPTION_MODE_NONE);
         }
