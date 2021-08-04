@@ -78,23 +78,6 @@ public class MapUtil {
         return result;
     }
 
-    public static <K, V> Map<K, V> mp(K k1, K k2, V v1, V v2) {
-        Map<K, V> result = ofCap(2);
-        result.put(k1, v1);
-        result.put(k2, v2);
-
-        return result;
-    }
-
-    public static <K, V> Map<K, V> mp(K k1, K k2, K k3, V v1, V v2, V v3) {
-        Map<K, V> result = ofCap(3);
-        result.put(k1, v1);
-        result.put(k2, v2);
-        result.put(k3, v3);
-
-        return result;
-    }
-
     public static <K, V> Map<K, V> mp(List<K> keys, List<V> values) {
         Objects.requireNonNull(keys);
         Objects.requireNonNull(values);

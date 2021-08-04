@@ -3,6 +3,7 @@ package com.ncoxs.myblog.controller;
 import com.ncoxs.myblog.constant.ParamValidateMsg;
 import com.ncoxs.myblog.constant.ParamValidateRule;
 import com.ncoxs.myblog.constant.ResultCode;
+import com.ncoxs.myblog.handler.encryption.Encryption;
 import com.ncoxs.myblog.model.dto.GenericResult;
 import com.ncoxs.myblog.model.dto.UserAndIdentity;
 import com.ncoxs.myblog.model.pojo.User;
@@ -36,6 +37,7 @@ public class UserController {
 
     @PostMapping("/register/{name}")
     @ResponseBody
+    @Encryption
     public GenericResult<Object> register(User user) throws MessagingException {
         int exists = userService.existsUser(user.getName(), user.getEmail());
         if (exists == 0 && userService.registerUser(user)) {
@@ -97,6 +99,7 @@ public class UserController {
 
     @PostMapping("/login/name/{name}")
     @ResponseBody
+    @Encryption
     public GenericResult<UserAndIdentity> loginByName(LoginByNameReq loginByNameReq) {
         loginByNameReq.rememberDays = loginByNameReq.rememberDays != null ? loginByNameReq.rememberDays : 0;
         loginByNameReq.source = loginByNameReq.source != null ? loginByNameReq.source : "";
@@ -125,6 +128,7 @@ public class UserController {
 
     @PostMapping("/login/email/{email}")
     @ResponseBody
+    @Encryption
     public GenericResult<UserAndIdentity> loginByEmail(LoginByEmailReq loginByEmailReq) {
         loginByEmailReq.rememberDays = loginByEmailReq.rememberDays != null ? loginByEmailReq.rememberDays : 0;
         loginByEmailReq.source = loginByEmailReq.source != null ? loginByEmailReq.source : "";

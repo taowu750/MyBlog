@@ -1,8 +1,10 @@
 package com.ncoxs.myblog.controller.system;
 
 import com.ncoxs.myblog.handler.encryption.DecryptionInterceptor;
+import com.ncoxs.myblog.model.dto.GenericResult;
 import com.ncoxs.myblog.util.general.RSAUtil;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -30,18 +32,18 @@ public class EncryptionController {
     /**
      * 获取服务器 RSA 公钥，用来加/解密 AES 秘钥。
      */
-    @RequestMapping("/rsa-public-key")
-    public Map<String, Object> getRsaPublicKey() {
+    @GetMapping("/rsa-public-key")
+    public GenericResult<Map<String, Object>> getRsaPublicKey() {
         RSAUtil.Keys keys = decryptionInterceptor.getRsaKeys();
-        return mp(kv("key", Base64.getEncoder().encodeToString(keys.publicKey.getEncoded())),
-                kv("expire", decryptionInterceptor.getRsaKeysExpireTime()));
+        return GenericResult.success(mp(kv("key", Base64.getEncoder().encodeToString(keys.publicKey.getEncoded())),
+                kv("expire", decryptionInterceptor.getRsaKeysExpireTime())));
     }
 
     /**
      * 获取服务器 RSA 秘钥过期时间。
      */
-    @RequestMapping("/rsa-public-key/expire")
-    public long getRsaExpireTime() {
-        return decryptionInterceptor.getRsaKeysExpireTime();
+    @GetMapping("/rsa-public-key/expire")
+    public GenericResult<Long> getRsaExpireTime() {
+        return GenericResult.success(decryptionInterceptor.getRsaKeysExpireTime());
     }
 }

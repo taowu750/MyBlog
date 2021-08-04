@@ -8,6 +8,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.converter.HttpMessageConverter;
 import org.springframework.http.server.ServerHttpRequest;
 import org.springframework.http.server.ServerHttpResponse;
+import org.springframework.http.server.ServletServerHttpRequest;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseBodyAdvice;
 
@@ -41,7 +42,7 @@ public class ResponseResultHandler implements ResponseBodyAdvice<Object> {
         让 EncryptJacksonHttpMessageConverter 能够进行加密。
          */
         if (methodParameter.getMethod() != null && methodParameter.getMethod().getAnnotation(Encryption.class) != null) {
-            HttpServletRequest request = (HttpServletRequest) serverHttpRequest;
+            HttpServletRequest request = ((ServletServerHttpRequest) serverHttpRequest).getServletRequest();
             request.setAttribute(RequestAttributeKey.NEED_ENCRYPT_RESPONSE_BODY, true);
         }
 

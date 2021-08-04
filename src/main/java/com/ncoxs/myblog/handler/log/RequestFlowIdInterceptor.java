@@ -30,7 +30,7 @@ import java.util.concurrent.atomic.AtomicLong;
  */
 @Component
 @PropertySource("classpath:app-props.properties")
-public class RequestFLowIdInterceptor implements HandlerInterceptor, InitializingBean, DisposableBean {
+public class RequestFlowIdInterceptor implements HandlerInterceptor, InitializingBean, DisposableBean {
     
     @Value("${request.flow-id.write-mode}")
     private String requestFlowIdWriteMode;

@@ -29,6 +29,7 @@ import java.util.Base64;
 import java.util.Properties;
 
 
+// TODO: GET 参数也需要加密
 /**
  * 对客户端请求数据解密。
  *
@@ -132,17 +133,15 @@ public class DecryptionInterceptor implements HandlerInterceptor {
 
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
-        // 未开启加密解密功能就返回 true
-        if (!enable) {
+        // 未开启加密解密功能，或者请求的是加解密相关功能控制器，就返回 true
+        if (!enable || request.getRequestURI().startsWith("/system/encryption")) {
             return true;
         }
 
         // 检查是否有 ENCRYPTION_MODE 请求头
         String encryptionMode = request.getHeader(HttpHeaderKey.ENCRYPTION_MODE);
         if (!HttpHeaderConst.isEncryptionMode(encryptionMode)) {
-            response.setStatus(403);
-            response.getWriter().print(objectMapper.writeValueAsString(
-                    GenericResult.error(ResultCode.REQUEST_NOT_ENCRYPTION_MODE_HEADER)));
+            writeErrorResult(response, ResultCode.REQUEST_NOT_ENCRYPTION_MODE_HEADER);
             return false;
         }
 
@@ -153,26 +152,20 @@ public class DecryptionInterceptor implements HandlerInterceptor {
 
         // 需要解密，验证客户端是否请求过 RSA 公钥
         if (rsaKeys == null) {
-            response.setStatus(403);
-            response.getWriter().print(objectMapper.writeValueAsString(
-                    GenericResult.error(ResultCode.REQUEST_NON_ENCRYPT_INIT)));
+            writeErrorResult(response, ResultCode.REQUEST_NON_ENCRYPT_INIT);
             return false;
         }
 
         // 验证 RSA key 是否过期
         if (rsaKeysExpireTime < System.currentTimeMillis()) {
-            response.setStatus(403);
-            response.getWriter().print(objectMapper.writeValueAsString(
-                    GenericResult.error(ResultCode.REQUEST_RSA_KEY_EXPIRE)));
+            writeErrorResult(response, ResultCode.REQUEST_RSA_KEY_EXPIRE);
             return false;
         }
 
         // 验证客户端是否提供 AES key
         String encryptedAESKey = request.getHeader(HttpHeaderKey.REQUEST_ENCRYPTED_AES_KEY);
         if (!StringUtils.hasText(encryptedAESKey)) {
-            response.setStatus(403);
-            response.getWriter().print(objectMapper.writeValueAsString(
-                    GenericResult.error(ResultCode.REQUEST_NOT_ENCRYPTED_AES_KEY)));
+            writeErrorResult(response, ResultCode.REQUEST_NOT_ENCRYPTED_AES_KEY);
             return false;
         }
 
@@ -180,11 +173,9 @@ public class DecryptionInterceptor implements HandlerInterceptor {
         byte[] aesKey;
         try {
             // TODO: 注意秘钥可能突然过期，导致解密失败
-            aesKey = RSAUtil.decryptByPrivate(getRsaKeys(), encryptedAESKey.getBytes());
+            aesKey = RSAUtil.decryptByPrivate(getRsaKeys(), Base64.getDecoder().decode(encryptedAESKey));
         } catch (GeneralSecurityException e) {
-            response.setStatus(403);
-            response.getWriter().print(objectMapper.writeValueAsString(
-                    GenericResult.error(ResultCode.REQUEST_RSA_ERROR)));
+            writeErrorResult(response, ResultCode.REQUEST_RSA_ERROR);
             return false;
         }
 
@@ -202,24 +193,26 @@ public class DecryptionInterceptor implements HandlerInterceptor {
         if (aesKey != null) {
             // 需要加密，验证客户端是否请求过 RSA 公钥
             if (rsaKeys == null) {
-                response.setStatus(403);
-                response.getWriter().print(objectMapper.writeValueAsString(
-                        GenericResult.error(ResultCode.REQUEST_NON_ENCRYPT_INIT)));
+                writeErrorResult(response, ResultCode.REQUEST_NON_ENCRYPT_INIT);
                 return;
             }
 
             response.setHeader(HttpHeaderKey.ENCRYPTION_MODE, HttpHeaderConst.ENCRYPTION_MODE_FULL);
             try {
                 // 使用 RSA 私钥加密 AES 秘钥
-                response.setHeader(HttpHeaderKey.REQUEST_ENCRYPTED_AES_KEY, Base64.getEncoder().encodeToString(
-                        RSAUtil.encryptByPrivate(getRsaKeys(), aesKey)));
+                aesKey = RSAUtil.encryptByPrivate(getRsaKeys(), aesKey);
+                response.setHeader(HttpHeaderKey.REQUEST_ENCRYPTED_AES_KEY, Base64.getEncoder().encodeToString(aesKey));
             } catch (GeneralSecurityException e) {
-                response.setStatus(403);
-                response.getWriter().print(objectMapper.writeValueAsString(
-                        GenericResult.error(ResultCode.REQUEST_RSA_ERROR)));
+                writeErrorResult(response, ResultCode.REQUEST_RSA_ERROR);
             }
         } else {
             response.setHeader(HttpHeaderKey.ENCRYPTION_MODE, HttpHeaderConst.ENCRYPTION_MODE_NONE);
         }
+    }
+
+    private void writeErrorResult(HttpServletResponse response, ResultCode resultCode) throws IOException {
+        response.setStatus(403);
+        response.setHeader("Content-Type", "application/json;charset=UTF-8");
+        response.getWriter().print(objectMapper.writeValueAsString(GenericResult.error(resultCode)));
     }
 }
