@@ -42,7 +42,8 @@ import java.util.Properties;
  * - 服务器使用 AES 加密数据，然后用 RSA 私钥加密 AES 秘钥后将其放在响应头中。
  * - 客户端使用 RSA 公钥解密 AES 秘钥，然后用它解密数据
  *
- * 注意 RSA 具有过期时间，返回 RSA 解密失败时，客户端需要重新请求 RSA 公钥。
+ * 注意 RSA 具有过期时间，当客户端请求时 RSA 已过期，则会返回已过期错误；
+ * 当服务器返回数据时 RSA 已过期，服务器会将新的 RSA 公钥和过期时间放在响应体中返回。
  */
 @Component
 @PropertySource("classpath:app-props.properties")
@@ -150,32 +151,44 @@ public class DecryptionInterceptor implements HandlerInterceptor {
             return true;
         }
 
+        // 检查是否有 RSA_EXPIRE 请求头
+        long clientRsaExpire = request.getDateHeader(HttpHeaderKey.RSA_EXPIRE);
+        if (clientRsaExpire < 0) {
+            writeErrorResult(response, ResultCode.REQUEST_NOT_ENCRYPTION_MODE_HEADER);
+            return false;
+        }
+
         // 需要解密，验证客户端是否请求过 RSA 公钥
         if (rsaKeys == null) {
-            writeErrorResult(response, ResultCode.REQUEST_NON_ENCRYPT_INIT);
+            writeErrorResult(response, ResultCode.ENCRYPTION_NON_ENCRYPT_INIT);
             return false;
         }
 
         // 验证 RSA key 是否过期
         if (rsaKeysExpireTime < System.currentTimeMillis()) {
-            writeErrorResult(response, ResultCode.REQUEST_RSA_KEY_EXPIRE);
+            writeErrorResult(response, ResultCode.ENCRYPTION_RSA_KEY_EXPIRE);
             return false;
         }
 
         // 验证客户端是否提供 AES key
         String encryptedAESKey = request.getHeader(HttpHeaderKey.REQUEST_ENCRYPTED_AES_KEY);
         if (!StringUtils.hasText(encryptedAESKey)) {
-            writeErrorResult(response, ResultCode.REQUEST_NOT_ENCRYPTED_AES_KEY);
+            writeErrorResult(response, ResultCode.ENCRYPTION_NOT_ENCRYPTED_AES_KEY);
             return false;
         }
 
         // 使用 RSA 私钥解密 AES 秘钥
         byte[] aesKey;
         try {
-            // TODO: 注意秘钥可能突然过期，导致解密失败
-            aesKey = RSAUtil.decryptByPrivate(getRsaKeys(), Base64.getDecoder().decode(encryptedAESKey));
+            getRsaKeys();
+            // 如果 RSA 秘钥过期，返回客户端错误结果
+            if (clientRsaExpire != rsaKeysExpireTime) {
+                writeErrorResult(response, ResultCode.ENCRYPTION_RSA_KEY_EXPIRE);
+                return false;
+            }
+            aesKey = RSAUtil.decryptByPrivate(rsaKeys, Base64.getDecoder().decode(encryptedAESKey));
         } catch (GeneralSecurityException e) {
-            writeErrorResult(response, ResultCode.REQUEST_RSA_ERROR);
+            writeErrorResult(response, ResultCode.ENCRYPTION_RSA_ERROR);
             return false;
         }
 
@@ -193,17 +206,31 @@ public class DecryptionInterceptor implements HandlerInterceptor {
         if (aesKey != null) {
             // 需要加密，验证客户端是否请求过 RSA 公钥
             if (rsaKeys == null) {
-                writeErrorResult(response, ResultCode.REQUEST_NON_ENCRYPT_INIT);
+                writeErrorResult(response, ResultCode.ENCRYPTION_NON_ENCRYPT_INIT);
                 return;
+            }
+
+            // 检查是否有 RSA_EXPIRE 请求头
+            long clientRsaExpire = request.getDateHeader(HttpHeaderKey.RSA_EXPIRE);
+            if (clientRsaExpire < 0) {
+                writeErrorResult(response, ResultCode.REQUEST_NOT_RSA_EXPIRE_HEADER);
+                return;
+            }
+            // 如果原来的 RSA 秘钥已过期，就在响应头中设置新的 RSA 公钥和过期时间
+            getRsaKeys();
+            if (clientRsaExpire != rsaKeysExpireTime) {
+                response.setHeader(HttpHeaderKey.NEW_RSA_PUBLIC_KEY, Base64.getEncoder().encodeToString(
+                        rsaKeys.publicKey.getEncoded()));
+                response.setHeader(HttpHeaderKey.RSA_EXPIRE, String.valueOf(rsaKeysExpireTime));
             }
 
             response.setHeader(HttpHeaderKey.ENCRYPTION_MODE, HttpHeaderConst.ENCRYPTION_MODE_FULL);
             try {
                 // 使用 RSA 私钥加密 AES 秘钥
-                aesKey = RSAUtil.encryptByPrivate(getRsaKeys(), aesKey);
+                aesKey = RSAUtil.encryptByPrivate(rsaKeys, aesKey);
                 response.setHeader(HttpHeaderKey.REQUEST_ENCRYPTED_AES_KEY, Base64.getEncoder().encodeToString(aesKey));
             } catch (GeneralSecurityException e) {
-                writeErrorResult(response, ResultCode.REQUEST_RSA_ERROR);
+                writeErrorResult(response, ResultCode.ENCRYPTION_RSA_ERROR);
             }
         } else {
             response.setHeader(HttpHeaderKey.ENCRYPTION_MODE, HttpHeaderConst.ENCRYPTION_MODE_NONE);
@@ -211,6 +238,7 @@ public class DecryptionInterceptor implements HandlerInterceptor {
     }
 
     private void writeErrorResult(HttpServletResponse response, ResultCode resultCode) throws IOException {
+        response.resetBuffer();
         response.setStatus(403);
         response.setHeader("Content-Type", "application/json;charset=UTF-8");
         response.getWriter().print(objectMapper.writeValueAsString(GenericResult.error(resultCode)));

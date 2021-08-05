@@ -13,7 +13,22 @@ public interface HttpHeaderKey {
      * 客户端传递的、被服务器 RSA 公钥加密的 AES key。
      * 或者服务器返回的、被 RSA 私钥加密的 AES key。
      *
-     * 当请求体或响应体被加密时，请求头中就必须带这个参数。
+     * 当请求体/响应体被加密时，请求头/响应头中就必须带这个参数。
      */
     String REQUEST_ENCRYPTED_AES_KEY = "_Encrypted-AES-Key";
+
+    /**
+     * 客户端传递的 RSA 公钥的过期时间。
+     * - 如果服务器接收数据时发现 RSA 公钥已过期，会返回 RSA 已过期错误。
+     * - 如果服务器返回数据时发现 RSA 公钥已过期，会返回给客户端新的 RSA 公钥和过期时间（也是这个参数）。
+     *
+     * 当请求体或响应体被加密时，请求头中就必须带这个参数。
+     */
+    String RSA_EXPIRE = "_RSA-Expire";
+
+    /**
+     * 如果服务器返回数据时发现 RSA 公钥已过期，返回给客户端的新的 RSA 公钥；
+     * 同时也会返回新的 RSA 公钥的过期时间 {@link #RSA_EXPIRE}。
+     */
+    String NEW_RSA_PUBLIC_KEY = "_New-RSA-Public-Key";
 }
