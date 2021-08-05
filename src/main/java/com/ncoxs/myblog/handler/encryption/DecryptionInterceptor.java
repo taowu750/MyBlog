@@ -31,7 +31,6 @@ import java.util.Base64;
 import java.util.Properties;
 
 
-// TODO: GET 参数也需要加密
 /**
  * 对客户端请求数据解密。
  *
