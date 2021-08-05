@@ -11,9 +11,11 @@ import com.ncoxs.myblog.model.dto.GenericResult;
 import com.ncoxs.myblog.util.general.AESUtil;
 import com.ncoxs.myblog.util.general.RSAUtil;
 import com.ncoxs.myblog.util.general.ResourceUtil;
+import com.ncoxs.myblog.util.model.FormParser;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.PropertySource;
+import org.springframework.http.HttpMethod;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import org.springframework.web.servlet.HandlerInterceptor;
@@ -23,7 +25,7 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.security.GeneralSecurityException;
+import java.nio.charset.StandardCharsets;
 import java.security.spec.InvalidKeySpecException;
 import java.util.Base64;
 import java.util.Properties;
@@ -44,6 +46,8 @@ import java.util.Properties;
  *
  * 注意 RSA 具有过期时间，当客户端请求时 RSA 已过期，则会返回已过期错误；
  * 当服务器返回数据时 RSA 已过期，服务器会将新的 RSA 公钥和过期时间放在响应体中返回。
+ *
+ * 请求头/响应头中的秘钥或参数都需要加密（RSA 公钥除外）后再经过 Base64 编码。
  */
 @Component
 @PropertySource("classpath:app-props.properties")
@@ -178,23 +182,26 @@ public class DecryptionInterceptor implements HandlerInterceptor {
         }
 
         // 使用 RSA 私钥解密 AES 秘钥
-        byte[] aesKey;
-        try {
-            getRsaKeys();
-            // 如果 RSA 秘钥过期，返回客户端错误结果
-            if (clientRsaExpire != rsaKeysExpireTime) {
-                writeErrorResult(response, ResultCode.ENCRYPTION_RSA_KEY_EXPIRE);
-                return false;
-            }
-            aesKey = RSAUtil.decryptByPrivate(rsaKeys, Base64.getDecoder().decode(encryptedAESKey));
-        } catch (GeneralSecurityException e) {
-            writeErrorResult(response, ResultCode.ENCRYPTION_RSA_ERROR);
+        getRsaKeys();
+        // 如果 RSA 秘钥过期，返回客户端错误结果
+        if (clientRsaExpire != rsaKeysExpireTime) {
+            writeErrorResult(response, ResultCode.ENCRYPTION_RSA_KEY_EXPIRE);
             return false;
         }
+        byte[] aesKey = RSAUtil.decryptByPrivate(rsaKeys, Base64.getDecoder().decode(encryptedAESKey));
 
-        // 使用 AES 解密请求体
         CustomServletRequest customRequest = (CustomServletRequest) request;
-        customRequest.setRequestBody(AESUtil.decrypt(aesKey, customRequest.getRequestBody()));
+        // GET 请求，并且带有加密参数请求头，则进行解密
+        if (HttpMethod.GET.matches(customRequest.getMethod())) {
+            String encryptedParams = customRequest.getHeader(HttpHeaderKey.ENCRYPTED_PARAMS);
+            if (StringUtils.hasText(encryptedParams)) {
+                String urlEncodedParams = new String(AESUtil.decrypt(aesKey, Base64.getDecoder().decode(encryptedParams)),
+                        StandardCharsets.US_ASCII);
+                customRequest.setFormParser(new FormParser(urlEncodedParams));
+            }
+        } else if (customRequest.getContentLength() > 0) {  // 使用 AES 解密请求体
+            customRequest.setRequestBody(AESUtil.decrypt(aesKey, customRequest.getRequestBody()));
+        }
 
         return true;
     }
@@ -225,13 +232,9 @@ public class DecryptionInterceptor implements HandlerInterceptor {
             }
 
             response.setHeader(HttpHeaderKey.ENCRYPTION_MODE, HttpHeaderConst.ENCRYPTION_MODE_FULL);
-            try {
-                // 使用 RSA 私钥加密 AES 秘钥
-                aesKey = RSAUtil.encryptByPrivate(rsaKeys, aesKey);
-                response.setHeader(HttpHeaderKey.REQUEST_ENCRYPTED_AES_KEY, Base64.getEncoder().encodeToString(aesKey));
-            } catch (GeneralSecurityException e) {
-                writeErrorResult(response, ResultCode.ENCRYPTION_RSA_ERROR);
-            }
+            // 使用 RSA 私钥加密 AES 秘钥
+            aesKey = RSAUtil.encryptByPrivate(rsaKeys, aesKey);
+            response.setHeader(HttpHeaderKey.REQUEST_ENCRYPTED_AES_KEY, Base64.getEncoder().encodeToString(aesKey));
         } else {
             response.setHeader(HttpHeaderKey.ENCRYPTION_MODE, HttpHeaderConst.ENCRYPTION_MODE_NONE);
         }

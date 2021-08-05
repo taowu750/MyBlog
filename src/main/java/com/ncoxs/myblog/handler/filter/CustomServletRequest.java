@@ -1,12 +1,16 @@
 package com.ncoxs.myblog.handler.filter;
 
 import com.ncoxs.myblog.util.general.IOUtil;
+import com.ncoxs.myblog.util.model.FormParser;
 
 import javax.servlet.ReadListener;
 import javax.servlet.ServletInputStream;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletRequestWrapper;
 import java.io.*;
+import java.nio.charset.StandardCharsets;
+import java.util.Enumeration;
+import java.util.Map;
 import java.util.Objects;
 
 /**
@@ -15,6 +19,7 @@ import java.util.Objects;
 public class CustomServletRequest extends HttpServletRequestWrapper {
 
     private byte[] requestBody;
+    private FormParser formParser;
 
     public CustomServletRequest(HttpServletRequest request) {
         super(request);
@@ -31,6 +36,10 @@ public class CustomServletRequest extends HttpServletRequestWrapper {
     public void setRequestBody(byte[] requestBody) {
         Objects.requireNonNull(requestBody);
         this.requestBody = requestBody;
+        // 如果数据类型是 application/x-www-form-urlencoded，就需要设置 Form 解析器解析参数
+        if (getContentType().toLowerCase().startsWith("application/x-www-form-urlencoded")) {
+            setFormParser(new FormParser(new String(requestBody, StandardCharsets.US_ASCII)));
+        }
     }
 
     @Override
@@ -45,6 +54,55 @@ public class CustomServletRequest extends HttpServletRequestWrapper {
     @Override
     public BufferedReader getReader() throws IOException {
         return new BufferedReader(new InputStreamReader(getInputStream(), getCharacterEncoding()));
+    }
+
+    /**
+     * 设置 {@link FormParser}，一般是为了设置 GET 请求中的加密参数。
+     */
+    public void setFormParser(FormParser formParser) {
+        Objects.requireNonNull(formParser);
+
+        this.formParser = formParser;
+//        // 将原来的参数都添加到 formParser 中
+//        for (Map.Entry<String, String[]> kv : getParameterMap().entrySet()) {
+//            this.formParser.putParameter(kv.getKey(), kv.getValue());
+//        }
+    }
+
+    @Override
+    public String getParameter(String name) {
+        if (formParser == null) {
+            return super.getParameter(name);
+        } else {
+            return formParser.getParameter(name);
+        }
+    }
+
+    @Override
+    public Map<String, String[]> getParameterMap() {
+        if (formParser == null) {
+            return super.getParameterMap();
+        } else {
+            return formParser.getParameterMap();
+        }
+    }
+
+    @Override
+    public Enumeration<String> getParameterNames() {
+        if (formParser == null) {
+            return super.getParameterNames();
+        } else {
+            return formParser.getParameterNames();
+        }
+    }
+
+    @Override
+    public String[] getParameterValues(String name) {
+        if (formParser == null) {
+            return super.getParameterValues(name);
+        } else {
+            return formParser.getParameterValues(name);
+        }
     }
 
     private static class CustomServletInputStream extends ServletInputStream {

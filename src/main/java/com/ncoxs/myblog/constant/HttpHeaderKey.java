@@ -31,4 +31,10 @@ public interface HttpHeaderKey {
      * 同时也会返回新的 RSA 公钥的过期时间 {@link #RSA_EXPIRE}。
      */
     String NEW_RSA_PUBLIC_KEY = "_New-RSA-Public-Key";
+
+    /**
+     * 当使用 GET 请求，有想要加密参数时，需要将参数加密后放到此请求头中。
+     * 注意，参数需要符合 application/x-www-form-urlencoded 格式，并且必须是 UTF-8 编码。
+     */
+    String ENCRYPTED_PARAMS = "_Encrypted-Params";
 }
