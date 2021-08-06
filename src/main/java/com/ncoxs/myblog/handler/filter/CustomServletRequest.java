@@ -38,7 +38,7 @@ public class CustomServletRequest extends HttpServletRequestWrapper {
         this.requestBody = requestBody;
         // 如果数据类型是 application/x-www-form-urlencoded，就需要设置 Form 解析器解析参数
         if (getContentType().toLowerCase().startsWith("application/x-www-form-urlencoded")) {
-            setFormParser(new FormParser(new String(requestBody, StandardCharsets.US_ASCII)));
+            setFormParser(new FormParser(new String(requestBody, StandardCharsets.US_ASCII), getCharacterEncoding()));
         }
     }
 

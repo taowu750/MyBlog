@@ -27,8 +27,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.security.spec.InvalidKeySpecException;
-import java.util.Base64;
-import java.util.Properties;
+import java.util.*;
 
 
 /**
@@ -61,6 +60,10 @@ public class DecryptionInterceptor implements HandlerInterceptor {
     @Value("${encryption.rsa-file-path}")
     private String rsaKeysFilePath;
 
+    @Value("${encryption.ignore-url-prefix}")
+    private String ignoreUrlPrefixesString;
+    private volatile List<String> ignoreUrlPrefixes;
+
     private ObjectMapper objectMapper;
 
     @Autowired
@@ -72,7 +75,6 @@ public class DecryptionInterceptor implements HandlerInterceptor {
     private static final String PROP_RSA_PUBLIC_KEY = "public-key";
     private static final String PROP_RSA_PRIVATE_KEY = "private-key";
     private static final String PROP_RSA_EXPIRE = "expire";
-    private static final String REQUEST_ATTR_RSA_KEY = DecryptionInterceptor.class.getSimpleName() + ".rsaKeys";
 
 
     private volatile RSAUtil.Keys rsaKeys;
@@ -137,9 +139,25 @@ public class DecryptionInterceptor implements HandlerInterceptor {
 
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
-        // 未开启加密解密功能，或者请求的是加解密相关功能控制器，就返回 true
-        if (!enable || request.getRequestURI().startsWith("/system/encryption")) {
+        // 未开启加密解密功能，就返回 true
+        if (!enable) {
             return true;
+        }
+
+        // TODO: 使用 Trie 实现
+        if (ignoreUrlPrefixes == null) {
+            synchronized (this) {
+                if (ignoreUrlPrefixes == null) {
+                    ignoreUrlPrefixes = new ArrayList<>();
+                    ignoreUrlPrefixes.addAll(Arrays.asList(ignoreUrlPrefixesString.split(",")));
+                }
+            }
+        }
+        // 如果请求地址包含忽略的前缀，则返回 true
+        for (String ignoreUrlPrefix : ignoreUrlPrefixes) {
+            if (request.getRequestURI().startsWith(ignoreUrlPrefix)) {
+                return true;
+            }
         }
 
         // 检查是否有 ENCRYPTION_MODE 请求头
@@ -196,7 +214,7 @@ public class DecryptionInterceptor implements HandlerInterceptor {
             if (StringUtils.hasText(encryptedParams)) {
                 String urlEncodedParams = new String(AESUtil.decrypt(aesKey, Base64.getDecoder().decode(encryptedParams)),
                         StandardCharsets.US_ASCII);
-                customRequest.setFormParser(new FormParser(urlEncodedParams));
+                customRequest.setFormParser(new FormParser(urlEncodedParams, request.getCharacterEncoding()));
             }
         } else if (customRequest.getContentLength() > 0) {  // 使用 AES 解密请求体
             customRequest.setRequestBody(AESUtil.decrypt(aesKey, customRequest.getRequestBody()));
