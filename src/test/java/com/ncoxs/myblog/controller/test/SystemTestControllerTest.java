@@ -2,14 +2,13 @@ package com.ncoxs.myblog.controller.test;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ncoxs.myblog.model.pojo.User;
+import com.ncoxs.myblog.testutil.EncryptionMockMvcBuilder;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.web.servlet.MockMvc;
 
-import static com.ncoxs.myblog.testutil.EncryptionMockMvcUtil.requestMap;
-import static com.ncoxs.myblog.testutil.EncryptionMockMvcUtil.requestRsaPublicKey;
 import static com.ncoxs.myblog.util.general.MapUtil.kv;
 import static com.ncoxs.myblog.util.general.MapUtil.mp;
 
@@ -28,7 +27,7 @@ public class SystemTestControllerTest {
 
     @Test
     public void testGetRsaPublicKey() throws Exception {
-        System.out.println(requestRsaPublicKey(mockMvc, objectMapper));
+        System.out.println(EncryptionMockMvcBuilder.requestRsaPublicKey(mockMvc, objectMapper));
     }
 
     /**
@@ -39,9 +38,14 @@ public class SystemTestControllerTest {
         User user = new User();
         user.setName("wutao");
         user.setAge(23);
-        System.out.println(requestMap(mockMvc, objectMapper, "/test/system/encryption/json",
-                mp(kv("message", "加密信息"), kv("code", 42), kv("user", user)),
-                true, true));
+        System.out.println(
+                new EncryptionMockMvcBuilder(mockMvc, objectMapper, "/test/system/encryption/json")
+                        .post()
+                        .jsonParams(mp(kv("message", "加密信息"), kv("code", 42), kv("user", user)))
+                        .request()
+                        .isStatusOk()
+                        .print()
+                        .buildMap());
     }
 
     /**
@@ -49,9 +53,15 @@ public class SystemTestControllerTest {
      */
     @Test
     public void testEncryptionFormPost() throws Exception {
-        System.out.println(requestMap(mockMvc, objectMapper, "/test/system/encryption/form-post",
-                mp(kv("message", "加密信息"), kv("code", 42), kv("name", "wuhan"), kv("age", 23)),
-                true, false));
+        System.out.println(
+                new EncryptionMockMvcBuilder(mockMvc, objectMapper, "/test/system/encryption/form-post")
+                        .post()
+                        .formParams(mp(kv("message", "加密信息"), kv("code", 42), kv("name", "wuhan"),
+                                kv("age", 23)))
+                        .request()
+                        .isStatusOk()
+                        .print()
+                        .buildMap());
     }
 
     /**
@@ -59,8 +69,14 @@ public class SystemTestControllerTest {
      */
     @Test
     public void testEncryptionFormGet() throws Exception {
-        System.out.println(requestMap(mockMvc, objectMapper, "/test/system/encryption/form-get",
-                mp(kv("message", "加密信息"), kv("code", 42), kv("name", "野兽先辈"), kv("age", 24)),
-                false, false));
+        System.out.println(
+                new EncryptionMockMvcBuilder(mockMvc, objectMapper, "/test/system/encryption/form-get")
+                        .get()
+                        .formParams(mp(kv("message", "加密信息"), kv("code", 42), kv("name", "野兽先辈"),
+                                kv("age", 24)))
+                        .request()
+                        .isStatusOk()
+                        .print()
+                        .buildMap());
     }
 }
