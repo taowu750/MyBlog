@@ -9,6 +9,7 @@ import com.ncoxs.myblog.model.dto.GenericResult;
 import com.ncoxs.myblog.util.general.AESUtil;
 import com.ncoxs.myblog.util.general.MapUtil;
 import com.ncoxs.myblog.util.general.RSAUtil;
+import com.ncoxs.myblog.util.general.ResourceUtil;
 import com.ncoxs.myblog.util.model.FormFormatter;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -23,6 +24,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
 import java.util.Base64;
 import java.util.Map;
+import java.util.Properties;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -38,14 +40,16 @@ public class EncryptionMockMvcBuilder {
 
     private MockHttpServletRequestBuilder requestBuilder;
 
+
+    private boolean enable;
     private MockMvc mockMvc;
     private ObjectMapper objectMapper;
-    private String url;
 
     private byte[] rsaPublicKey;
     private long rsaPublicKeyExpire;
     private byte[] aesKey;
 
+    private String url;
     private String method;
     private Object params;
 
@@ -67,38 +71,36 @@ public class EncryptionMockMvcBuilder {
         return result.getData();
     }
 
-    public EncryptionMockMvcBuilder(MockMvc mockMvc, ObjectMapper objectMapper, String url, String... pathVariables) throws Exception {
+    public EncryptionMockMvcBuilder(MockMvc mockMvc, ObjectMapper objectMapper) throws Exception {
         this.mockMvc = mockMvc;
         this.objectMapper = objectMapper;
-        this.url = url;
 
-        Matcher matcher = URL_VARIABLE_PATTERN.matcher(url);
-        int i = 0;
-        while (matcher.find()) {
-            if (i == pathVariables.length) {
-                throw new IllegalArgumentException("pathVariables' number mismatch");
-            }
-            this.url = matcher.replaceFirst(pathVariables[i++]);
+        // 读取配置
+        Properties props = new Properties();
+        props.load(ResourceUtil.load("app-props.properties"));
+        enable = Boolean.parseBoolean(props.getProperty("encryption.enable"));
+        if (enable) {
+            // 获取 RSA 公钥
+            Map<String, Object> rsaData = requestRsaPublicKey(mockMvc, objectMapper);
+            rsaPublicKey = Base64.getDecoder().decode((String) rsaData.get("key"));
+            rsaPublicKeyExpire = (long) rsaData.get("expire");
+
+            // 生成客户端 AES 秘钥，并使用它加密数据
+            aesKey = AESUtil.generateKey();
         }
-
-        // 获取 RSA 公钥
-        Map<String, Object> rsaData = requestRsaPublicKey(mockMvc, objectMapper);
-        rsaPublicKey = Base64.getDecoder().decode((String) rsaData.get("key"));
-        rsaPublicKeyExpire = (long) rsaData.get("expire");
-
-        // 生成客户端 AES 秘钥，并使用它加密数据
-        aesKey = AESUtil.generateKey();
     }
 
     /**
      * 创建 post 请求。
      */
-    public EncryptionMockMvcBuilder post() throws GeneralSecurityException {
+    public EncryptionMockMvcBuilder post(String url, String... pathVariables) throws GeneralSecurityException {
         if (method != null) {
             throw new IllegalStateException("method has setting");
         }
+
         method = "post";
-        requestBuilder = MockMvcRequestBuilders.post(url);
+        urlSetting(url, pathVariables);
+        requestBuilder = MockMvcRequestBuilders.post(this.url);
         publicSetting();
 
         return this;
@@ -107,12 +109,14 @@ public class EncryptionMockMvcBuilder {
     /**
      * 创建 get 请求。
      */
-    public EncryptionMockMvcBuilder get() throws GeneralSecurityException {
+    public EncryptionMockMvcBuilder get(String url, String... pathVariables) throws GeneralSecurityException {
         if (method != null) {
             throw new IllegalStateException("method has setting");
         }
+
         method = "get";
-        requestBuilder = MockMvcRequestBuilders.get(url);
+        urlSetting(url, pathVariables);
+        requestBuilder = MockMvcRequestBuilders.get(this.url);
         publicSetting();
 
         return this;
@@ -121,12 +125,14 @@ public class EncryptionMockMvcBuilder {
     /**
      * 创建 delete 请求。
      */
-    public EncryptionMockMvcBuilder delete() throws GeneralSecurityException {
+    public EncryptionMockMvcBuilder delete(String url, String... pathVariables) throws GeneralSecurityException {
         if (method != null) {
             throw new IllegalStateException("method has setting");
         }
+
         method = "delete";
-        requestBuilder = MockMvcRequestBuilders.delete(url);
+        urlSetting(url, pathVariables);
+        requestBuilder = MockMvcRequestBuilders.delete(this.url);
         publicSetting();
 
         return this;
@@ -135,24 +141,41 @@ public class EncryptionMockMvcBuilder {
     /**
      * 创建 patch 请求。
      */
-    public EncryptionMockMvcBuilder patch() throws GeneralSecurityException {
+    public EncryptionMockMvcBuilder patch(String url, String... pathVariables) throws GeneralSecurityException {
         if (method != null) {
             throw new IllegalStateException("method has setting");
         }
+
         method = "patch";
-        requestBuilder = MockMvcRequestBuilders.patch(url);
+        urlSetting(url, pathVariables);
+        requestBuilder = MockMvcRequestBuilders.patch(this.url);
         publicSetting();
 
         return this;
     }
 
+    private void urlSetting(String url, String... pathVariables) {
+        this.url = url;
+        Matcher matcher = URL_VARIABLE_PATTERN.matcher(url);
+        int i = 0;
+        while (matcher.find()) {
+            if (i == pathVariables.length) {
+                throw new IllegalArgumentException("pathVariables' number mismatch");
+            }
+            this.url = matcher.replaceFirst(pathVariables[i++]);
+        }
+    }
+
     private void publicSetting() throws GeneralSecurityException {
-        requestBuilder.header(HttpHeaders.CONTENT_ENCODING, StandardCharsets.UTF_8.name())
-                .header(HttpHeaderKey.ENCRYPTION_MODE, HttpHeaderConst.ENCRYPTION_MODE_FULL)
-                .header(HttpHeaderKey.RSA_EXPIRE, rsaPublicKeyExpire)
-                // 使用 RSA 公钥加密客户端 AES 秘钥
-                .header(HttpHeaderKey.REQUEST_ENCRYPTED_AES_KEY, Base64.getEncoder().encodeToString(
-                        RSAUtil.encryptByPublic(rsaPublicKey, aesKey)));
+        if (enable) {
+            requestBuilder.header(HttpHeaderKey.ENCRYPTION_MODE, HttpHeaderConst.ENCRYPTION_MODE_FULL)
+                    .header(HttpHeaderKey.RSA_EXPIRE, rsaPublicKeyExpire)
+                    // 使用 RSA 公钥加密客户端 AES 秘钥
+                    .header(HttpHeaderKey.REQUEST_ENCRYPTED_AES_KEY, Base64.getEncoder().encodeToString(
+                            RSAUtil.encryptByPublic(rsaPublicKey, aesKey)));
+        } else {
+            requestBuilder.header(HttpHeaderKey.ENCRYPTION_MODE, HttpHeaderConst.ENCRYPTION_MODE_NONE);
+        }
     }
 
     /**
@@ -171,8 +194,11 @@ public class EncryptionMockMvcBuilder {
         }
 
         this.params = params;
-        requestBuilder.header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON);
-        byte[] encryptedParams = AESUtil.encrypt(aesKey, objectMapper.writeValueAsBytes(params));
+        requestBuilder.header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_UTF8_VALUE);
+        byte[] encryptedParams = objectMapper.writeValueAsBytes(params);
+        if (enable) {
+             encryptedParams = AESUtil.encrypt(aesKey, encryptedParams);
+        }
         requestBuilder.content(encryptedParams);
 
         return this;
@@ -198,13 +224,21 @@ public class EncryptionMockMvcBuilder {
         }
 
         this.params = params;
-        requestBuilder.header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_FORM_URLENCODED);
-        byte[] encryptedParams = AESUtil.encrypt(aesKey, FormFormatter.format(params).getBytes(StandardCharsets.US_ASCII));
-        if (method.equals("get")) {
-            requestBuilder.header(HttpHeaderKey.ENCRYPTED_PARAMS, Base64.getEncoder().encodeToString(encryptedParams));
+        if (enable) {
+            byte[] encryptedParams = AESUtil.encrypt(aesKey, FormFormatter.format(params).getBytes(StandardCharsets.US_ASCII));
+            if (method.equals("get")) {
+                requestBuilder.header(HttpHeaderKey.ENCRYPTED_PARAMS, Base64.getEncoder().encodeToString(encryptedParams));
+            } else {
+                requestBuilder.header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_FORM_URLENCODED)
+                        .content(encryptedParams);
+            }
         } else {
-            requestBuilder.content(encryptedParams);
+            params.forEach((k, v) -> requestBuilder.param(k, String.valueOf(v)));
+            if (!method.equals("get")) {
+                requestBuilder.header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_FORM_URLENCODED);
+            }
         }
+
 
         return this;
     }
@@ -273,13 +307,15 @@ public class EncryptionMockMvcBuilder {
     /**
      * 发送请求后，断言请求正常。
      */
-    public EncryptionMockMvcBuilder isStatusOk() throws Exception {
+    public EncryptionMockMvcBuilder expectStatusOk() throws Exception {
         if (resultActions == null) {
             throw new IllegalStateException("request not send");
         }
         resultActions.andExpect(status().isOk())
-                .andExpect(header().exists(HttpHeaderKey.ENCRYPTION_MODE))
-                .andExpect(header().exists(HttpHeaderKey.REQUEST_ENCRYPTED_AES_KEY));
+                .andExpect(header().exists(HttpHeaderKey.ENCRYPTION_MODE));
+        if (enable) {
+            resultActions.andExpect(header().exists(HttpHeaderKey.REQUEST_ENCRYPTED_AES_KEY));
+        }
 
         return this;
     }
@@ -312,13 +348,26 @@ public class EncryptionMockMvcBuilder {
      */
     public static byte[] decryptData(EncryptionMockMvcBuilder builder, MvcResult mvcResult)
             throws GeneralSecurityException {
-        // 获取响应数据
-        byte[] encryptedResponse = mvcResult.getResponse().getContentAsByteArray();
-        String aesKeyString = mvcResult.getResponse().getHeader(HttpHeaderKey.REQUEST_ENCRYPTED_AES_KEY);
-        // 使用 RSA 公钥解密服务器 AES 秘钥
-        byte[] aesKey = RSAUtil.decryptByPublic(builder.rsaPublicKey, Base64.getDecoder().decode(aesKeyString));
+        if (builder.enable) {
+            // 获取响应数据
+            byte[] encryptedResponse = mvcResult.getResponse().getContentAsByteArray();
+            String aesKeyString = mvcResult.getResponse().getHeader(HttpHeaderKey.REQUEST_ENCRYPTED_AES_KEY);
+            // 使用 RSA 公钥解密服务器 AES 秘钥
+            byte[] aesKey = RSAUtil.decryptByPublic(builder.rsaPublicKey, Base64.getDecoder().decode(aesKeyString));
 
-        return AESUtil.decrypt(aesKey, encryptedResponse);
+            return AESUtil.decrypt(aesKey, encryptedResponse);
+        } else {
+            return mvcResult.getResponse().getContentAsByteArray();
+        }
+    }
+
+    /**
+     * 解析最终构造的 MvcResult 中的响应体，返回 GenericResult。
+     */
+    public static GenericResult<Map<String, Object>> decryptDataToGR(EncryptionMockMvcBuilder builder, MvcResult mvcResult)
+            throws GeneralSecurityException, IOException {
+        return builder.objectMapper.readValue(decryptData(builder, mvcResult),
+                new TypeReference<GenericResult<Map<String, Object>>>() {});
     }
 
     /**
@@ -326,9 +375,7 @@ public class EncryptionMockMvcBuilder {
      */
     public static Map<String, Object> decryptDataToMap(EncryptionMockMvcBuilder builder, MvcResult mvcResult)
             throws GeneralSecurityException, IOException {
-        return builder.objectMapper.readValue(decryptData(builder, mvcResult),
-                new TypeReference<GenericResult<Map<String, Object>>>() {})
-                .getData();
+        return decryptDataToGR(builder, mvcResult).getData();
     }
 
     /**
@@ -336,6 +383,13 @@ public class EncryptionMockMvcBuilder {
      */
     public byte[] buildByte() throws GeneralSecurityException {
         return decryptData(this, build());
+    }
+
+    /**
+     * 最终构造 GenericResult。
+     */
+    public GenericResult<Map<String, Object>> buildGR() throws GeneralSecurityException, IOException {
+        return decryptDataToGR(this, build());
     }
 
     /**

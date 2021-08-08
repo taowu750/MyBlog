@@ -39,11 +39,11 @@ public class SystemTestControllerTest {
         user.setName("wutao");
         user.setAge(23);
         System.out.println(
-                new EncryptionMockMvcBuilder(mockMvc, objectMapper, "/test/system/encryption/json")
-                        .post()
+                new EncryptionMockMvcBuilder(mockMvc, objectMapper)
+                        .post("/test/system/encryption/json")
                         .jsonParams(mp(kv("message", "加密信息"), kv("code", 42), kv("user", user)))
                         .request()
-                        .isStatusOk()
+                        .expectStatusOk()
                         .print()
                         .buildMap());
     }
@@ -54,12 +54,12 @@ public class SystemTestControllerTest {
     @Test
     public void testEncryptionFormPost() throws Exception {
         System.out.println(
-                new EncryptionMockMvcBuilder(mockMvc, objectMapper, "/test/system/encryption/form-post")
-                        .post()
+                new EncryptionMockMvcBuilder(mockMvc, objectMapper)
+                        .post("/test/system/encryption/form-post")
                         .formParams(mp(kv("message", "加密信息"), kv("code", 42), kv("name", "wuhan"),
                                 kv("age", 23)))
                         .request()
-                        .isStatusOk()
+                        .expectStatusOk()
                         .print()
                         .buildMap());
     }
@@ -70,12 +70,12 @@ public class SystemTestControllerTest {
     @Test
     public void testEncryptionFormGet() throws Exception {
         System.out.println(
-                new EncryptionMockMvcBuilder(mockMvc, objectMapper, "/test/system/encryption/form-get")
-                        .get()
+                new EncryptionMockMvcBuilder(mockMvc, objectMapper)
+                        .get("/test/system/encryption/form-get")
                         .formParams(mp(kv("message", "加密信息"), kv("code", 42), kv("name", "野兽先辈"),
                                 kv("age", 24)))
                         .request()
-                        .isStatusOk()
+                        .expectStatusOk()
                         .print()
                         .buildMap());
     }
