@@ -43,3 +43,7 @@ mybatis:
 logging:
   level:
     com.wutaodsg.redisdemo.dao: debug
+server:
+  servlet:
+    encoding:
+      force: true

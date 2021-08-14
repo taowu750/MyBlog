@@ -16,12 +16,10 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.ModelAndView;
 
 import javax.mail.MessagingException;
-import javax.validation.constraints.Max;
-import javax.validation.constraints.Min;
-import javax.validation.constraints.NotBlank;
-import javax.validation.constraints.Pattern;
+import javax.validation.constraints.*;
+import java.io.UnsupportedEncodingException;
+import java.security.GeneralSecurityException;
 
-// TODO: 密码强度验证
 @Controller
 @RequestMapping("/user")
 @Validated
@@ -35,7 +33,7 @@ public class UserController {
     }
 
 
-    @PostMapping("/register/{name}")
+    @PostMapping("/register")
     @ResponseBody
     @Encryption
     public GenericResult<Object> register(User user) throws MessagingException {
@@ -97,7 +95,7 @@ public class UserController {
         public String source;
     }
 
-    @PostMapping("/login/name/{name}")
+    @PostMapping("/login/name")
     @ResponseBody
     @Encryption
     public GenericResult<UserAndIdentity> loginByName(LoginByNameReq loginByNameReq) {
@@ -126,7 +124,7 @@ public class UserController {
         public String source;
     }
 
-    @PostMapping("/login/email/{email}")
+    @PostMapping("/login/email")
     @ResponseBody
     @Encryption
     public GenericResult<UserAndIdentity> loginByEmail(LoginByEmailReq loginByEmailReq) {
@@ -145,5 +143,50 @@ public class UserController {
         } else {
             return GenericResult.success(userAndIdentity);
         }
+    }
+
+    @PostMapping("/login/identity")
+    @ResponseBody
+    @Encryption
+    public GenericResult<User> loginByIdentity(@NotNull String identity,
+                                               @NotNull String source) {
+        return GenericResult.success(userService.loginByIdentity(identity, source));
+    }
+
+    @PostMapping("/password/send-forget")
+    @ResponseBody
+    @Encryption
+    public GenericResult<Boolean> sendForgetPasswordEmail(@NotBlank(message = ParamValidateMsg.USER_EMAIL_BLANK)
+                                                          @Pattern(regexp = ParamValidateRule.EMAIL_REGEX, message = ParamValidateMsg.USER_EMAIL_FORMAT)
+                                                                  String email,
+                                                          @NotBlank(message = ParamValidateMsg.USER_PASSWORD_BLANK)
+                                                          @Pattern(regexp = ParamValidateRule.PASSWORD_REGEX, message = ParamValidateMsg.USER_PASSWORD_FORMAT)
+                                                                  String newPassword)
+            throws MessagingException, GeneralSecurityException, UnsupportedEncodingException {
+        return GenericResult.success(userService.sendForgetPasswordMail(email, newPassword));
+    }
+
+    @PostMapping("/password/forget/{encryptedParams}")
+    public ModelAndView forgetPassword(@PathVariable("encryptedParams")
+                                       @NotBlank String encryptedParams) throws GeneralSecurityException, UnsupportedEncodingException {
+        ModelAndView mv = new ModelAndView();
+        String[] params = userService.decryptForgetPasswordParams(encryptedParams).split(" ");
+        if (params.length != 3) {
+            mv.addObject("result", "params-error");
+        } else {
+            String email = params[0], newPassword = params[1];
+            long expire = Long.parseLong(params[2]);
+            if (expire < System.currentTimeMillis()) {
+                mv.addObject("result", "expired");
+            } else if (!userService.existsEmail(email)) {
+                mv.addObject("result", "non-exists");
+            } else {
+                userService.setNewPassword(email, newPassword);
+                mv.addObject("result", "success");
+            }
+        }
+        mv.setViewName("/view/forget-password-result");
+
+        return mv;
     }
 }

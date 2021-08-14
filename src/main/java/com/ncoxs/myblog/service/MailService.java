@@ -41,4 +41,8 @@ public class MailService {
         helper.setText(text, true);
         javaMailSender.send(message);
     }
+
+    public void sendTemplateEmail(String templateName, String from, String to, String subject) throws MessagingException {
+        sendTemplateEmail(templateName, from, to, subject, new Context());
+    }
 }

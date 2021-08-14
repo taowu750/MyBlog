@@ -11,11 +11,12 @@ import com.ncoxs.myblog.model.pojo.User;
 import com.ncoxs.myblog.model.pojo.UserIdentity;
 import com.ncoxs.myblog.util.general.PasswordUtil;
 import com.ncoxs.myblog.util.general.TimeUtil;
+import com.ncoxs.myblog.util.general.URLUtil;
 import com.ncoxs.myblog.util.general.UUIDUtil;
-import org.springframework.lang.NonNull;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.PropertySource;
+import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,10 +24,14 @@ import org.springframework.util.StringUtils;
 import org.thymeleaf.context.Context;
 
 import javax.mail.MessagingException;
+import java.io.UnsupportedEncodingException;
+import java.security.GeneralSecurityException;
 import java.util.Date;
 import java.util.concurrent.TimeUnit;
 
+// TODO: 密码强度验证
 // TODO: 要有定时清理数据库中过期数据的机制
+// TODO: 用户登录等行为应该被记录
 @Service
 @PropertySource("classpath:app-props.properties")
 public class UserService {
@@ -39,6 +44,15 @@ public class UserService {
 
     @Value("${user.activate-expire-time}")
     private int activateExpireTime;
+
+    @Value("${user.forget-password.aes-key}")
+    private String forgetPasswordAesKey;
+
+    @Value("${user.forget-password.url}")
+    private String forgetPasswordUrl;
+
+    @Value("${user.forget-password.url-expire}")
+    private int forgetPasswordExpire;
 
     private UserDao userDao;
     private UserIdentityDao userIdentityDao;
@@ -151,6 +165,8 @@ public class UserService {
             // 删除数据库中的记录
             userDao.deleteById(user.getId());
             userIdentityDao.deleteByUserId(user.getId());
+            // 删除缓存中的记录
+            redisUserDao.deleteUserById(user.getId());
             return USER_EXPIRED;
         }
 
@@ -246,6 +262,14 @@ public class UserService {
         return result;
     }
 
+    /**
+     * 根据用户标识和来源进行登录。如果不存在、标识或来源不对、已过期则返回 null。
+     *
+     * @param loginIdentity 用户登录标识
+     * @param source 来源，用于唯一标识一个客户端
+     * @return 登录成功返回 User 对象，否则返回 null
+     */
+    @Transactional(isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
     public User loginByIdentity(@NonNull String loginIdentity, @NonNull String source) {
         User user = redisUserDao.getUserByIdentity(loginIdentity, source);
         if (user == null) {
@@ -266,6 +290,68 @@ public class UserService {
         }
 
         return user;
+    }
+
+    /**
+     * 发送“忘记密码”邮件，用户点击邮件中的链接后即可使用设置的新密码。
+     *
+     * @param email 需要重置密码的用户邮箱
+     * @param newPassword 新密码
+     * @return 邮箱是否存在
+     * @throws GeneralSecurityException
+     * @throws MessagingException
+     * @throws UnsupportedEncodingException
+     */
+    public boolean sendForgetPasswordMail(@NonNull String email, @NonNull String newPassword)
+            throws GeneralSecurityException, MessagingException, UnsupportedEncodingException {
+        boolean exists = redisUserDao.existsEmail(email) || userDao.existsEmail(email);
+        if (exists) {
+            User user = redisUserDao.getUserByEmail(email);
+            if (user == null) {
+                user = userDao.selectByEmail(email);
+            }
+            // 拼接参数并加密
+            String params = email + " " + newPassword + " " + TimeUtil.changeDateTime(forgetPasswordExpire, TimeUnit.HOURS).getTime();
+            String encryptedParams = URLUtil.encryptParams(forgetPasswordAesKey, params);
+            Context context = new Context();
+            context.setVariable("username", user.getName());
+            context.setVariable("resetPasswordUrl", forgetPasswordUrl + encryptedParams);
+            // 发送重置密码邮件
+            mailService.sendTemplateEmail(EmailTemplate.FORGET_PASSWORD_NAME, mailSender, email,
+                    EmailTemplate.FORGET_PASSWORD_SUBJECT, context);
+        }
+
+        return exists;
+    }
+
+    public String decryptForgetPasswordParams(@NonNull String encryptedParams) throws GeneralSecurityException, UnsupportedEncodingException {
+        return URLUtil.decryptParams(forgetPasswordAesKey, encryptedParams);
+    }
+
+    public boolean existsEmail(@NonNull String email) {
+        return redisUserDao.existsEmail(email) || userDao.existsEmail(email);
+    }
+
+    public boolean setNewPassword(@NonNull String email, @NonNull String newPassword) {
+        User user = redisUserDao.getUserByEmail(email);
+        if (user == null) {
+            user = userDao.selectByEmail(email);
+        }
+        if (user == null) {
+            return false;
+        }
+
+        // 更新数据库中的用户密码
+        User updated = new User();
+        updated.setId(user.getId());
+        updated.setPassword(PasswordUtil.encrypt(newPassword));
+        userDao.updateByIdSelective(updated);
+
+        // 更新 Redis 中的用户密码
+        user.setPassword(newPassword);
+        redisUserDao.setUser(user);
+
+        return true;
     }
 
     /**

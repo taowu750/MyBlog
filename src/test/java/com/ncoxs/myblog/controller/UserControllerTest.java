@@ -12,21 +12,24 @@ import com.ncoxs.myblog.model.dto.GenericResult;
 import com.ncoxs.myblog.model.dto.UserAndIdentity;
 import com.ncoxs.myblog.model.pojo.User;
 import com.ncoxs.myblog.model.pojo.UserIdentity;
+import com.ncoxs.myblog.testutil.EncryptionMockMvcBuilder;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.web.servlet.ModelAndView;
 
 import java.util.List;
+import java.util.Map;
 
+import static com.ncoxs.myblog.util.general.MapUtil.kv;
+import static com.ncoxs.myblog.util.general.MapUtil.mp;
 import static org.junit.jupiter.api.Assertions.*;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -53,23 +56,16 @@ public class UserControllerTest {
 
     @Test
     public void testRegister() throws Exception {
-        mockMvc.perform(post("/user/register/{name}", "test")
-                .param("email", "wutaoyx163@163.com")
-                .param("password", "12345")
-                .accept(MediaType.APPLICATION_JSON_UTF8_VALUE))
-                .andExpect(status().isOk())
-                .andExpect(handler().handlerType(UserController.class))
-                .andExpect(jsonPath("$.code").value(ResultCode.SUCCESS.getCode()))
-                .andDo(print());
+        registerTestUser();
 
-        mockMvc.perform(post("/user/register/{name}", "test")
-                .param("email", "wutaoyx163@163.com")
-                .param("password", "12345")
-                .accept(MediaType.APPLICATION_JSON_UTF8_VALUE))
-                .andExpect(status().isOk())
-                .andExpect(handler().handlerType(UserController.class))
-                .andExpect(jsonPath("$.code").value(ResultCode.USER_HAS_EXISTED.getCode()))
-                .andDo(print());
+        GenericResult<Map<String, Object>> result = new EncryptionMockMvcBuilder(mockMvc, objectMapper)
+                .post("/user/register")
+                .formParams(mp(kv("name", "test"), kv("email", "wutaoyx163@163.com"), kv("password", "12345")))
+                .request()
+                .expectStatusOk()
+                .print()
+                .buildGR();
+        assertEquals(ResultCode.USER_HAS_EXISTED.getCode(), result.getCode());
 
         User user = userDao.selectByName("test");
         List<UserIdentity> userIdentities = userIdentityDao.selectByUserId(user.getId());
@@ -96,10 +92,14 @@ public class UserControllerTest {
         user.setEmail("wutaoyx163@163.com");
         user.setPassword("12345");
 
-        mockMvc.perform(post("/user/register/{name}", "test")
-                .param("email", "wutaoyx163@163.com")
-                .param("password", "12345"))
-                .andExpect(jsonPath("$.code").value(ResultCode.SUCCESS.getCode()));
+        GenericResult<Map<String, Object>> result = new EncryptionMockMvcBuilder(mockMvc, objectMapper)
+                .post("/user/register")
+                .formParams(mp(kv("name", "test"), kv("email", "wutaoyx163@163.com"), kv("password", "12345")))
+                .request()
+                .expectStatusOk()
+                .print()
+                .buildGR();
+        assertEquals(ResultCode.SUCCESS.getCode(), result.getCode());
 
         return user;
     }
@@ -129,18 +129,21 @@ public class UserControllerTest {
         assertEquals("non-exist", mv.getModel().get("result"));
 
         User savedUser = userDao.selectByName(user.getName());
-        assertEquals(0, userIdentityDao.selectByUserName(user.getName()).size());
-        assertEquals(user.getEmail(), savedUser.getEmail());
-        assertEquals(UserState.NORMAL.getState(), savedUser.getState());
-        assertTrue(savedUser.getId() != null && savedUser.getId() > 0);
+        try {
+            assertEquals(0, userIdentityDao.selectByUserName(user.getName()).size());
+            assertEquals(user.getEmail(), savedUser.getEmail());
+            assertEquals(UserState.NORMAL.getState(), savedUser.getState());
+            assertTrue(savedUser.getId() != null && savedUser.getId() > 0);
 
-        User cachedUser = redisUserDao.getUserByName(user.getName());
-        assertEquals(user.getEmail(), cachedUser.getEmail());
-        assertEquals(UserState.NORMAL.getState(), cachedUser.getState());
-        assertEquals(savedUser.getId(), cachedUser.getId());
-
-        userDao.deleteById(savedUser.getId());
-        redisUserDao.deleteUserById(savedUser.getId());
+            User cachedUser = redisUserDao.getUserByName(user.getName());
+            assertEquals(user.getEmail(), cachedUser.getEmail());
+            assertEquals(UserState.NORMAL.getState(), cachedUser.getState());
+            assertEquals(savedUser.getId(), cachedUser.getId());
+        } finally {
+            //noinspection ConstantConditions
+            userDao.deleteById(savedUser.getId());
+            redisUserDao.deleteUserById(savedUser.getId());
+        }
     }
 
     private void activateTestUser() throws Exception {
@@ -163,15 +166,17 @@ public class UserControllerTest {
             registerTestUser();
             activateTestUser();
 
-            MvcResult mvcResult = mockMvc.perform(post("/user/login/name/{name}", "test")
-                    .param("password", "12345")
-                    .accept(MediaType.APPLICATION_JSON_UTF8))
-                    .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.code").value(ResultCode.SUCCESS.getCode()))
-                    .andDo(print())
-                    .andReturn();
-            GenericResult<UserAndIdentity> result = objectMapper.readValue(mvcResult.getResponse().getContentAsString(),
-                    new TypeReference<GenericResult<UserAndIdentity>>(){});
+            byte[] data = new EncryptionMockMvcBuilder(mockMvc, objectMapper)
+                    .post("/user/login/name")
+                    .formParams(mp(kv("name", "test"), kv("password", "12345")))
+                    .request()
+                    .expectStatusOk()
+                    .print()
+                    .buildByte();
+            GenericResult<UserAndIdentity> result = objectMapper.readValue(data,
+                    new TypeReference<GenericResult<UserAndIdentity>>() {
+                    });
+
             assertNotNull(result);
             assertNotNull(result.getData());
 
@@ -181,17 +186,18 @@ public class UserControllerTest {
             assertEquals("test", userAndIdentity.getUser().getName());
             assertNull(userAndIdentity.getUser().getPassword());
 
-            mvcResult = mockMvc.perform(post("/user/login/email/{email}", "wutaoyx163@163.com")
-                    .param("password", "12345")
-                    .param("rememberDays", String.valueOf(10))
-                    .param("source", "source")
-                    .accept(MediaType.APPLICATION_JSON_UTF8))
-                    .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.code").value(ResultCode.SUCCESS.getCode()))
-                    .andDo(print())
-                    .andReturn();
-            result = objectMapper.readValue(mvcResult.getResponse().getContentAsString(),
-                    new TypeReference<GenericResult<UserAndIdentity>>(){});
+            data = new EncryptionMockMvcBuilder(mockMvc, objectMapper)
+                    .post("/user/login/email")
+                    .formParams(mp(kv("email", "wutaoyx163@163.com"), kv("password", "12345"),
+                            kv("rememberDays", 10), kv("source", "source")))
+                    .request()
+                    .expectStatusOk()
+                    .print()
+                    .buildByte();
+            result = objectMapper.readValue(data,
+                    new TypeReference<GenericResult<UserAndIdentity>>() {
+                    });
+
             assertNotNull(result);
             assertNotNull(result.getData());
 
