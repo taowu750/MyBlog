@@ -16,4 +16,7 @@ public interface ParamValidateRule {
 
     int LOGIN_REMEMBER_DAYS_MIN = 0;
     int LOGIN_REMEMBER_DAYS_MAX = 30;
+
+    String IP_REGEX = "^(((\\d)|([1-9]\\d)|((1\\d\\d)(2[0-4]\\d)(25[0-5])))\\.){3}" +
+            "((\\d)|([1-9]\\d)|((1\\d\\d)(2[0-4]\\d)(25[0-5])))$";
 }

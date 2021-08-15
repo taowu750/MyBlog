@@ -1,22 +1,30 @@
 package com.ncoxs.myblog.service;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ncoxs.myblog.constant.EmailTemplate;
 import com.ncoxs.myblog.constant.UserIdentityType;
+import com.ncoxs.myblog.constant.UserLogType;
 import com.ncoxs.myblog.constant.UserState;
+import com.ncoxs.myblog.controller.UserController;
 import com.ncoxs.myblog.dao.mysql.UserDao;
 import com.ncoxs.myblog.dao.mysql.UserIdentityDao;
+import com.ncoxs.myblog.dao.mysql.UserLogDao;
 import com.ncoxs.myblog.dao.redis.RedisUserDao;
+import com.ncoxs.myblog.model.bo.UserLoginLog;
+import com.ncoxs.myblog.model.bo.UserRegisterLog;
+import com.ncoxs.myblog.model.bo.UserUpdateLog;
+import com.ncoxs.myblog.model.dto.IpLocInfo;
 import com.ncoxs.myblog.model.dto.UserAndIdentity;
 import com.ncoxs.myblog.model.pojo.User;
 import com.ncoxs.myblog.model.pojo.UserIdentity;
-import com.ncoxs.myblog.util.general.PasswordUtil;
-import com.ncoxs.myblog.util.general.TimeUtil;
-import com.ncoxs.myblog.util.general.URLUtil;
-import com.ncoxs.myblog.util.general.UUIDUtil;
+import com.ncoxs.myblog.model.pojo.UserLog;
+import com.ncoxs.myblog.util.general.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.PropertySource;
 import org.springframework.lang.NonNull;
+import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
@@ -61,6 +69,10 @@ public class UserService {
 
     private MailService mailService;
 
+    private UserLogDao userLogDao;
+
+    private ObjectMapper objectMapper;
+
     @Autowired
     public void setUserDao(UserDao userDao) {
         this.userDao = userDao;
@@ -79,6 +91,16 @@ public class UserService {
     @Autowired
     public void setMailService(MailService mailService) {
         this.mailService = mailService;
+    }
+
+    @Autowired
+    public void setUserLogDao(UserLogDao userLogDao) {
+        this.userLogDao = userLogDao;
+    }
+
+    @Autowired
+    public void setObjectMapper(ObjectMapper objectMapper) {
+        this.objectMapper = objectMapper;
     }
 
 
@@ -110,11 +132,12 @@ public class UserService {
 
     /**
      * 发送邮箱激活邮件（一定时间内有效）生成标识 ID，将标识 ID 和用户信息保存到数据库中。
-     *
+     * <p>
      * 调用此方法时，user 参数的 name、email、password 属性必须提供。
      */
     @Transactional(isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
-    public boolean registerUser(@NonNull User user) throws MessagingException {
+    public boolean registerUser(@NonNull User user, @Nullable IpLocInfo ipLocInfo)
+            throws MessagingException, JsonProcessingException {
         // 先对客户端传递过来的用户对象初始化
         user = initialUser(user);
         // 尝试插入数据库，如果用户名或邮箱不重复则插入成功
@@ -127,8 +150,14 @@ public class UserService {
         // 将用户激活标识插入到数据库中
         UserIdentity userIdentity = newUserActivateIdentity(user, activateId);
         userIdentityDao.insert(userIdentity);
+
+        // 插入用户注册日志
+        userLogDao.insert(new UserLog(user.getId(), UserLogType.REGISTER, objectMapper.writeValueAsString(
+                new UserRegisterLog(user.getStateNote(), DeviceUtil.fillIpLocInfo(ipLocInfo)))));
+
         // 将用户信息插入到 Redis 中
         redisUserDao.setNonActivateUser(activateId, user);
+
         // 发送用户激活模板邮件
         Context context = new Context();
         context.setVariable("username", user.getName());
@@ -146,7 +175,7 @@ public class UserService {
      * 激活具有指定标识的用户。
      */
     @Transactional(isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
-    public User activateUser(@NonNull String identity) {
+    public User activateUser(@NonNull String identity) throws JsonProcessingException {
         // 先从缓存中获取未激活用户数据
         User user = redisUserDao.getAndDeleteNonActivateUser(identity);
         if (user == null) {
@@ -181,6 +210,10 @@ public class UserService {
         // 删除激活凭证
         userIdentityDao.deleteByIdentity(identity);
 
+        // 插入用户注册日志
+        userLogDao.insert(new UserLog(user.getId(), UserLogType.REGISTER, objectMapper.writeValueAsString(
+                new UserRegisterLog(update.getStateNote(), DeviceUtil.fillIpLocInfo(null)))));
+
         // 将已激活的用户缓存到 redis 中
         user.setState(UserState.NORMAL.getState());
         user.setStateNote(UserState.NORMAL.getStateNote());
@@ -193,18 +226,14 @@ public class UserService {
     /**
      * 根据用户名和密码进行登录。如果选择了“记住我”，则还会返回新的登录标识。
      *
-     * @param name         用户名
-     * @param password     密码
-     * @param rememberDays 记住多少天
-     * @param source       客户端标识
-     * @return User 对象和登录标识
+     * @return User 对象和登录标识。如果返回值为 null，表示用户名不存在；如果返回值 user 属性为空，表示用户密码错误；
+     * 否则登录成功
      */
     @Transactional(isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
-    public UserAndIdentity loginUserByName(@NonNull String name, @NonNull String password,
-                                           int rememberDays, @NonNull String source) {
-        User user = redisUserDao.getUserByName(name);
+    public UserAndIdentity loginUserByName(UserController.LoginByNameParams params) throws JsonProcessingException {
+        User user = redisUserDao.getUserByName(params.name);
         if (user == null) {
-            user = userDao.selectByName(name);
+            user = userDao.selectByName(params.name);
             if (user == null) {
                 return null;
             } else {
@@ -213,24 +242,21 @@ public class UserService {
             }
         }
 
-        return loginUser(user, password, rememberDays, source);
+        return loginUser("name", user, params.password, params.rememberDays, params.source,
+                params.ipLocInfo);
     }
 
     /**
      * 根据用户邮箱和密码进行登录。如果选择了“记住我”，则还会返回新的登录标识。
      *
-     * @param email        邮箱
-     * @param password     密码
-     * @param rememberDays 记住多少天
-     * @param source       客户端标识
-     * @return User 对象和登录标识
+     * @return User 对象和登录标识。如果返回值为 null，表示用户邮箱不存在；如果返回值 user 属性为空，表示用户密码错误；
+     * 否则登录成功
      */
     @Transactional(isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
-    public UserAndIdentity loginUserByEmail(@NonNull String email, @NonNull String password,
-                                            int rememberDays, @NonNull String source) {
-        User user = redisUserDao.getUserByEmail(email);
+    public UserAndIdentity loginUserByEmail(UserController.LoginByEmailParams params) throws JsonProcessingException {
+        User user = redisUserDao.getUserByEmail(params.email);
         if (user == null) {
-            user = userDao.selectByEmail(email);
+            user = userDao.selectByEmail(params.email);
             if (user == null) {
                 return null;
             }
@@ -238,10 +264,13 @@ public class UserService {
             redisUserDao.setUser(user);
         }
 
-        return loginUser(user, password, rememberDays, source);
+        return loginUser("email", user, params.password, params.rememberDays, params.source,
+                params.ipLocInfo);
     }
 
-    UserAndIdentity loginUser(User user, String password, int rememberDays, String source) {
+    UserAndIdentity loginUser(String loginType, User user, String password,
+                              int rememberDays, String source, IpLocInfo ipLocInfo)
+            throws JsonProcessingException {
         UserAndIdentity result = new UserAndIdentity();
         // 比对密码是否相同
         String actualPassword = PasswordUtil.encrypt(password + user.getSalt());
@@ -254,9 +283,18 @@ public class UserService {
                 result.setIdentity(identity);
                 userIdentityDao.deleteByUserIdAndSource(user.getId(), source);
                 userIdentityDao.insert(userIdentity);
+
+                // 插入登录成功日志
+                userLogDao.insert(new UserLog(user.getId(), UserLogType.LOGIN, objectMapper.writeValueAsString(
+                        new UserLoginLog("success", loginType, DeviceUtil.fillIpLocInfo(ipLocInfo)))));
+
                 // 新的登录标识缓存到 redis 中
                 redisUserDao.setIdentity2Id(identity, source, user.getId());
             }
+        } else {
+            // 插入登录密码错误日志
+            userLogDao.insert(new UserLog(user.getId(), UserLogType.LOGIN, objectMapper.writeValueAsString(
+                    new UserLoginLog("fail-password", loginType, DeviceUtil.fillIpLocInfo(ipLocInfo)))));
         }
 
         return result;
@@ -266,11 +304,12 @@ public class UserService {
      * 根据用户标识和来源进行登录。如果不存在、标识或来源不对、已过期则返回 null。
      *
      * @param loginIdentity 用户登录标识
-     * @param source 来源，用于唯一标识一个客户端
+     * @param source        来源，用于唯一标识一个客户端
      * @return 登录成功返回 User 对象，否则返回 null
      */
     @Transactional(isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
-    public User loginByIdentity(@NonNull String loginIdentity, @NonNull String source) {
+    public User loginByIdentity(@NonNull String loginIdentity, @NonNull String source, @Nullable IpLocInfo ipLocInfo)
+            throws JsonProcessingException {
         User user = redisUserDao.getUserByIdentity(loginIdentity, source);
         if (user == null) {
             UserIdentity userIdentity = userIdentityDao.selectByIdentity(loginIdentity, source);
@@ -281,8 +320,17 @@ public class UserService {
             if (!userIdentity.getExpire().equals(TimeUtil.EMPTY_DATE)
                     && userIdentity.getExpire().getTime() < System.currentTimeMillis()) {
                 userIdentityDao.deleteByIdentity(loginIdentity);
+
+                // 插入登录过期日志
+                userLogDao.insert(new UserLog(userIdentity.getUserId(), UserLogType.LOGIN, objectMapper.writeValueAsString(
+                        new UserLoginLog("expire-identity", "identity", DeviceUtil.fillIpLocInfo(ipLocInfo)))));
                 return null;
             }
+
+            // 插入登录成功日志
+            userLogDao.insert(new UserLog(userIdentity.getUserId(), UserLogType.LOGIN, objectMapper.writeValueAsString(
+                    new UserLoginLog("success", "identity", DeviceUtil.fillIpLocInfo(ipLocInfo)))));
+
             // 将数据缓存到 redis 中
             user = userDao.selectByIdentity(loginIdentity, source);
             redisUserDao.setIdentity2Id(loginIdentity, source, user.getId());
@@ -295,7 +343,7 @@ public class UserService {
     /**
      * 发送“忘记密码”邮件，用户点击邮件中的链接后即可使用设置的新密码。
      *
-     * @param email 需要重置密码的用户邮箱
+     * @param email       需要重置密码的用户邮箱
      * @param newPassword 新密码
      * @return 邮箱是否存在
      * @throws GeneralSecurityException
@@ -324,15 +372,26 @@ public class UserService {
         return exists;
     }
 
+    /**
+     * 解密忘记密码 URL 的参数
+     */
     public String decryptForgetPasswordParams(@NonNull String encryptedParams) throws GeneralSecurityException, UnsupportedEncodingException {
         return URLUtil.decryptParams(forgetPasswordAesKey, encryptedParams);
     }
 
+    /**
+     * 判断是否存在 email
+     */
     public boolean existsEmail(@NonNull String email) {
         return redisUserDao.existsEmail(email) || userDao.existsEmail(email);
     }
 
-    public boolean setNewPassword(@NonNull String email, @NonNull String newPassword) {
+    /**
+     * 为指定的邮箱账号，设置新的密码
+     */
+    @Transactional(isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
+    public boolean setNewPassword(int userLogType, @NonNull String email, @NonNull String newPassword)
+            throws JsonProcessingException {
         User user = redisUserDao.getUserByEmail(email);
         if (user == null) {
             user = userDao.selectByEmail(email);
@@ -344,14 +403,66 @@ public class UserService {
         // 更新数据库中的用户密码
         User updated = new User();
         updated.setId(user.getId());
-        updated.setPassword(PasswordUtil.encrypt(newPassword));
+        setPassword(updated, newPassword);
         userDao.updateByIdSelective(updated);
 
+        // 写入用户更新密码日志
+        userLogDao.insert(new UserLog(user.getId(), userLogType, objectMapper.writeValueAsString(
+                new UserUpdateLog(user.getPassword(), updated.getPassword()))));
+
         // 更新 Redis 中的用户密码
-        user.setPassword(newPassword);
+        user.setSalt(updated.getSalt());
+        user.setPassword(updated.getPassword());
         redisUserDao.setUser(user);
 
         return true;
+    }
+
+    /**
+     * 修改用户密码。
+     *
+     * @return 如果邮箱和老密码存在，返回 true；否则返回 false
+     */
+    @Transactional(isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
+    public boolean modifyPassword(UserController.ModifyPasswordParams params) throws JsonProcessingException {
+        if (userDao.existsByEmailPassword(params.email, params.oldPassword)) {
+            return setNewPassword(UserLogType.MODIFY_PASSWORD, params.email, params.newPassword);
+        }
+
+        return false;
+    }
+
+    /**
+     * 修改用户名称。
+     */
+    @Transactional(isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
+    public boolean modifyName(UserController.ModifyNameParams params) throws JsonProcessingException {
+        User user = redisUserDao.getUserByName(params.oldName);
+        if (user == null) {
+            user = userDao.selectByName(params.oldName);
+        }
+
+        // 如果老用户名和密码匹配
+        if (user != null &&
+                user.getPassword().equals(PasswordUtil.encrypt(params.password + user.getSalt()))) {
+            // 更新数据库中的用户名
+            User update = new User();
+            update.setId(user.getId());
+            update.setName(params.newName);
+            userDao.updateByIdSelective(update);
+
+            // 写入用户更新名称日志
+            userLogDao.insert(new UserLog(user.getId(), UserLogType.MODIFY_NAME, objectMapper.writeValueAsString(
+                    new UserUpdateLog(params.oldName, params.newName))));
+
+            // 更新 redis 中的用户名
+            user.setName(params.newName);
+            redisUserDao.setUser(user);
+
+            return true;
+        }
+
+        return false;
     }
 
     /**
@@ -361,10 +472,8 @@ public class UserService {
         // 如果用户 note 是空字符串，将其设为 null
         if (!StringUtils.hasText(user.getNote()))
             user.setNote(null);
-        // 为用户随机生成“密码盐”
-        user.setSalt(PasswordUtil.generateSalt());
-        // 将密码和“密码盐”组合，然后进行加密变成最终的密码
-        user.setPassword(PasswordUtil.encrypt(user.getPassword() + user.getSalt()));
+        // 设置用户密码
+        setPassword(user, user.getPassword());
         // 设置用户状态为 NOT_ACTIVATED
         user.setState(UserState.NOT_ACTIVATED.getState());
         user.setStateNote(UserState.NOT_ACTIVATED.getStateNote());
@@ -376,6 +485,14 @@ public class UserService {
                 TimeUnit.HOURS));
 
         return user;
+    }
+
+    /**
+     * 设置用户对象密码。
+     */
+    public void setPassword(User user, String password) {
+        user.setSalt(PasswordUtil.generateSalt());
+        user.setPassword(PasswordUtil.encrypt(password + user.getSalt()));
     }
 
     /**

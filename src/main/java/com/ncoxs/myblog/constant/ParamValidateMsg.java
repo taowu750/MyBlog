@@ -25,4 +25,6 @@ public interface ParamValidateMsg {
             + ParamValidateRule.LOGIN_REMEMBER_DAYS_MIN;
     String USER_LOGIN_REMEMBER_DAYS_MAX = "user.login_remember_days.range:用户登录状态保留天数不能大于 "
             + ParamValidateRule.LOGIN_REMEMBER_DAYS_MAX;
+
+    String IP_FORMAT = "device.ip:客户端 IP 格式错误";
 }

@@ -29,6 +29,16 @@ public interface UserDao {
 
     boolean existsByNameEmail(String name, String email);
 
+    /**
+     * 判断邮箱账号是否存在。注意 password 需要是原始密码。
+     */
+    boolean existsByEmailPassword(String email, String password);
+
+    /**
+     * 判断名称账号是否存在。注意 password 需要是原始密码。
+     */
+    boolean existsByNamePassword(String name, String password);
+
     boolean updateByIdSelective(User user);
 
     boolean deleteById(int id);

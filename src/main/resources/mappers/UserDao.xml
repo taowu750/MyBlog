@@ -58,6 +58,18 @@
         where email=#{email}
     </select>
 
+    <select id="existsByEmailPassword" resultType="java.lang.Boolean">
+        select <include refid="AllColumns"/>
+        from user
+        where email=#{email} and password=md5(concat(#{password}, salt))
+    </select>
+
+    <select id="existsByNamePassword" resultType="java.lang.Boolean">
+        select <include refid="AllColumns"/>
+        from user
+        where name=#{name} and password=md5(concat(#{password}, salt))
+    </select>
+
     <delete id="deleteById">
         delete
         from user

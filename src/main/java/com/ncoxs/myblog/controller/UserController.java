@@ -1,14 +1,19 @@
 package com.ncoxs.myblog.controller;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.ncoxs.myblog.constant.ParamValidateMsg;
 import com.ncoxs.myblog.constant.ParamValidateRule;
 import com.ncoxs.myblog.constant.ResultCode;
+import com.ncoxs.myblog.constant.UserLogType;
 import com.ncoxs.myblog.handler.encryption.Encryption;
 import com.ncoxs.myblog.model.dto.GenericResult;
+import com.ncoxs.myblog.model.dto.IpLocInfo;
 import com.ncoxs.myblog.model.dto.UserAndIdentity;
 import com.ncoxs.myblog.model.pojo.User;
 import com.ncoxs.myblog.service.UserService;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.NonNull;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.validation.annotation.Validated;
@@ -36,9 +41,10 @@ public class UserController {
     @PostMapping("/register")
     @ResponseBody
     @Encryption
-    public GenericResult<Object> register(User user) throws MessagingException {
+    public GenericResult<Object> register(User user, IpLocInfo ipLocInfo)
+            throws MessagingException, JsonProcessingException {
         int exists = userService.existsUser(user.getName(), user.getEmail());
-        if (exists == 0 && userService.registerUser(user)) {
+        if (exists == 0 && userService.registerUser(user, ipLocInfo)) {
             return GenericResult.success();
         }
 
@@ -60,7 +66,7 @@ public class UserController {
     @GetMapping("/account-activate/{identity}")
     public ModelAndView accountActivate(@PathVariable("identity")
                                         @NotBlank(message = ParamValidateMsg.USER_ACTIVATE_IDENTITY_BLANK)
-                                                String identity) {
+                                                String identity) throws JsonProcessingException {
         User user = userService.activateUser(identity);
         ModelAndView modelAndView = new ModelAndView();
         if (user == UserService.USER_EXPIRED) {
@@ -78,60 +84,58 @@ public class UserController {
     }
 
     @Data
-    public static class LoginByNameReq {
-
-        @NotBlank(message = ParamValidateMsg.USER_NAME_BLANK)
-        @Pattern(regexp = ParamValidateRule.NAME_REGEX, message = ParamValidateMsg.USER_NAME_FORMAT)
-        public String name;
+    public static class LoginParams {
 
         @NotBlank(message = ParamValidateMsg.USER_PASSWORD_BLANK)
         @Pattern(regexp = ParamValidateRule.PASSWORD_REGEX, message = ParamValidateMsg.USER_PASSWORD_FORMAT)
         public String password;
 
+        // 记住多少天
         @Min(value = ParamValidateRule.LOGIN_REMEMBER_DAYS_MIN, message = ParamValidateMsg.USER_LOGIN_REMEMBER_DAYS_MIN)
         @Max(value = ParamValidateRule.LOGIN_REMEMBER_DAYS_MAX, message = ParamValidateMsg.USER_LOGIN_REMEMBER_DAYS_MAX)
         public Integer rememberDays;
 
+        // 客户端标识
         public String source;
+
+        public IpLocInfo ipLocInfo;
+    }
+
+    @EqualsAndHashCode(callSuper = true)
+    @Data
+    public static class LoginByNameParams extends LoginParams {
+
+        @NotBlank(message = ParamValidateMsg.USER_NAME_BLANK)
+        @Pattern(regexp = ParamValidateRule.NAME_REGEX, message = ParamValidateMsg.USER_NAME_FORMAT)
+        public String name;
     }
 
     @PostMapping("/login/name")
     @ResponseBody
     @Encryption
-    public GenericResult<UserAndIdentity> loginByName(LoginByNameReq loginByNameReq) {
-        loginByNameReq.rememberDays = loginByNameReq.rememberDays != null ? loginByNameReq.rememberDays : 0;
-        loginByNameReq.source = loginByNameReq.source != null ? loginByNameReq.source : "";
-        UserAndIdentity userAndIdentity = userService.loginUserByName(loginByNameReq.name, loginByNameReq.password,
-                loginByNameReq.rememberDays, loginByNameReq.source);
+    public GenericResult<UserAndIdentity> loginByName(LoginByNameParams loginByNameParams) throws JsonProcessingException {
+        loginByNameParams.rememberDays = loginByNameParams.rememberDays != null ? loginByNameParams.rememberDays : 0;
+        loginByNameParams.source = loginByNameParams.source != null ? loginByNameParams.source : "";
+        UserAndIdentity userAndIdentity = userService.loginUserByName(loginByNameParams);
         return checkUserAndIdentity(userAndIdentity);
     }
 
+    @EqualsAndHashCode(callSuper = true)
     @Data
-    public static class LoginByEmailReq {
+    public static class LoginByEmailParams extends LoginParams {
 
         @NotBlank(message = ParamValidateMsg.USER_EMAIL_BLANK)
         @Pattern(regexp = ParamValidateRule.EMAIL_REGEX, message = ParamValidateMsg.USER_EMAIL_FORMAT)
         public String email;
-
-        @NotBlank(message = ParamValidateMsg.USER_PASSWORD_BLANK)
-        @Pattern(regexp = ParamValidateRule.PASSWORD_REGEX, message = ParamValidateMsg.USER_PASSWORD_FORMAT)
-        public String password;
-
-        @Min(value = ParamValidateRule.LOGIN_REMEMBER_DAYS_MIN, message = ParamValidateMsg.USER_LOGIN_REMEMBER_DAYS_MIN)
-        @Max(value = ParamValidateRule.LOGIN_REMEMBER_DAYS_MAX, message = ParamValidateMsg.USER_LOGIN_REMEMBER_DAYS_MAX)
-        public Integer rememberDays;
-
-        public String source;
     }
 
     @PostMapping("/login/email")
     @ResponseBody
     @Encryption
-    public GenericResult<UserAndIdentity> loginByEmail(LoginByEmailReq loginByEmailReq) {
-        loginByEmailReq.rememberDays = loginByEmailReq.rememberDays != null ? loginByEmailReq.rememberDays : 0;
-        loginByEmailReq.source = loginByEmailReq.source != null ? loginByEmailReq.source : "";
-        UserAndIdentity userAndIdentity = userService.loginUserByEmail(loginByEmailReq.email, loginByEmailReq.password,
-                loginByEmailReq.rememberDays, loginByEmailReq.source);
+    public GenericResult<UserAndIdentity> loginByEmail(LoginByEmailParams loginByEmailParams) throws JsonProcessingException {
+        loginByEmailParams.rememberDays = loginByEmailParams.rememberDays != null ? loginByEmailParams.rememberDays : 0;
+        loginByEmailParams.source = loginByEmailParams.source != null ? loginByEmailParams.source : "";
+        UserAndIdentity userAndIdentity = userService.loginUserByEmail(loginByEmailParams);
         return checkUserAndIdentity(userAndIdentity);
     }
 
@@ -149,13 +153,13 @@ public class UserController {
     @ResponseBody
     @Encryption
     public GenericResult<User> loginByIdentity(@NotNull String identity,
-                                               @NotNull String source) {
-        return GenericResult.success(userService.loginByIdentity(identity, source));
+                                               @NotNull String source,
+                                               @NonNull IpLocInfo ipLocInfo) throws JsonProcessingException {
+        return GenericResult.success(userService.loginByIdentity(identity, source, ipLocInfo));
     }
 
     @PostMapping("/password/send-forget")
     @ResponseBody
-    @Encryption
     public GenericResult<Boolean> sendForgetPasswordEmail(@NotBlank(message = ParamValidateMsg.USER_EMAIL_BLANK)
                                                           @Pattern(regexp = ParamValidateRule.EMAIL_REGEX, message = ParamValidateMsg.USER_EMAIL_FORMAT)
                                                                   String email,
@@ -168,7 +172,8 @@ public class UserController {
 
     @PostMapping("/password/forget/{encryptedParams}")
     public ModelAndView forgetPassword(@PathVariable("encryptedParams")
-                                       @NotBlank String encryptedParams) throws GeneralSecurityException, UnsupportedEncodingException {
+                                       @NotBlank String encryptedParams)
+            throws GeneralSecurityException, UnsupportedEncodingException, JsonProcessingException {
         ModelAndView mv = new ModelAndView();
         String[] params = userService.decryptForgetPasswordParams(encryptedParams).split(" ");
         if (params.length != 3) {
@@ -181,12 +186,55 @@ public class UserController {
             } else if (!userService.existsEmail(email)) {
                 mv.addObject("result", "non-exists");
             } else {
-                userService.setNewPassword(email, newPassword);
+                userService.setNewPassword(UserLogType.FORGET_PASSWORD, email, newPassword);
                 mv.addObject("result", "success");
             }
         }
         mv.setViewName("/view/forget-password-result");
 
         return mv;
+    }
+
+    @Data
+    public static class ModifyPasswordParams {
+
+        @NotBlank(message = ParamValidateMsg.USER_EMAIL_BLANK)
+        @Pattern(regexp = ParamValidateRule.EMAIL_REGEX, message = ParamValidateMsg.USER_EMAIL_FORMAT)
+        public String email;
+
+        @NotBlank(message = ParamValidateMsg.USER_PASSWORD_BLANK)
+        @Pattern(regexp = ParamValidateRule.PASSWORD_REGEX, message = ParamValidateMsg.USER_PASSWORD_FORMAT)
+        public String oldPassword;
+
+        @NotBlank(message = ParamValidateMsg.USER_PASSWORD_BLANK)
+        @Pattern(regexp = ParamValidateRule.PASSWORD_REGEX, message = ParamValidateMsg.USER_PASSWORD_FORMAT)
+        public String newPassword;
+    }
+
+    @PostMapping("/password/modify")
+    @ResponseBody
+    public GenericResult<Boolean> modifyPassword(ModifyPasswordParams params) throws JsonProcessingException {
+        return GenericResult.success(userService.modifyPassword(params));
+    }
+
+    @Data
+    public static class ModifyNameParams {
+
+        @NotBlank(message = ParamValidateMsg.USER_NAME_BLANK)
+        @Pattern(regexp = ParamValidateRule.NAME_REGEX, message = ParamValidateMsg.USER_NAME_FORMAT)
+        public String oldName;
+
+        @NotBlank(message = ParamValidateMsg.USER_NAME_BLANK)
+        @Pattern(regexp = ParamValidateRule.NAME_REGEX, message = ParamValidateMsg.USER_NAME_FORMAT)
+        public String newName;
+
+        @NotBlank(message = ParamValidateMsg.USER_PASSWORD_BLANK)
+        @Pattern(regexp = ParamValidateRule.PASSWORD_REGEX, message = ParamValidateMsg.USER_PASSWORD_FORMAT)
+        public String password;
+    }
+
+    @PostMapping("/name/modify")
+    public GenericResult<Boolean> modifyName(ModifyNameParams params) throws JsonProcessingException {
+        return GenericResult.success(userService.modifyName(params));
     }
 }
