@@ -268,7 +268,7 @@ public class EncryptionMockMvcBuilder {
     /**
      * 发送请求
      */
-    public EncryptionMockMvcBuilder request() throws Exception {
+    public EncryptionMockMvcBuilder sendRequest() throws Exception {
         if (requestBuilder == null) {
             throw new IllegalStateException("method not setting");
         }
@@ -348,7 +348,9 @@ public class EncryptionMockMvcBuilder {
      */
     public static byte[] decryptData(EncryptionMockMvcBuilder builder, MvcResult mvcResult)
             throws GeneralSecurityException {
-        if (builder.enable) {
+        boolean isResponseEncrypt = HttpHeaderConst.ENCRYPTION_MODE_FULL.equals(mvcResult.getResponse()
+                .getHeader(HttpHeaderKey.ENCRYPTION_MODE));
+        if (builder.enable && isResponseEncrypt) {
             // 获取响应数据
             byte[] encryptedResponse = mvcResult.getResponse().getContentAsByteArray();
             String aesKeyString = mvcResult.getResponse().getHeader(HttpHeaderKey.REQUEST_ENCRYPTED_AES_KEY);

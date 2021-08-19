@@ -42,7 +42,7 @@ public class SystemTestControllerTest {
                 new EncryptionMockMvcBuilder(mockMvc, objectMapper)
                         .post("/test/system/encryption/json")
                         .jsonParams(mp(kv("message", "加密信息"), kv("code", 42), kv("user", user)))
-                        .request()
+                        .sendRequest()
                         .expectStatusOk()
                         .print()
                         .buildMap());
@@ -58,7 +58,7 @@ public class SystemTestControllerTest {
                         .post("/test/system/encryption/form-post")
                         .formParams(mp(kv("message", "加密信息"), kv("code", 42), kv("name", "wuhan"),
                                 kv("age", 23)))
-                        .request()
+                        .sendRequest()
                         .expectStatusOk()
                         .print()
                         .buildMap());
@@ -74,7 +74,7 @@ public class SystemTestControllerTest {
                         .get("/test/system/encryption/form-get")
                         .formParams(mp(kv("message", "加密信息"), kv("code", 42), kv("name", "野兽先辈"),
                                 kv("age", 24)))
-                        .request()
+                        .sendRequest()
                         .expectStatusOk()
                         .print()
                         .buildMap());
