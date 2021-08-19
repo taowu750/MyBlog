@@ -47,9 +47,13 @@ create table if not exists `user_log`
     `id`          int primary key auto_increment,
     `user_id`     int            not null,
     `type`        int            not null,
+    # 用来唯一标识某条日志的 token，方便日后查找、修改
+    `token`       varchar(100)   not null default '',
     # 描述，json 文本
     `description` varchar(10000) not null,
     `create_time` timestamp      not null default current_timestamp,
+    `modify_time` timestamp      not null default current_timestamp on update current_timestamp,
 
-    key (user_id, type)
+    key (user_id, type),
+    key (token)
 );

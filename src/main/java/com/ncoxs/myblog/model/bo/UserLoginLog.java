@@ -16,8 +16,8 @@ public class UserLoginLog {
     /**
      * 登录状态：
      * - success: 成功
-     * - fail-password: 密码错误
-     * - expire-identity: 标识过期
+     * - password-fail: 密码错误
+     * - identity-expire: 标识过期
      */
     private String status;
 

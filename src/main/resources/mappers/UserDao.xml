@@ -59,13 +59,13 @@
     </select>
 
     <select id="existsByEmailPassword" resultType="java.lang.Boolean">
-        select <include refid="AllColumns"/>
+        select count(*)
         from user
         where email=#{email} and password=md5(concat(#{password}, salt))
     </select>
 
     <select id="existsByNamePassword" resultType="java.lang.Boolean">
-        select <include refid="AllColumns"/>
+        select count(*)
         from user
         where name=#{name} and password=md5(concat(#{password}, salt))
     </select>

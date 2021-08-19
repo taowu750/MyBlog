@@ -16,7 +16,17 @@ public interface UserLogDao {
 
     UserLog selectByUserIdTypeLatest(int userId, int type);
 
-    int updateByIdSelective(UserLog record);
+    UserLog selectByToken(String token);
+
+    String selectDescriptionByToken(String token);
+
+    boolean updateByIdSelective(UserLog record);
+
+    boolean updateDescriptionByToken(String token, String description);
 
     boolean deleteById(Integer id);
+
+    int deleteByUserId(int userId);
+
+    int deleteAll();
 }

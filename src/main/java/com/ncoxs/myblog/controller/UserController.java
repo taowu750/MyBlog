@@ -170,7 +170,7 @@ public class UserController {
         return GenericResult.success(userService.sendForgetPasswordMail(email, newPassword));
     }
 
-    @PostMapping("/password/forget/{encryptedParams}")
+    @GetMapping("/password/forget/{encryptedParams}")
     public ModelAndView forgetPassword(@PathVariable("encryptedParams")
                                        @NotBlank String encryptedParams)
             throws GeneralSecurityException, UnsupportedEncodingException, JsonProcessingException {
@@ -234,6 +234,7 @@ public class UserController {
     }
 
     @PostMapping("/name/modify")
+    @ResponseBody
     public GenericResult<Boolean> modifyName(ModifyNameParams params) throws JsonProcessingException {
         return GenericResult.success(userService.modifyName(params));
     }

@@ -11,6 +11,7 @@ import com.ncoxs.myblog.dao.mysql.UserDao;
 import com.ncoxs.myblog.dao.mysql.UserIdentityDao;
 import com.ncoxs.myblog.dao.mysql.UserLogDao;
 import com.ncoxs.myblog.dao.redis.RedisUserDao;
+import com.ncoxs.myblog.exception.UserLogException;
 import com.ncoxs.myblog.model.bo.UserLoginLog;
 import com.ncoxs.myblog.model.bo.UserRegisterLog;
 import com.ncoxs.myblog.model.bo.UserUpdateLog;
@@ -39,7 +40,6 @@ import java.util.concurrent.TimeUnit;
 
 // TODO: 密码强度验证
 // TODO: 要有定时清理数据库中过期数据的机制
-// TODO: 用户登录等行为应该被记录
 @Service
 @PropertySource("classpath:app-props.properties")
 public class UserService {
@@ -152,8 +152,8 @@ public class UserService {
         userIdentityDao.insert(userIdentity);
 
         // 插入用户注册日志
-        userLogDao.insert(new UserLog(user.getId(), UserLogType.REGISTER, objectMapper.writeValueAsString(
-                new UserRegisterLog(user.getStateNote(), DeviceUtil.fillIpLocInfo(ipLocInfo)))));
+        userLogDao.insert(new UserLog(user.getId(), UserLogType.REGISTER, userIdentity.getIdentity(),
+                objectMapper.writeValueAsString(new UserRegisterLog(user.getStateNote(), DeviceUtil.fillIpLocInfo(ipLocInfo)))));
 
         // 将用户信息插入到 Redis 中
         redisUserDao.setNonActivateUser(activateId, user);
@@ -210,9 +210,14 @@ public class UserService {
         // 删除激活凭证
         userIdentityDao.deleteByIdentity(identity);
 
-        // 插入用户注册日志
-        userLogDao.insert(new UserLog(user.getId(), UserLogType.REGISTER, objectMapper.writeValueAsString(
-                new UserRegisterLog(update.getStateNote(), DeviceUtil.fillIpLocInfo(null)))));
+        // 修改用户注册日志
+        String userRegisterLogStr = userLogDao.selectDescriptionByToken(identity);
+        if (userRegisterLogStr == null) {
+            throw new UserLogException("没有 token 为 " + identity + " 的用户注册日志");
+        }
+        UserRegisterLog userRegisterLog = objectMapper.readValue(userRegisterLogStr, UserRegisterLog.class);
+        userRegisterLog.setStatus(update.getStateNote());
+        userLogDao.updateDescriptionByToken(identity, objectMapper.writeValueAsString(userRegisterLog));
 
         // 将已激活的用户缓存到 redis 中
         user.setState(UserState.NORMAL.getState());
@@ -276,6 +281,10 @@ public class UserService {
         String actualPassword = PasswordUtil.encrypt(password + user.getSalt());
         if (actualPassword.equals(user.getPassword())) {
             result.setUser(user);
+            // 插入登录成功日志
+            userLogDao.insert(new UserLog(user.getId(), UserLogType.LOGIN, objectMapper.writeValueAsString(
+                    new UserLoginLog("success", loginType, DeviceUtil.fillIpLocInfo(ipLocInfo)))));
+
             // 如果登录时选择了“记住我”的选项，则删除上一个登录标识，插入新的登录标识
             if (rememberDays > 0 && StringUtils.hasText(source)) {
                 UserIdentity userIdentity = newLoginIdentity(user, rememberDays, source);
@@ -284,17 +293,13 @@ public class UserService {
                 userIdentityDao.deleteByUserIdAndSource(user.getId(), source);
                 userIdentityDao.insert(userIdentity);
 
-                // 插入登录成功日志
-                userLogDao.insert(new UserLog(user.getId(), UserLogType.LOGIN, objectMapper.writeValueAsString(
-                        new UserLoginLog("success", loginType, DeviceUtil.fillIpLocInfo(ipLocInfo)))));
-
                 // 新的登录标识缓存到 redis 中
                 redisUserDao.setIdentity2Id(identity, source, user.getId());
             }
         } else {
             // 插入登录密码错误日志
             userLogDao.insert(new UserLog(user.getId(), UserLogType.LOGIN, objectMapper.writeValueAsString(
-                    new UserLoginLog("fail-password", loginType, DeviceUtil.fillIpLocInfo(ipLocInfo)))));
+                    new UserLoginLog("password-fail", loginType, DeviceUtil.fillIpLocInfo(ipLocInfo)))));
         }
 
         return result;
@@ -323,19 +328,19 @@ public class UserService {
 
                 // 插入登录过期日志
                 userLogDao.insert(new UserLog(userIdentity.getUserId(), UserLogType.LOGIN, objectMapper.writeValueAsString(
-                        new UserLoginLog("expire-identity", "identity", DeviceUtil.fillIpLocInfo(ipLocInfo)))));
+                        new UserLoginLog("identity-expire", "identity", DeviceUtil.fillIpLocInfo(ipLocInfo)))));
                 return null;
             }
-
-            // 插入登录成功日志
-            userLogDao.insert(new UserLog(userIdentity.getUserId(), UserLogType.LOGIN, objectMapper.writeValueAsString(
-                    new UserLoginLog("success", "identity", DeviceUtil.fillIpLocInfo(ipLocInfo)))));
 
             // 将数据缓存到 redis 中
             user = userDao.selectByIdentity(loginIdentity, source);
             redisUserDao.setIdentity2Id(loginIdentity, source, user.getId());
             redisUserDao.setUser(user);
         }
+
+        // 插入登录成功日志
+        userLogDao.insert(new UserLog(user.getId(), UserLogType.LOGIN, objectMapper.writeValueAsString(
+                new UserLoginLog("success", "identity", DeviceUtil.fillIpLocInfo(ipLocInfo)))));
 
         return user;
     }
@@ -345,7 +350,7 @@ public class UserService {
      *
      * @param email       需要重置密码的用户邮箱
      * @param newPassword 新密码
-     * @return 邮箱是否存在
+     * @return 邮箱不存在，或新密码和旧密码相同，则返回 false；否则返回 true
      * @throws GeneralSecurityException
      * @throws MessagingException
      * @throws UnsupportedEncodingException
@@ -358,6 +363,12 @@ public class UserService {
             if (user == null) {
                 user = userDao.selectByEmail(email);
             }
+
+            // 新密码和老密码相同，返回 false
+            if (user.getPassword().equals(PasswordUtil.encrypt(newPassword + user.getSalt()))) {
+                return false;
+            }
+
             // 拼接参数并加密
             String params = email + " " + newPassword + " " + TimeUtil.changeDateTime(forgetPasswordExpire, TimeUnit.HOURS).getTime();
             String encryptedParams = URLUtil.encryptParams(forgetPasswordAesKey, params);
@@ -421,11 +432,12 @@ public class UserService {
     /**
      * 修改用户密码。
      *
-     * @return 如果邮箱和老密码存在，返回 true；否则返回 false
+     * @return 如果邮箱和老密码存在，并且新旧密码不相同，返回 true；否则返回 false
      */
     @Transactional(isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
     public boolean modifyPassword(UserController.ModifyPasswordParams params) throws JsonProcessingException {
-        if (userDao.existsByEmailPassword(params.email, params.oldPassword)) {
+        if (!params.oldPassword.equals(params.newPassword)
+                && userDao.existsByEmailPassword(params.email, params.oldPassword)) {
             return setNewPassword(UserLogType.MODIFY_PASSWORD, params.email, params.newPassword);
         }
 
@@ -437,6 +449,11 @@ public class UserService {
      */
     @Transactional(isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
     public boolean modifyName(UserController.ModifyNameParams params) throws JsonProcessingException {
+        // 如果新旧名称相同，返回 false
+        if (params.oldName.equals(params.newName)) {
+            return false;
+        }
+
         User user = redisUserDao.getUserByName(params.oldName);
         if (user == null) {
             user = userDao.selectByName(params.oldName);
