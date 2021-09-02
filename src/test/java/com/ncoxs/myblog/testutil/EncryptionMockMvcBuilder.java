@@ -59,7 +59,7 @@ public class EncryptionMockMvcBuilder {
      * 请求 RSA 公钥。
      */
     public static Map<String, Object> requestRsaPublicKey(MockMvc mockMvc, ObjectMapper objectMapper) throws Exception {
-        MvcResult mvcResult = mockMvc.perform(MockMvcRequestBuilders.get("/system/encryption/rsa-public-key")
+        MvcResult mvcResult = mockMvc.perform(MockMvcRequestBuilders.get("/app/encryption/rsa-public-key")
                 .accept(MediaType.APPLICATION_JSON_UTF8_VALUE))
                 .andExpect(status().isOk())
                 .andDo(MockMvcResultHandlers.print())

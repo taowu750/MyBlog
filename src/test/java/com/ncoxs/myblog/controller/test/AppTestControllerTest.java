@@ -13,11 +13,11 @@ import static com.ncoxs.myblog.util.general.MapUtil.kv;
 import static com.ncoxs.myblog.util.general.MapUtil.mp;
 
 /**
- * {@link SystemTestController} 测试类。
+ * {@link AppTestController} 测试类。
  */
 @SpringBootTest
 @AutoConfigureMockMvc
-public class SystemTestControllerTest {
+public class AppTestControllerTest {
 
     @Autowired
     MockMvc mockMvc;
@@ -40,7 +40,7 @@ public class SystemTestControllerTest {
         user.setAge(23);
         System.out.println(
                 new EncryptionMockMvcBuilder(mockMvc, objectMapper)
-                        .post("/test/system/encryption/json")
+                        .post("/test/app/encryption/json")
                         .jsonParams(mp(kv("message", "加密信息"), kv("code", 42), kv("user", user)))
                         .sendRequest()
                         .expectStatusOk()
@@ -55,7 +55,7 @@ public class SystemTestControllerTest {
     public void testEncryptionFormPost() throws Exception {
         System.out.println(
                 new EncryptionMockMvcBuilder(mockMvc, objectMapper)
-                        .post("/test/system/encryption/form-post")
+                        .post("/test/app/encryption/form-post")
                         .formParams(mp(kv("message", "加密信息"), kv("code", 42), kv("name", "wuhan"),
                                 kv("age", 23)))
                         .sendRequest()
@@ -71,7 +71,7 @@ public class SystemTestControllerTest {
     public void testEncryptionFormGet() throws Exception {
         System.out.println(
                 new EncryptionMockMvcBuilder(mockMvc, objectMapper)
-                        .get("/test/system/encryption/form-get")
+                        .get("/test/app/encryption/form-get")
                         .formParams(mp(kv("message", "加密信息"), kv("code", 42), kv("name", "野兽先辈"),
                                 kv("age", 24)))
                         .sendRequest()

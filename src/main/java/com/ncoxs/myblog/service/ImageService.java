@@ -51,7 +51,7 @@ public class ImageService {
     }
 
     public List<Boolean> deleteUnusedImages(List<String> images) {
-
+        return null;
     }
 
     public List<Boolean> deleteImages(List<String> unusedImgs) {
@@ -59,6 +59,8 @@ public class ImageService {
         for (int i = 0; i < unusedImgs.size(); i++) {
 
         }
+
+        return null;
     }
 
     public boolean isUnusedImage(String imagePath) {

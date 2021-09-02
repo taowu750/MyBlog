@@ -15,8 +15,8 @@ import static com.ncoxs.myblog.util.general.MapUtil.mp;
  * 用来测试一些系统级别功能的控制器。
  */
 @RestController
-@RequestMapping("/test/system")
-public class SystemTestController {
+@RequestMapping("/test/app")
+public class AppTestController {
 
     @ToString
     public static class TestEncryptionParam {
