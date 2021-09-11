@@ -15,7 +15,7 @@ myapp:
       # 用户忘记密码请求过期时间，单位小时
       url-expire: 1
       # 用来加解密“忘记密码”信息的秘钥
-      aes-key: xojDGXtVip8AuU4lj9KUJQ\=\=
+      aes-key: xojDGXtVip8AuU4lj9KUJQ==
 
   request:
     flow-id:
