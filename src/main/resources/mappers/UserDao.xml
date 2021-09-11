@@ -5,21 +5,18 @@
     <resultMap id="BaseResultMap" type="com.ncoxs.myblog.model.pojo.User">
         <id column="id" jdbcType="INTEGER" property="id"/>
         <result column="name" jdbcType="VARCHAR" property="name"/>
-        <result column="note" jdbcType="VARCHAR" property="note"/>
-        <result column="age" jdbcType="INTEGER" property="age"/>
-        <result column="sex" jdbcType="TINYINT" property="sex"/>
+        <result column="type" jdbcType="VARCHAR" property="type"/>
         <result column="password" jdbcType="VARCHAR" property="password"/>
         <result column="email" jdbcType="VARCHAR" property="email"/>
         <result column="salt" jdbcType="VARCHAR" property="salt"/>
-        <result column="state" jdbcType="INTEGER" property="state"/>
-        <result column="state_note" jdbcType="VARCHAR" property="stateNote"/>
+        <result column="status" jdbcType="INTEGER" property="status"/>
         <result column="limit_time" jdbcType="TIMESTAMP" property="limitTime"/>
         <result column="create_time" jdbcType="TIMESTAMP" property="createTime"/>
         <result column="modify_time" jdbcType="TIMESTAMP" property="modifyTime"/>
     </resultMap>
 
     <sql id="AllColumns">
-        id, `name`, note, age, sex, `password`, email, salt, `state`, state_note, limit_time, create_time, modify_time
+        id, `name`, `type`, `password`, email, salt, `status`, limit_time, create_time, modify_time
     </sql>
 
     <select id="selectById" resultMap="BaseResultMap">
@@ -85,20 +82,11 @@
         insert into user
         <trim prefix="(" suffix=")" suffixOverrides=",">
             `name`,
+            `type`,
             `password`,
             email,
             salt,
-            state,
-            state_note,
-            <if test="note != null">
-                note,
-            </if>
-            <if test="age != null">
-                age,
-            </if>
-            <if test="sex != null">
-                sex,
-            </if>
+            `status`,
             <if test="limitTime != null">
                 limit_time,
             </if>
@@ -112,20 +100,11 @@
         select
         <trim suffixOverrides=",">
             #{name,jdbcType=VARCHAR},
+            #{type},
             #{password},
             #{email,jdbcType=VARCHAR},
             #{salt},
-            #{state},
-            #{stateNote},
-            <if test="note != null">
-                #{note},
-            </if>
-            <if test="age != null">
-                #{age,jdbcType=INTEGER},
-            </if>
-            <if test="sex != null">
-                #{sex,jdbcType=TINYINT},
-            </if>
+            #{status},
             <if test="limitTime != null">
                 #{limitTime},
             </if>
@@ -147,14 +126,8 @@
             <if test="name != null">
                 `name` = #{name,jdbcType=VARCHAR},
             </if>
-            <if test="note != null">
-                note = #{note,jdbcType=VARCHAR},
-            </if>
-            <if test="age != null">
-                age = #{age,jdbcType=INTEGER},
-            </if>
-            <if test="sex != null">
-                sex = #{sex,jdbcType=TINYINT},
+            <if test="type != null">
+                `type` = #{type},
             </if>
             <if test="password != null">
                 `password` = #{password},
@@ -165,11 +138,8 @@
             <if test="salt != null">
                 salt = #{salt,jdbcType=VARCHAR},
             </if>
-            <if test="state != null">
-                state = #{state},
-            </if>
-            <if test="stateNote != null">
-                state_note = #{stateNote},
+            <if test="status != null">
+                `status` = #{status},
             </if>
             <if test="limitTime != null">
                 limit_time = #{limitTime},

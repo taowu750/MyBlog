@@ -3,9 +3,10 @@ package com.ncoxs.myblog.controller;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ncoxs.myblog.constant.ResultCode;
-import com.ncoxs.myblog.constant.UserIdentityType;
-import com.ncoxs.myblog.constant.UserLogType;
-import com.ncoxs.myblog.constant.UserState;
+import com.ncoxs.myblog.constant.user.UserIdentityType;
+import com.ncoxs.myblog.constant.user.UserLogType;
+import com.ncoxs.myblog.constant.user.UserStatus;
+import com.ncoxs.myblog.controller.user.UserController;
 import com.ncoxs.myblog.dao.mysql.UserDao;
 import com.ncoxs.myblog.dao.mysql.UserIdentityDao;
 import com.ncoxs.myblog.dao.mysql.UserLogDao;
@@ -110,10 +111,10 @@ public class UserControllerTest {
 
         // assert 用户对象和用户标识
         assertEquals(1, userIdentities.size());
-        assertEquals((byte) userIdentities.get(0).getType(), UserIdentityType.ACTIVATE_IDENTITY.getType());
+        assertEquals(UserIdentityType.ACTIVATE_IDENTITY, userIdentities.get(0).getType());
         // assert Redis 中的用户对象
         User redisUser = redisUserDao.getAndDeleteNonActivateUser(userIdentities.get(0).getIdentity());
-        assertTrue(UserState.NOT_ACTIVATED.is(user.getState()));
+        assertEquals(UserStatus.NOT_ACTIVATED, user.getStatus());
         assertEquals(user.getId(), redisUser.getId());
         assertEquals(user.getName(), redisUser.getName());
 
@@ -121,7 +122,7 @@ public class UserControllerTest {
         UserLog userLog = userLogDao.selectByToken(userIdentities.get(0).getIdentity());
         assertEquals(UserLogType.REGISTER, userLog.getType());
         UserRegisterLog userRegisterLog = objectMapper.readValue(userLog.getDescription(), UserRegisterLog.class);
-        assertEquals(UserState.NOT_ACTIVATED.getStateNote(), userRegisterLog.getStatus());
+        assertEquals(UserStatus.NOT_ACTIVATED, userRegisterLog.getStatus());
         System.out.println(userRegisterLog.getIpLocInfo());
     }
 
@@ -153,7 +154,7 @@ public class UserControllerTest {
         List<UserIdentity> identities = userIdentityDao.selectByUserName(user.getName());
         assertEquals(1, identities.size());
         UserIdentity identity = identities.get(0);
-        assertEquals(UserIdentityType.ACTIVATE_IDENTITY.getType(), identity.getType());
+        assertEquals(UserIdentityType.ACTIVATE_IDENTITY, identity.getType());
 
         // 发送用户激活请求
         MvcResult mvcResult = mockMvc.perform(get("/user/account-activate/{identity}", identity.getIdentity()))
@@ -176,20 +177,20 @@ public class UserControllerTest {
         // assert 数据库的用户对象
         assertEquals(0, userIdentityDao.selectByUserName(user.getName()).size());
         assertEquals(user.getEmail(), savedUser.getEmail());
-        assertEquals(UserState.NORMAL.getState(), savedUser.getState());
+        assertEquals(UserStatus.NORMAL, savedUser.getStatus());
         assertTrue(savedUser.getId() != null && savedUser.getId() > 0);
 
         // assert Redis 中的用户对象
         User cachedUser = redisUserDao.getUserByName(user.getName());
         assertEquals(user.getEmail(), cachedUser.getEmail());
-        assertEquals(UserState.NORMAL.getState(), cachedUser.getState());
+        assertEquals(UserStatus.NORMAL, cachedUser.getStatus());
         assertEquals(savedUser.getId(), cachedUser.getId());
 
         // assert 用户注册日志
         UserLog userLog = userLogDao.selectByToken(identity.getIdentity());
         assertEquals(UserLogType.REGISTER, userLog.getType());
         UserRegisterLog userRegisterLog = objectMapper.readValue(userLog.getDescription(), UserRegisterLog.class);
-        assertEquals(UserState.NORMAL.getStateNote(), userRegisterLog.getStatus());
+        assertEquals(UserStatus.NORMAL, userRegisterLog.getStatus());
         System.out.println(userRegisterLog.getIpLocInfo());
     }
 
@@ -197,7 +198,7 @@ public class UserControllerTest {
         List<UserIdentity> identities = userIdentityDao.selectByUserName("test");
         assertEquals(1, identities.size());
         UserIdentity identity = identities.get(0);
-        assertEquals(UserIdentityType.ACTIVATE_IDENTITY.getType(), identity.getType());
+        assertEquals(UserIdentityType.ACTIVATE_IDENTITY, identity.getType());
 
         MvcResult mvcResult = mockMvc.perform(get("/user/account-activate/{identity}", identity.getIdentity()))
                 .andExpect(status().isOk())

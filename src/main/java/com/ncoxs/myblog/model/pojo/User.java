@@ -9,7 +9,6 @@ import javax.validation.constraints.*;
 import java.io.Serializable;
 import java.util.Date;
 
-// TODO: 以后可能要加入用户登录表等用户相关信息记录表
 /**
  * user
  * @author wutao
@@ -23,28 +22,14 @@ public class User implements Serializable {
     private Integer id;
 
     /*
-    个人信息
+    身份信息
      */
     @NotBlank(message = ParamValidateMsg.USER_NAME_BLANK)
     @Pattern(regexp = ParamValidateRule.NAME_REGEX, message = ParamValidateMsg.USER_NAME_FORMAT)
     private String name;
 
-    @FilterBlank
-    private String note;
+    private Integer type;
 
-    @Min(value = ParamValidateRule.AGE_MIN, message = ParamValidateMsg.USER_AGE_RANGE_MIN)
-    @Max(value = ParamValidateRule.AGE_MAX, message = ParamValidateMsg.USER_AGE_RANGE_MAX)
-    @FilterBlank
-    private Integer age;
-
-    @Min(value = ParamValidateRule.SEX_MIN, message = ParamValidateMsg.USER_SEX_VALUE)
-    @Max(value = ParamValidateRule.SEX_MAX, message = ParamValidateMsg.USER_SEX_VALUE)
-    @FilterBlank
-    private Byte sex;
-
-    /*
-    身份信息
-     */
     @NotBlank(message = ParamValidateMsg.USER_PASSWORD_BLANK)
     @Pattern(regexp = ParamValidateRule.PASSWORD_REGEX, message = ParamValidateMsg.USER_PASSWORD_FORMAT)
     @FilterBlank(alwaysNull = true)
@@ -59,9 +44,7 @@ public class User implements Serializable {
     /*
     账户状态信息
      */
-    private Integer state;
-
-    private String stateNote;
+    private Integer status;
 
     @FilterBlank
     private Date limitTime;

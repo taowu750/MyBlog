@@ -1,4 +1,4 @@
-package com.ncoxs.myblog.constant;
+package com.ncoxs.myblog.constant.user;
 
 /**
  * 用户日志类型。

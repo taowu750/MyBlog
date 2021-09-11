@@ -6,7 +6,7 @@
         <id column="id" jdbcType="INTEGER" property="id"/>
         <result column="user_id" jdbcType="INTEGER" property="userId"/>
         <result column="identity" jdbcType="VARCHAR" property="identity"/>
-        <result column="type" jdbcType="TINYINT" property="type"/>
+        <result column="type" jdbcType="INTEGER" property="type"/>
         <result column="source" jdbcType="VARCHAR" property="source"/>
         <result column="expire" jdbcType="TIMESTAMP" property="expire"/>
         <result column="create_time" jdbcType="TIMESTAMP" property="createTime"/>
@@ -36,7 +36,7 @@
     </select>
 
     <select id="selectByUserName" resultType="com.ncoxs.myblog.model.pojo.UserIdentity">
-        select ui.id, user_id, `identity`, `type`, `source`, expire, ui.create_time
+        select ui.id, user_id, `identity`, ui.`type`, `source`, expire, ui.create_time
         from user_identity ui join user u on u.id = ui.user_id
         where u.name=#{username}
     </select>
@@ -44,7 +44,7 @@
     <insert id="insert" keyColumn="id" keyProperty="id" parameterType="com.ncoxs.myblog.model.pojo.UserIdentity"
             useGeneratedKeys="true">
         insert into user_identity (user_id, `identity`, `type`, <if test="source != null">`source`,</if> expire, create_time)
-        values (#{userId,jdbcType=INTEGER}, #{identity,jdbcType=VARCHAR}, #{type,jdbcType=TINYINT},
+        values (#{userId,jdbcType=INTEGER}, #{identity,jdbcType=VARCHAR}, #{type},
         <if test="source != null">#{source,jdbcType=VARCHAR},</if> #{expire,jdbcType=TIMESTAMP}, #{createTime,jdbcType=TIMESTAMP})
     </insert>
 
@@ -58,7 +58,7 @@
                 `identity` = #{identity,jdbcType=VARCHAR},
             </if>
             <if test="type != null">
-                `type` = #{type,jdbcType=TINYINT},
+                `type` = #{type},
             </if>
             <if test="source != null">
                 `source` = #{source,jdbcType=VARCHAR},

@@ -17,7 +17,7 @@ public class UserIdentity implements Serializable {
 
     private String identity;
 
-    private Byte type;
+    private Integer type;
 
     private String source;
 

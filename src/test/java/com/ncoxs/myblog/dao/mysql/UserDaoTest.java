@@ -35,8 +35,7 @@ public class UserDaoTest {
         assertEquals(u.getPassword(), user.getPassword());
         assertEquals(u.getEmail(), user.getEmail());
         assertEquals(u.getSalt(), user.getSalt());
-        assertEquals(u.getState(), user.getState());
-        assertEquals(u.getStateNote(), user.getStateNote());
+        assertEquals(u.getStatus(), user.getStatus());
 
         System.out.println(u);
         userDao.deleteById(u.getId());

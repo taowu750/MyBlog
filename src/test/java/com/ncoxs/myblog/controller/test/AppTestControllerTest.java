@@ -37,7 +37,6 @@ public class AppTestControllerTest {
     public void testEncryptionJson() throws Exception {
         User user = new User();
         user.setName("wutao");
-        user.setAge(23);
         System.out.println(
                 new EncryptionMockMvcBuilder(mockMvc, objectMapper)
                         .post("/test/app/encryption/json")

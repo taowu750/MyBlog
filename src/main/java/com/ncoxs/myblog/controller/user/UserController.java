@@ -1,10 +1,10 @@
-package com.ncoxs.myblog.controller;
+package com.ncoxs.myblog.controller.user;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.ncoxs.myblog.constant.ParamValidateMsg;
 import com.ncoxs.myblog.constant.ParamValidateRule;
 import com.ncoxs.myblog.constant.ResultCode;
-import com.ncoxs.myblog.constant.UserLogType;
+import com.ncoxs.myblog.constant.user.UserLogType;
 import com.ncoxs.myblog.handler.encryption.Encryption;
 import com.ncoxs.myblog.model.dto.GenericResult;
 import com.ncoxs.myblog.model.dto.IpLocInfo;
@@ -25,6 +25,7 @@ import javax.validation.constraints.*;
 import java.io.UnsupportedEncodingException;
 import java.security.GeneralSecurityException;
 
+// TODO: 考虑和官方用户账号的兼容问题
 @Controller
 @RequestMapping("/user")
 @Validated

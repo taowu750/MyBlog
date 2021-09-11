@@ -1,5 +1,6 @@
 package com.ncoxs.myblog.model.bo;
 
+import com.ncoxs.myblog.constant.user.UserStatus;
 import com.ncoxs.myblog.model.dto.IpLocInfo;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -11,8 +12,8 @@ import lombok.NoArgsConstructor;
 public class UserRegisterLog {
 
     /**
-     * 用户注册状态，同 {@link com.ncoxs.myblog.constant.UserState}。
+     * 用户注册状态，同 {@link UserStatus}。
      */
-    private String status;
+    private int status;
     private IpLocInfo ipLocInfo;
 }

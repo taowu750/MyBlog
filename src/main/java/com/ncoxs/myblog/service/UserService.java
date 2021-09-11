@@ -3,10 +3,11 @@ package com.ncoxs.myblog.service;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ncoxs.myblog.constant.EmailTemplate;
-import com.ncoxs.myblog.constant.UserIdentityType;
-import com.ncoxs.myblog.constant.UserLogType;
-import com.ncoxs.myblog.constant.UserState;
-import com.ncoxs.myblog.controller.UserController;
+import com.ncoxs.myblog.constant.user.UserIdentityType;
+import com.ncoxs.myblog.constant.user.UserLogType;
+import com.ncoxs.myblog.constant.user.UserStatus;
+import com.ncoxs.myblog.constant.user.UserType;
+import com.ncoxs.myblog.controller.user.UserController;
 import com.ncoxs.myblog.dao.mysql.UserDao;
 import com.ncoxs.myblog.dao.mysql.UserIdentityDao;
 import com.ncoxs.myblog.dao.mysql.UserLogDao;
@@ -151,7 +152,7 @@ public class UserService {
 
         // 插入用户注册日志
         userLogDao.insert(new UserLog(user.getId(), UserLogType.REGISTER, userIdentity.getIdentity(),
-                objectMapper.writeValueAsString(new UserRegisterLog(user.getStateNote(), DeviceUtil.fillIpLocInfo(ipLocInfo)))));
+                objectMapper.writeValueAsString(new UserRegisterLog(user.getStatus(), DeviceUtil.fillIpLocInfo(ipLocInfo)))));
 
         // 将用户信息插入到 Redis 中
         redisUserDao.setNonActivateUser(activateId, user);
@@ -184,7 +185,7 @@ public class UserService {
             return null;
 
         // 如果用户已经激活，返回已激活
-        if (!UserState.NOT_ACTIVATED.is(user.getState()))
+        if (UserStatus.NOT_ACTIVATED != user.getStatus())
             return USER_ACTIVATED;
 
         // 如果已经过期，返回已过期
@@ -199,8 +200,7 @@ public class UserService {
 
         User update = new User();
         update.setId(user.getId());
-        update.setState(UserState.NORMAL.getState());
-        update.setStateNote(UserState.NORMAL.getStateNote());
+        update.setStatus(UserStatus.NORMAL);
         update.setLimitTime(TimeUtil.EMPTY_DATE);
         // 更新数据库中的用户状态
         userDao.updateByIdSelective(update);
@@ -214,12 +214,11 @@ public class UserService {
             throw new UserLogException("没有 token 为 " + identity + " 的用户注册日志");
         }
         UserRegisterLog userRegisterLog = objectMapper.readValue(userRegisterLogStr, UserRegisterLog.class);
-        userRegisterLog.setStatus(update.getStateNote());
+        userRegisterLog.setStatus(update.getStatus());
         userLogDao.updateDescriptionByToken(identity, objectMapper.writeValueAsString(userRegisterLog));
 
         // 将已激活的用户缓存到 redis 中
-        user.setState(UserState.NORMAL.getState());
-        user.setStateNote(UserState.NORMAL.getStateNote());
+        user.setStatus(UserStatus.NORMAL);
         user.setLimitTime(TimeUtil.EMPTY_DATE);
         redisUserDao.setUser(user);
 
@@ -484,14 +483,12 @@ public class UserService {
      * 将客户端传来的用户信息初始化可以插入数据库的用户对象。
      */
     public User initialUser(User user) {
-        // 如果用户 note 是空字符串，将其设为 null
-        if (!StringUtils.hasText(user.getNote()))
-            user.setNote(null);
+        // 设置用户类型为普通用户
+        user.setType(UserType.PLAIN);
         // 设置用户密码
         setPassword(user, user.getPassword());
         // 设置用户状态为 NOT_ACTIVATED
-        user.setState(UserState.NOT_ACTIVATED.getState());
-        user.setStateNote(UserState.NOT_ACTIVATED.getStateNote());
+        user.setStatus(UserStatus.NOT_ACTIVATED);
         // 设置用户创建时间
         user.setCreateTime(new Date());
         user.setModifyTime(new Date(user.getCreateTime().getTime()));
@@ -517,7 +514,7 @@ public class UserService {
         UserIdentity userIdentity = new UserIdentity();
         userIdentity.setUserId(user.getId());
         userIdentity.setIdentity(activateIdentity);
-        userIdentity.setType(UserIdentityType.ACTIVATE_IDENTITY.getType());
+        userIdentity.setType(UserIdentityType.ACTIVATE_IDENTITY);
         userIdentity.setCreateTime(new Date());
         userIdentity.setExpire(user.getLimitTime());
 
@@ -537,7 +534,7 @@ public class UserService {
         userIdentity.setUserId(user.getId());
         userIdentity.setIdentity(UUIDUtil.generate());
         userIdentity.setSource(source);
-        userIdentity.setType(UserIdentityType.LOGIN_IDENTITY.getType());
+        userIdentity.setType(UserIdentityType.LOGIN_IDENTITY);
         userIdentity.setCreateTime(new Date());
         userIdentity.setExpire(TimeUtil.changeDateTime(userIdentity.getCreateTime(), rememberDays,
                 TimeUnit.DAYS));
