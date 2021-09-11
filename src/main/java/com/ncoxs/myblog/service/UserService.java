@@ -23,7 +23,6 @@ import com.ncoxs.myblog.model.pojo.UserLog;
 import com.ncoxs.myblog.util.general.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.annotation.PropertySource;
 import org.springframework.lang.NonNull;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
@@ -41,25 +40,24 @@ import java.util.concurrent.TimeUnit;
 // TODO: 密码强度验证
 // TODO: 要有定时清理数据库中过期数据的机制
 @Service
-@PropertySource("classpath:app-props.properties")
 public class UserService {
 
     @Value("${spring.mail.username}")
     private String mailSender;
 
-    @Value("${user.activate-url}")
+    @Value("${myapp.user.activate-url}")
     private String activateUrl;
 
-    @Value("${user.activate-expire-time}")
+    @Value("${myapp.user.activate-expire-time}")
     private int activateExpireTime;
 
-    @Value("${user.forget-password.aes-key}")
+    @Value("${myapp.user.forget-password.aes-key}")
     private String forgetPasswordAesKey;
 
-    @Value("${user.forget-password.url}")
+    @Value("${myapp.user.forget-password.url}")
     private String forgetPasswordUrl;
 
-    @Value("${user.forget-password.url-expire}")
+    @Value("${myapp.user.forget-password.url-expire}")
     private int forgetPasswordExpire;
 
     private UserDao userDao;

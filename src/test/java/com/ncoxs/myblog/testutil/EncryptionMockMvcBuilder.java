@@ -17,14 +17,15 @@ import org.springframework.test.web.servlet.*;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 import org.springframework.test.web.servlet.result.MockMvcResultHandlers;
+import org.yaml.snakeyaml.Yaml;
 
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
 import java.util.Base64;
+import java.util.HashMap;
 import java.util.Map;
-import java.util.Properties;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -39,7 +40,6 @@ public class EncryptionMockMvcBuilder {
     private static final Pattern URL_VARIABLE_PATTERN = Pattern.compile("\\{.*?\\}");
 
     private MockHttpServletRequestBuilder requestBuilder;
-
 
     private boolean enable;
     private MockMvc mockMvc;
@@ -75,10 +75,13 @@ public class EncryptionMockMvcBuilder {
         this.mockMvc = mockMvc;
         this.objectMapper = objectMapper;
 
-        // 读取配置
-        Properties props = new Properties();
-        props.load(ResourceUtil.load("app-props.properties"));
-        enable = Boolean.parseBoolean(props.getProperty("encryption.enable"));
+//        Properties props = new Properties();
+//        props.load(ResourceUtil.load("app-props.properties"));
+//        enable = Boolean.parseBoolean(props.getProperty("encryption.enable"));
+        Yaml yaml = new Yaml();
+        //noinspection unchecked
+        Map<String, Map<String, Map<String, Object>>> properties = yaml.loadAs(ResourceUtil.load("application-dev-extend.yml"), HashMap.class);
+        enable = (boolean) properties.get("myapp").get("encryption").get("enable");
         if (enable) {
             // 获取 RSA 公钥
             Map<String, Object> rsaData = requestRsaPublicKey(mockMvc, objectMapper);

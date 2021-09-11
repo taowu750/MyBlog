@@ -1,0 +1,42 @@
+myapp:
+  website:
+    # 网站 URL
+    url: http://localhost:8080/my-blog/
+
+  user:
+    # 用户注册网址链接
+    activate-url: http://localhost:8080/my-blog/user/account-activate/
+    # 用户注册激活过期时间，单位小时
+    activate-expire-time: 24
+
+    # 用户忘记密码请求发送网址
+    forget-password:
+      url: http://localhost:8080/my-blog/user/password/forget/
+      # 用户忘记密码请求过期时间，单位小时
+      url-expire: 1
+      # 用来加解密“忘记密码”信息的秘钥
+      aes-key: xojDGXtVip8AuU4lj9KUJQ\=\=
+
+  request:
+    flow-id:
+      # 请求 flow id 写入模式
+      write-mode: seconds
+      # 请求 flow id 写入文件位置
+      resource: data/app/requestFlowId.txt
+
+  encryption:
+    # 是否开启请求体/响应体加密模式
+    enable: true
+    # 服务器 RSA 秘钥过期时间间隔，单位毫秒。30 天
+    rsa-key-expire: 2592000000
+    # 服务器 RSA 秘钥的存储位置
+    rsa-file-path: data/app/rsa.properties
+    # 服务器 AES 秘钥过期时间间隔，单位毫秒。7 天
+    aes-key-expire: 604800000
+    # 服务器 AES 秘钥的存储位置
+    aes-file-path: data/app/aes.properties
+    # 不使用加解密功能的 url 前缀
+    ignore-url-prefixes:
+      - "/app/encryption"
+      - "/user/account-activate"
+      - "/password/forget"

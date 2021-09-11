@@ -6,7 +6,6 @@ import org.springframework.beans.factory.DisposableBean;
 import org.springframework.beans.factory.InitializingBean;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.annotation.PropertySource;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 import org.springframework.scheduling.support.CronTrigger;
 import org.springframework.stereotype.Component;
@@ -29,13 +28,12 @@ import java.util.concurrent.atomic.AtomicLong;
  * 流水号分配类似于数据库的自增主键，它会按照配置文件中的保存策略进行保存。
  */
 @Component
-@PropertySource("classpath:app-props.properties")
 public class RequestFlowIdInterceptor implements HandlerInterceptor, InitializingBean, DisposableBean {
     
-    @Value("${request.flow-id.write-mode}")
+    @Value("${myapp.request.flow-id.write-mode}")
     private String requestFlowIdWriteMode;
     
-    @Value("${request.flow-id.resource}")
+    @Value("${myapp.request.flow-id.resource}")
     private String requestFlowIdResource;
 
     private ThreadPoolTaskScheduler threadPoolTaskScheduler;

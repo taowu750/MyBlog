@@ -3,7 +3,6 @@ package com.ncoxs.myblog.service;
 import com.ncoxs.myblog.util.general.FileUtil;
 import com.ncoxs.myblog.util.general.ResourceUtil;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.annotation.PropertySource;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -17,12 +16,11 @@ import java.util.List;
  * 处理客户端传过来的图片。
  */
 @Service
-@PropertySource("classpath:app-props.properties")
 public class ImageService {
 
     public static final String IMAGE_TYPE_BLOG = "blog";
 
-    @Value("${website.url}")
+    @Value("${myapp.website.url}")
     private String webSiteUrl;
 
     /**

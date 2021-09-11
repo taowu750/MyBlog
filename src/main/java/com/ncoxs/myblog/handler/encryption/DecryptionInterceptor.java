@@ -13,8 +13,7 @@ import com.ncoxs.myblog.util.general.RSAUtil;
 import com.ncoxs.myblog.util.general.ResourceUtil;
 import com.ncoxs.myblog.util.model.FormParser;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.annotation.PropertySource;
+import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.http.HttpMethod;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
@@ -27,7 +26,8 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.security.spec.InvalidKeySpecException;
-import java.util.*;
+import java.util.Base64;
+import java.util.Properties;
 
 
 /**
@@ -48,21 +48,33 @@ import java.util.*;
  * 请求头/响应头中的秘钥或参数都需要加密（RSA 公钥除外）后再经过 Base64 编码。
  */
 @Component
-@PropertySource("classpath:app-props.properties")
+// yaml 中，数组等复杂数据结构不能通过 @Value 解析，只能使用 @ConfigurationProperties 读取
+@ConfigurationProperties("myapp.encryption")
 public class DecryptionInterceptor implements HandlerInterceptor {
 
-    @Value("${encryption.enable}")
     private boolean enable;
 
-    @Value("${encryption.rsa-key-expire}")
-    private long rsaKeysExpire;
+    private long rsaKeyExpire;
 
-    @Value("${encryption.rsa-file-path}")
-    private String rsaKeysFilePath;
+    private String rsaFilePath;
 
-    @Value("${encryption.ignore-url-prefix}")
-    private String ignoreUrlPrefixesString;
-    private volatile List<String> ignoreUrlPrefixes;
+    private String[] ignoreUrlPrefixes;
+
+    public void setEnable(boolean enable) {
+        this.enable = enable;
+    }
+
+    public void setRsaKeyExpire(long rsaKeyExpire) {
+        this.rsaKeyExpire = rsaKeyExpire;
+    }
+
+    public void setRsaFilePath(String rsaFilePath) {
+        this.rsaFilePath = rsaFilePath;
+    }
+
+    public void setIgnoreUrlPrefixes(String[] ignoreUrlPrefixes) {
+        this.ignoreUrlPrefixes = ignoreUrlPrefixes;
+    }
 
     private ObjectMapper objectMapper;
 
@@ -93,7 +105,7 @@ public class DecryptionInterceptor implements HandlerInterceptor {
                     // 先从文件中获取
                     rsaProperties = new Properties();
                     try {
-                        rsaProperties.load(ResourceUtil.loanByCreate(rsaKeysFilePath));
+                        rsaProperties.load(ResourceUtil.loanByCreate(rsaFilePath));
                     } catch (IOException e) {
                         throw new ImpossibleError(e);
                     }
@@ -115,13 +127,13 @@ public class DecryptionInterceptor implements HandlerInterceptor {
             synchronized (this) {
                 if (rsaKeys == null || rsaKeysExpireTime < System.currentTimeMillis()) {
                     rsaKeys = RSAUtil.generateKeys();
-                    rsaKeysExpireTime = System.currentTimeMillis() + rsaKeysExpire;
+                    rsaKeysExpireTime = System.currentTimeMillis() + rsaKeyExpire;
                     // 保存秘钥到文件中
                     rsaProperties.setProperty(PROP_RSA_PUBLIC_KEY, Base64.getEncoder().encodeToString(rsaKeys.publicKey.getEncoded()));
                     rsaProperties.setProperty(PROP_RSA_PRIVATE_KEY, Base64.getEncoder().encodeToString(rsaKeys.privateKey.getEncoded()));
                     rsaProperties.setProperty(PROP_RSA_EXPIRE, String.valueOf(rsaKeysExpireTime));
                     try {
-                        rsaProperties.store(new FileOutputStream(ResourceUtil.classpath(rsaKeysFilePath)), null);
+                        rsaProperties.store(new FileOutputStream(ResourceUtil.classpath(rsaFilePath)), null);
                     } catch (IOException e) {
                         throw new ImpossibleError(e);
                     }
@@ -144,15 +156,6 @@ public class DecryptionInterceptor implements HandlerInterceptor {
             return true;
         }
 
-        // TODO: 使用 Trie 实现
-        if (ignoreUrlPrefixes == null) {
-            synchronized (this) {
-                if (ignoreUrlPrefixes == null) {
-                    ignoreUrlPrefixes = new ArrayList<>();
-                    ignoreUrlPrefixes.addAll(Arrays.asList(ignoreUrlPrefixesString.split(",")));
-                }
-            }
-        }
         // 如果请求地址包含忽略的前缀，则返回 true
         for (String ignoreUrlPrefix : ignoreUrlPrefixes) {
             if (request.getRequestURI().startsWith(ignoreUrlPrefix)) {

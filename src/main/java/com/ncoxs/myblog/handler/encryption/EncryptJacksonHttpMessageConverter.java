@@ -5,7 +5,6 @@ import com.ncoxs.myblog.exception.ImpossibleError;
 import com.ncoxs.myblog.util.general.AESUtil;
 import com.ncoxs.myblog.util.general.ResourceUtil;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.annotation.PropertySource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpOutputMessage;
 import org.springframework.http.converter.HttpMessageNotWritableException;
@@ -29,16 +28,15 @@ import java.util.Properties;
  * 加解密流程参见 {@link DecryptionInterceptor} 注释。
  */
 @Component
-@PropertySource("classpath:app-props.properties")
 public class EncryptJacksonHttpMessageConverter extends MappingJackson2HttpMessageConverter {
 
-    @Value("${encryption.enable}")
+    @Value("${myapp.encryption.enable}")
     private boolean enable;
 
-    @Value("${encryption.aes-key-expire}")
+    @Value("${myapp.encryption.aes-key-expire}")
     private long aesKeyExpire;
 
-    @Value("${encryption.aes-file-path}")
+    @Value("${myapp.encryption.aes-file-path}")
     private String aesKeyFilePath;
 
 

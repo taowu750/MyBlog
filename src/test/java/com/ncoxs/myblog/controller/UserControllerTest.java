@@ -27,7 +27,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.context.annotation.PropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.web.servlet.ModelAndView;
@@ -45,7 +44,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @SpringBootTest
 @AutoConfigureMockMvc
-@PropertySource("classpath:app-props.properties")
 public class UserControllerTest {
 
     @Autowired
@@ -69,10 +67,10 @@ public class UserControllerTest {
     @Autowired
     ObjectMapper objectMapper;
 
-    @Value("${user.forget-password.aes-key}")
+    @Value("${myapp.user.forget-password.aes-key}")
     private String forgetPasswordAesKey;
 
-    @Value("${user.forget-password.url-expire}")
+    @Value("${myapp.user.forget-password.url-expire}")
     private int forgetPasswordExpire;
 
 
