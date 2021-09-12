@@ -1,4 +1,4 @@
-package com.ncoxs.myblog.service;
+package com.ncoxs.myblog.service.user;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -23,6 +23,7 @@ import com.ncoxs.myblog.model.pojo.User;
 import com.ncoxs.myblog.model.pojo.UserBasicInfo;
 import com.ncoxs.myblog.model.pojo.UserIdentity;
 import com.ncoxs.myblog.model.pojo.UserLog;
+import com.ncoxs.myblog.service.app.MailService;
 import com.ncoxs.myblog.util.general.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -363,6 +364,28 @@ public class UserService {
         // 插入登录成功日志
         userLogDao.insert(new UserLog(user.getId(), UserLogType.LOGIN, objectMapper.writeValueAsString(
                 new UserLoginLog("success", "identity", DeviceUtil.fillIpLocInfo(ipLocInfo)))));
+
+        return user;
+    }
+
+    /**
+     * 通过邮箱和密码获取用户信息
+     *
+     * @param email 邮箱
+     * @param password 密码
+     * @return 用户不存在或密码错误返回 null
+     */
+    public User accessByEmail(String email, String password) {
+        User user = redisUserDao.getUserByEmail(email);
+        if (user == null) {
+            user = userDao.selectByEmail(email);
+            if (user != null) {
+                redisUserDao.setUser(user);
+            }
+        }
+        if (user == null || !passwordEquals(user, password)) {
+            return null;
+        }
 
         return user;
     }

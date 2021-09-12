@@ -10,7 +10,7 @@ import com.ncoxs.myblog.model.dto.GenericResult;
 import com.ncoxs.myblog.model.dto.IpLocInfo;
 import com.ncoxs.myblog.model.dto.UserAndIdentity;
 import com.ncoxs.myblog.model.pojo.User;
-import com.ncoxs.myblog.service.UserService;
+import com.ncoxs.myblog.service.user.UserService;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import org.springframework.beans.factory.annotation.Autowired;

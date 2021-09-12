@@ -1,7 +1,7 @@
 package com.ncoxs.myblog.controller.app;
 
 import com.ncoxs.myblog.model.dto.GenericResult;
-import com.ncoxs.myblog.service.ImageService;
+import com.ncoxs.myblog.service.app.ImageService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.RequestBody;

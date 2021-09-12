@@ -1,4 +1,4 @@
-package com.ncoxs.myblog.service;
+package com.ncoxs.myblog.service.app;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.mail.javamail.JavaMailSender;

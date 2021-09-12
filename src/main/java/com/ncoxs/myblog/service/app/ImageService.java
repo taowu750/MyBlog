@@ -1,4 +1,4 @@
-package com.ncoxs.myblog.service;
+package com.ncoxs.myblog.service.app;
 
 import com.ncoxs.myblog.util.general.FileUtil;
 import com.ncoxs.myblog.util.general.ResourceUtil;
