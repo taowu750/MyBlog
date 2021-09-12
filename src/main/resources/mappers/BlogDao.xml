@@ -1,0 +1,155 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ncoxs.myblog.dao.mysql.BlogDao">
+
+    <resultMap id="BaseResultMap" type="com.ncoxs.myblog.model.pojo.Blog">
+        <id column="id" jdbcType="INTEGER" property="id"/>
+        <result column="user_id" jdbcType="INTEGER" property="userId"/>
+        <result column="title" jdbcType="VARCHAR" property="title"/>
+        <result column="html_body" jdbcType="VARCHAR" property="htmlBody"/>
+        <result column="markdown_body" jdbcType="VARCHAR" property="markdownBody"/>
+        <result column="cover_path" jdbcType="VARCHAR" property="coverPath"/>
+        <result column="word_count" jdbcType="INTEGER" property="wordCount"/>
+        <result column="reading_count" jdbcType="INTEGER" property="readingCount"/>
+        <result column="like_count" jdbcType="INTEGER" property="likeCount"/>
+        <result column="dislike_count" jdbcType="INTEGER" property="dislikeCount"/>
+        <result column="collect_count" jdbcType="INTEGER" property="collectCount"/>
+        <result column="comment_count" jdbcType="INTEGER" property="commentCount"/>
+        <result column="status" jdbcType="INTEGER" property="status"/>
+        <result column="is_allow_reprint" jdbcType="BOOLEAN" property="isAllowReprint"/>
+        <result column="create_time" jdbcType="TIMESTAMP" property="createTime"/>
+        <result column="modify_time" jdbcType="TIMESTAMP" property="modifyTime"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        id, user_id, title, html_body, markdown_body, cover_path, word_count, reading_count,
+    like_count, dislike_count, collect_count, comment_count, `status`, is_allow_reprint, 
+    create_time, modify_time
+    </sql>
+
+    <select id="selectByPrimaryKey" parameterType="java.lang.Integer" resultMap="BaseResultMap">
+        select
+        <include refid="Base_Column_List"/>
+        from blog
+        where id = #{id,jdbcType=INTEGER}
+    </select>
+
+    <insert id="insert" keyColumn="id" keyProperty="id" parameterType="com.ncoxs.myblog.model.pojo.Blog"
+            useGeneratedKeys="true">
+        insert into blog
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            user_id,
+            title,
+            html_body,
+            markdown_body,
+            cover_path,
+            word_count,
+            `status`,
+            is_allow_reprint,
+            <if test="readingCount != null">
+                reading_count,
+            </if>
+            <if test="likeCount != null">
+                like_count,
+            </if>
+            <if test="dislikeCount != null">
+                dislike_count,
+            </if>
+            <if test="collectCount != null">
+                collect_count,
+            </if>
+            <if test="commentCount != null">
+                comment_count,
+            </if>
+            <if test="createTime != null">
+                create_time,
+            </if>
+            <if test="modifyTime != null">
+                modify_time,
+            </if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            #{userId,jdbcType=INTEGER},
+            #{title,jdbcType=VARCHAR},
+            #{htmlBody,jdbcType=VARCHAR},
+            #{markdownBody,jdbcType=VARCHAR},
+            #{coverPath,jdbcType=VARCHAR},
+            #{wordCount,jdbcType=INTEGER},
+            #{status,jdbcType=INTEGER},
+            #{isAllowReprint,jdbcType=BOOLEAN},
+            <if test="readingCount != null">
+                #{readingCount,jdbcType=INTEGER},
+            </if>
+            <if test="likeCount != null">
+                #{likeCount,jdbcType=INTEGER},
+            </if>
+            <if test="dislikeCount != null">
+                #{dislikeCount,jdbcType=INTEGER},
+            </if>
+            <if test="collectCount != null">
+                #{collectCount,jdbcType=INTEGER},
+            </if>
+            <if test="commentCount != null">
+                #{commentCount,jdbcType=INTEGER},
+            </if>
+            <if test="createTime != null">
+                #{createTime,jdbcType=TIMESTAMP},
+            </if>
+            <if test="modifyTime != null">
+                #{modifyTime,jdbcType=TIMESTAMP},
+            </if>
+        </trim>
+    </insert>
+
+    <update id="updateByIdSelective" parameterType="com.ncoxs.myblog.model.pojo.Blog">
+        update blog
+        <set>
+            <if test="userId != null">
+                user_id = #{userId,jdbcType=INTEGER},
+            </if>
+            <if test="title != null">
+                title = #{title,jdbcType=VARCHAR},
+            </if>
+            <if test="htmlBody != null">
+                html_body = #{htmlBody,jdbcType=VARCHAR},
+            </if>
+            <if test="markdownBody != null">
+                markdown_body = #{markdownBody,jdbcType=VARCHAR},
+            </if>
+            <if test="coverPath != null">
+                cover_path = #{coverPath,jdbcType=VARCHAR},
+            </if>
+            <if test="wordCount != null">
+                word_count = #{wordCount,jdbcType=INTEGER},
+            </if>
+            <if test="readingCount != null">
+                reading_count = #{readingCount,jdbcType=INTEGER},
+            </if>
+            <if test="likeCount != null">
+                like_count = #{likeCount,jdbcType=INTEGER},
+            </if>
+            <if test="dislikeCount != null">
+                dislike_count = #{dislikeCount,jdbcType=INTEGER},
+            </if>
+            <if test="collectCount != null">
+                collect_count = #{collectCount,jdbcType=INTEGER},
+            </if>
+            <if test="commentCount != null">
+                comment_count = #{commentCount,jdbcType=INTEGER},
+            </if>
+            <if test="status != null">
+                `status` = #{status,jdbcType=INTEGER},
+            </if>
+            <if test="isAllowReprint != null">
+                is_allow_reprint = #{isAllowReprint,jdbcType=BOOLEAN},
+            </if>
+            <if test="createTime != null">
+                create_time = #{createTime,jdbcType=TIMESTAMP},
+            </if>
+            <if test="modifyTime != null">
+                modify_time = #{modifyTime,jdbcType=TIMESTAMP},
+            </if>
+        </set>
+        where id = #{id,jdbcType=INTEGER}
+    </update>
+</mapper>

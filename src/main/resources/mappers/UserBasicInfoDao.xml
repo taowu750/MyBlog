@@ -3,8 +3,7 @@
 <mapper namespace="com.ncoxs.myblog.dao.mysql.UserBasicInfoDao">
 
     <resultMap id="BaseResultMap" type="com.ncoxs.myblog.model.pojo.UserBasicInfo">
-        <id column="id" jdbcType="INTEGER" property="id"/>
-        <result column="user_id" jdbcType="INTEGER" property="userId"/>
+        <id column="user_id" jdbcType="INTEGER" property="userId"/>
         <result column="profile_picture_path" jdbcType="VARCHAR" property="profilePicturePath"/>
         <result column="description" jdbcType="VARCHAR" property="description"/>
         <result column="sex" jdbcType="INTEGER" property="sex"/>
@@ -20,27 +19,13 @@
         modify_time
     </sql>
 
-    <select id="selectById" parameterType="java.lang.Integer" resultMap="BaseResultMap">
-        select
-        <include refid="Base_Column_List"/>
-        from user_basic_info
-        where id = #{id,jdbcType=INTEGER}
-    </select>
-
     <select id="selectByUserId" resultType="com.ncoxs.myblog.model.pojo.UserBasicInfo">
         select <include refid="Base_Column_List"/>
         from user_basic_info
         where user_id=#{userId}
     </select>
 
-    <delete id="deleteById" parameterType="java.lang.Integer">
-        delete
-        from user_basic_info
-        where id = #{id,jdbcType=INTEGER}
-    </delete>
-
-    <insert id="insertSelective" keyColumn="id" keyProperty="id"
-            parameterType="com.ncoxs.myblog.model.pojo.UserBasicInfo" useGeneratedKeys="true">
+    <insert id="insertSelective" parameterType="com.ncoxs.myblog.model.pojo.UserBasicInfo">
         insert into user_basic_info
         <trim prefix="(" suffix=")" suffixOverrides=",">
             user_id,
@@ -98,12 +83,9 @@
         </trim>
     </insert>
 
-    <update id="updateByIdSelective" parameterType="com.ncoxs.myblog.model.pojo.UserBasicInfo">
+    <update id="updateByUserIdSelective" parameterType="com.ncoxs.myblog.model.pojo.UserBasicInfo">
         update user_basic_info
         <set>
-            <if test="userId != null">
-                user_id = #{userId,jdbcType=INTEGER},
-            </if>
             <if test="profilePicturePath != null">
                 profile_picture_path = #{profilePicturePath},
             </if>
@@ -129,6 +111,6 @@
                 modify_time = #{modifyTime,jdbcType=TIMESTAMP},
             </if>
         </set>
-        where id = #{id,jdbcType=INTEGER}
+        where user_id = #{userId}
     </update>
 </mapper>

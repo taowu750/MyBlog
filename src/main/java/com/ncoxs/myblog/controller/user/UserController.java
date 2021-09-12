@@ -13,7 +13,6 @@ import com.ncoxs.myblog.model.pojo.User;
 import com.ncoxs.myblog.service.UserService;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
-import lombok.NonNull;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.validation.annotation.Validated;
@@ -21,7 +20,10 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.ModelAndView;
 
 import javax.mail.MessagingException;
-import javax.validation.constraints.*;
+import javax.validation.constraints.Max;
+import javax.validation.constraints.Min;
+import javax.validation.constraints.NotBlank;
+import javax.validation.constraints.Pattern;
 import java.io.UnsupportedEncodingException;
 import java.security.GeneralSecurityException;
 
@@ -152,9 +154,11 @@ public class UserController {
     @PostMapping("/login/identity")
     @ResponseBody
     @Encryption
-    public GenericResult<User> loginByIdentity(@NotNull String identity,
-                                               @NotNull String source,
-                                               @NonNull IpLocInfo ipLocInfo) throws JsonProcessingException {
+    public GenericResult<User> loginByIdentity(@NotBlank(message = ParamValidateMsg.USER_IDENTITY_BLANK)
+                                                       String identity,
+                                               @NotBlank(message = ParamValidateMsg.USER_IDENTITY_SOURCE_BLANK)
+                                                       String source,
+                                               IpLocInfo ipLocInfo) throws JsonProcessingException {
         return GenericResult.success(userService.loginByIdentity(identity, source, ipLocInfo));
     }
 

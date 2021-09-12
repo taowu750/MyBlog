@@ -17,7 +17,6 @@ import java.util.Date;
  */
 @Data
 public class UserBasicInfo implements Serializable {
-    private Integer id;
 
     private Integer userId;
 

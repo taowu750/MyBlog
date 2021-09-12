@@ -40,3 +40,4 @@ myapp:
       - "/app/encryption"
       - "/user/account-activate"
       - "/password/forget"
+      - "/blog/editor-md-img/upload"

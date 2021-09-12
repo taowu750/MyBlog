@@ -1,4 +1,4 @@
-package com.ncoxs.myblog.controller;
+package com.ncoxs.myblog.controller.user;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -6,7 +6,6 @@ import com.ncoxs.myblog.constant.ResultCode;
 import com.ncoxs.myblog.constant.user.UserIdentityType;
 import com.ncoxs.myblog.constant.user.UserLogType;
 import com.ncoxs.myblog.constant.user.UserStatus;
-import com.ncoxs.myblog.controller.user.UserController;
 import com.ncoxs.myblog.dao.mysql.UserBasicInfoDao;
 import com.ncoxs.myblog.dao.mysql.UserDao;
 import com.ncoxs.myblog.dao.mysql.UserIdentityDao;
