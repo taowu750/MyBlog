@@ -38,8 +38,12 @@ import java.security.GeneralSecurityException;
 import java.util.Date;
 import java.util.concurrent.TimeUnit;
 
+
+// TODO: 考虑和官方用户账号的兼容问题
 // TODO: 密码强度验证
 // TODO: 要有定时清理数据库中过期数据的机制
+
+// TODO: 增加 user_basic_info，注册时需要插入数据
 @Service
 public class UserService {
 
@@ -229,7 +233,7 @@ public class UserService {
      * 根据用户名和密码进行登录。如果选择了“记住我”，则还会返回新的登录标识。
      *
      * @return User 对象和登录标识。如果返回值为 null，表示用户名不存在；如果返回值 user 属性为空，表示用户密码错误；
-     * 否则登录成功
+     * 如果 user 属性等于 {@link #USER_CANCELED}，表示用户账号已注销；否则登录成功
      */
     @Transactional(isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
     public UserAndIdentity loginUserByName(UserController.LoginByNameParams params) throws JsonProcessingException {
@@ -238,9 +242,6 @@ public class UserService {
             user = userDao.selectByName(params.name);
             if (user == null) {
                 return null;
-            } else {
-                // 将数据库中的用户数据再次缓存到 Redis 中
-                redisUserDao.setUser(user);
             }
         }
 
@@ -252,7 +253,7 @@ public class UserService {
      * 根据用户邮箱和密码进行登录。如果选择了“记住我”，则还会返回新的登录标识。
      *
      * @return User 对象和登录标识。如果返回值为 null，表示用户邮箱不存在；如果返回值 user 属性为空，表示用户密码错误；
-     * 否则登录成功
+     * 如果 user 属性等于 {@link #USER_CANCELED}，表示用户账号已注销；否则登录成功
      */
     @Transactional(isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
     public UserAndIdentity loginUserByEmail(UserController.LoginByEmailParams params) throws JsonProcessingException {
@@ -262,21 +263,26 @@ public class UserService {
             if (user == null) {
                 return null;
             }
-            // 将数据库中的用户数据再次缓存到 Redis 中
-            redisUserDao.setUser(user);
         }
 
         return loginUser("email", user, params.password, params.rememberDays, params.source,
                 params.ipLocInfo);
     }
 
+    public static final User USER_CANCELED = new User();
+
+    // 登录还需要检查用户状态，是否为已注销。封禁了还能登录，只是不能做除浏览外的其他操作
     UserAndIdentity loginUser(String loginType, User user, String password,
                               int rememberDays, String source, IpLocInfo ipLocInfo)
             throws JsonProcessingException {
         UserAndIdentity result = new UserAndIdentity();
         // 比对密码是否相同
-        String actualPassword = PasswordUtil.encrypt(password + user.getSalt());
-        if (actualPassword.equals(user.getPassword())) {
+        if (passwordEquals(user, password)) {
+            // 不需要检查用户是否已注销，因为已注销的用户不会被查询到
+
+            // 将数据库中的用户数据再次缓存到 Redis 中
+            redisUserDao.setUser(user);
+
             result.setUser(user);
             // 插入登录成功日志
             userLogDao.insert(new UserLog(user.getId(), UserLogType.LOGIN, objectMapper.writeValueAsString(
@@ -362,7 +368,7 @@ public class UserService {
             }
 
             // 新密码和老密码相同，返回 false
-            if (user.getPassword().equals(PasswordUtil.encrypt(newPassword + user.getSalt()))) {
+            if (passwordEquals(user, newPassword)) {
                 return false;
             }
 
@@ -457,8 +463,7 @@ public class UserService {
         }
 
         // 如果老用户名和密码匹配
-        if (user != null &&
-                user.getPassword().equals(PasswordUtil.encrypt(params.password + user.getSalt()))) {
+        if (user != null && passwordEquals(user, params.password)) {
             // 更新数据库中的用户名
             User update = new User();
             update.setId(user.getId());
@@ -477,6 +482,42 @@ public class UserService {
         }
 
         return false;
+    }
+
+    /**
+     * 注销账号。
+     */
+    public boolean canceledAccount(@NonNull String email, @NonNull String password) {
+        User user = redisUserDao.getUserByEmail(email);
+        if (user == null) {
+            user = userDao.selectByEmail(email);
+            if (user == null) {
+                return false;
+            }
+        }
+
+        if (!passwordEquals(user, password)) {
+            return false;
+        }
+
+        if (user.getStatus() != UserStatus.NORMAL) {
+            return false;
+        }
+
+        // 删除 redis 中已注销账号的数据
+        redisUserDao.deleteUserById(user.getId());
+
+        // 更新用户的状态
+        User update = new User();
+        update.setId(user.getId());
+        update.setStatus(UserStatus.CANCELLED);
+        userDao.updateByIdSelective(update);
+
+        return true;
+    }
+
+    public boolean passwordEquals(User user, String password) {
+        return PasswordUtil.encrypt(password + user.getSalt()).equals(user.getPassword());
     }
 
     /**

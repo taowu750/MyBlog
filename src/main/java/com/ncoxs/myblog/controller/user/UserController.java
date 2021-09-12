@@ -25,7 +25,6 @@ import javax.validation.constraints.*;
 import java.io.UnsupportedEncodingException;
 import java.security.GeneralSecurityException;
 
-// TODO: 考虑和官方用户账号的兼容问题
 @Controller
 @RequestMapping("/user")
 @Validated
@@ -64,7 +63,7 @@ public class UserController {
         }
     }
 
-    @GetMapping("/account-activate/{identity}")
+    @GetMapping("/account/activate/{identity}")
     public ModelAndView accountActivate(@PathVariable("identity")
                                         @NotBlank(message = ParamValidateMsg.USER_ACTIVATE_IDENTITY_BLANK)
                                                 String identity) throws JsonProcessingException {
@@ -238,5 +237,16 @@ public class UserController {
     @ResponseBody
     public GenericResult<Boolean> modifyName(ModifyNameParams params) throws JsonProcessingException {
         return GenericResult.success(userService.modifyName(params));
+    }
+
+    @PostMapping("/account/cancel")
+    @ResponseBody
+    public GenericResult<Boolean> canceledAccount(@NotBlank(message = ParamValidateMsg.USER_EMAIL_BLANK)
+                                                  @Pattern(regexp = ParamValidateRule.EMAIL_REGEX, message = ParamValidateMsg.USER_EMAIL_FORMAT)
+                                                          String email,
+                                                  @NotBlank(message = ParamValidateMsg.USER_PASSWORD_BLANK)
+                                                  @Pattern(regexp = ParamValidateRule.PASSWORD_REGEX, message = ParamValidateMsg.USER_PASSWORD_FORMAT)
+                                                          String password) {
+        return GenericResult.success(userService.canceledAccount(email, password));
     }
 }

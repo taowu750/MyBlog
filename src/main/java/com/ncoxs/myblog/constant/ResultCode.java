@@ -26,7 +26,8 @@ public enum ResultCode {
     USER_LOGIN_VERIFICATION_ERROR(203, "用户名或密码错误"),
     USER_HAS_EXISTED(204, "用户已存在"),
     USER_EMAIL_IS_BIND(205, "邮箱已绑定在其他账号上"),
-    USER_ACCOUNT_FORBIDDEN(206, "用户账号被禁用"),
+    USER_ACCOUNT_BANNED(206, "用户账号被禁用"),
+    USER_ACCOUNT_CANCELED(207, "用户账号已注销"),
     /*
     300-399：客户端请求错误码
      */

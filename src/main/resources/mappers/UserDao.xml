@@ -28,43 +28,44 @@
 
     <select id="selectByName" resultType="com.ncoxs.myblog.model.pojo.User">
         select <include refid="AllColumns"/>
-        from user where name=#{name}
+        from user where name=#{name} and `status` != 4
     </select>
 
     <select id="existsName" resultType="java.lang.Boolean">
-        select count(*) from user where name=#{name}
+        select count(*) from user where name=#{name} and `status` != 4
     </select>
 
     <select id="existsEmail" resultType="java.lang.Boolean">
-        select count(*) from user where email=#{email}
+        select count(*) from user where email=#{email} and `status` != 4
     </select>
 
     <select id="existsByNameEmail" resultType="java.lang.Boolean">
-        select count(*) from user where name=#{name} and email=#{email}
+        select count(*) from user where name=#{name} and email=#{email} and `status` != 4
     </select>
 
     <select id="selectByIdentity" resultType="com.ncoxs.myblog.model.pojo.User">
         select <include refid="AllColumns"/>
         from user
         where id=(select user_id from user_identity where identity=#{identity}<if test="source != null"> and source=#{source}</if>)
+              and `status` != 4
     </select>
 
     <select id="selectByEmail" resultType="com.ncoxs.myblog.model.pojo.User">
         select <include refid="AllColumns"/>
         from user
-        where email=#{email}
+        where email=#{email} and `status` != 4
     </select>
 
     <select id="existsByEmailPassword" resultType="java.lang.Boolean">
         select count(*)
         from user
-        where email=#{email} and password=md5(concat(#{password}, salt))
+        where email=#{email} and password=md5(concat(#{password}, salt)) and `status` != 4
     </select>
 
     <select id="existsByNamePassword" resultType="java.lang.Boolean">
         select count(*)
         from user
-        where name=#{name} and password=md5(concat(#{password}, salt))
+        where name=#{name} and password=md5(concat(#{password}, salt)) and `status` != 4
     </select>
 
     <delete id="deleteById">
@@ -116,8 +117,8 @@
             </if>
         </trim>
         from dual
-        # 防止多线程下重复插入
-        where not exists(select name, email from user where name=#{name} or email=#{email})
+        # 防止多线程下重复插入，已注销用户的名称和邮箱可以被其他用户注册
+        where not exists(select name, email from user where name=#{name} or email=#{email} and `status` != 4)
     </insert>
 
     <update id="updateByIdSelective" parameterType="com.ncoxs.myblog.model.pojo.User">

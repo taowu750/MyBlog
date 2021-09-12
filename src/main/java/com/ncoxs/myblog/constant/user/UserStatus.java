@@ -15,7 +15,7 @@ public interface UserStatus {
     /**
      * 被封禁
      */
-    int FORBIDDEN = 3;
+    int BANNED = 3;
 
     /**
      * 已注销
