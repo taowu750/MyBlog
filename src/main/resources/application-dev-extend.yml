@@ -17,6 +17,14 @@ myapp:
       # 用来加解密“忘记密码”信息的秘钥
       aes-key: xojDGXtVip8AuU4lj9KUJQ==
 
+    # 用户头像基路径
+    profile-picture-path: /img/user/profile-picture
+    # 用户默认头像路径
+    default-profile-picture-path: /img/user/profile-picture/default/default-man.jpeg
+
+    # 用户默认简介
+    default-description: 这个用户很懒，什么都没有说~
+
   request:
     flow-id:
       # 请求 flow id 写入模式

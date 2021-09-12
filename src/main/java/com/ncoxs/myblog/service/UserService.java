@@ -8,6 +8,7 @@ import com.ncoxs.myblog.constant.user.UserLogType;
 import com.ncoxs.myblog.constant.user.UserStatus;
 import com.ncoxs.myblog.constant.user.UserType;
 import com.ncoxs.myblog.controller.user.UserController;
+import com.ncoxs.myblog.dao.mysql.UserBasicInfoDao;
 import com.ncoxs.myblog.dao.mysql.UserDao;
 import com.ncoxs.myblog.dao.mysql.UserIdentityDao;
 import com.ncoxs.myblog.dao.mysql.UserLogDao;
@@ -19,6 +20,7 @@ import com.ncoxs.myblog.model.bo.UserUpdateLog;
 import com.ncoxs.myblog.model.dto.IpLocInfo;
 import com.ncoxs.myblog.model.dto.UserAndIdentity;
 import com.ncoxs.myblog.model.pojo.User;
+import com.ncoxs.myblog.model.pojo.UserBasicInfo;
 import com.ncoxs.myblog.model.pojo.UserIdentity;
 import com.ncoxs.myblog.model.pojo.UserLog;
 import com.ncoxs.myblog.util.general.*;
@@ -43,7 +45,6 @@ import java.util.concurrent.TimeUnit;
 // TODO: 密码强度验证
 // TODO: 要有定时清理数据库中过期数据的机制
 
-// TODO: 增加 user_basic_info，注册时需要插入数据
 @Service
 public class UserService {
 
@@ -65,6 +66,12 @@ public class UserService {
     @Value("${myapp.user.forget-password.url-expire}")
     private int forgetPasswordExpire;
 
+    @Value("${myapp.user.default-profile-picture-path}")
+    private String defaultProfilePicturePath;
+
+    @Value("${myapp.user.default-description}")
+    private String defaultDescription;
+
     private UserDao userDao;
     private UserIdentityDao userIdentityDao;
 
@@ -73,6 +80,8 @@ public class UserService {
     private MailService mailService;
 
     private UserLogDao userLogDao;
+
+    private UserBasicInfoDao userBasicInfoDao;
 
     private ObjectMapper objectMapper;
 
@@ -99,6 +108,11 @@ public class UserService {
     @Autowired
     public void setUserLogDao(UserLogDao userLogDao) {
         this.userLogDao = userLogDao;
+    }
+
+    @Autowired
+    public void setUserBasicInfoDao(UserBasicInfoDao userBasicInfoDao) {
+        this.userBasicInfoDao = userBasicInfoDao;
     }
 
     @Autowired
@@ -221,6 +235,13 @@ public class UserService {
         userRegisterLog.setStatus(update.getStatus());
         userLogDao.updateDescriptionByToken(identity, objectMapper.writeValueAsString(userRegisterLog));
 
+        // 插入用户基本信息
+        UserBasicInfo userBasicInfo = new UserBasicInfo();
+        userBasicInfo.setUserId(user.getId());
+        userBasicInfo.setProfilePicturePath(defaultProfilePicturePath);
+        userBasicInfo.setDescription(defaultDescription);
+        userBasicInfoDao.insertSelective(userBasicInfo);
+
         // 将已激活的用户缓存到 redis 中
         user.setStatus(UserStatus.NORMAL);
         user.setLimitTime(TimeUtil.EMPTY_DATE);
@@ -233,7 +254,7 @@ public class UserService {
      * 根据用户名和密码进行登录。如果选择了“记住我”，则还会返回新的登录标识。
      *
      * @return User 对象和登录标识。如果返回值为 null，表示用户名不存在；如果返回值 user 属性为空，表示用户密码错误；
-     * 如果 user 属性等于 {@link #USER_CANCELED}，表示用户账号已注销；否则登录成功
+     * 否则登录成功
      */
     @Transactional(isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
     public UserAndIdentity loginUserByName(UserController.LoginByNameParams params) throws JsonProcessingException {
@@ -253,7 +274,7 @@ public class UserService {
      * 根据用户邮箱和密码进行登录。如果选择了“记住我”，则还会返回新的登录标识。
      *
      * @return User 对象和登录标识。如果返回值为 null，表示用户邮箱不存在；如果返回值 user 属性为空，表示用户密码错误；
-     * 如果 user 属性等于 {@link #USER_CANCELED}，表示用户账号已注销；否则登录成功
+     * 否则登录成功
      */
     @Transactional(isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
     public UserAndIdentity loginUserByEmail(UserController.LoginByEmailParams params) throws JsonProcessingException {
@@ -485,6 +506,7 @@ public class UserService {
     /**
      * 注销账号。
      */
+    @Transactional(isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
     public boolean canceledAccount(@NonNull String email, @NonNull String password) {
         User user = redisUserDao.getUserByEmail(email);
         if (user == null) {
@@ -504,6 +526,9 @@ public class UserService {
 
         // 删除 redis 中已注销账号的数据
         redisUserDao.deleteUserById(user.getId());
+
+        // 删除用户的 token
+        userIdentityDao.deleteByUserId(user.getId());
 
         // 更新用户的状态
         User update = new User();

@@ -7,6 +7,7 @@ import com.ncoxs.myblog.constant.user.UserIdentityType;
 import com.ncoxs.myblog.constant.user.UserLogType;
 import com.ncoxs.myblog.constant.user.UserStatus;
 import com.ncoxs.myblog.controller.user.UserController;
+import com.ncoxs.myblog.dao.mysql.UserBasicInfoDao;
 import com.ncoxs.myblog.dao.mysql.UserDao;
 import com.ncoxs.myblog.dao.mysql.UserIdentityDao;
 import com.ncoxs.myblog.dao.mysql.UserLogDao;
@@ -17,6 +18,7 @@ import com.ncoxs.myblog.model.bo.UserUpdateLog;
 import com.ncoxs.myblog.model.dto.GenericResult;
 import com.ncoxs.myblog.model.dto.UserAndIdentity;
 import com.ncoxs.myblog.model.pojo.User;
+import com.ncoxs.myblog.model.pojo.UserBasicInfo;
 import com.ncoxs.myblog.model.pojo.UserIdentity;
 import com.ncoxs.myblog.model.pojo.UserLog;
 import com.ncoxs.myblog.testutil.EncryptionMockMvcBuilder;
@@ -65,6 +67,9 @@ public class UserControllerTest {
 
     @Autowired
     UserLogDao userLogDao;
+
+    @Autowired
+    UserBasicInfoDao userBasicInfoDao;
 
     @Autowired
     RedisUserDao redisUserDao;
@@ -192,6 +197,11 @@ public class UserControllerTest {
         UserRegisterLog userRegisterLog = objectMapper.readValue(userLog.getDescription(), UserRegisterLog.class);
         assertEquals(UserStatus.NORMAL, userRegisterLog.getStatus());
         System.out.println(userRegisterLog.getIpLocInfo());
+
+        // assert 用户基本信息
+        UserBasicInfo userBasicInfo = userBasicInfoDao.selectByUserId(savedUser.getId());
+        System.out.println(userBasicInfo.getProfilePicturePath());
+        System.out.println(userBasicInfo.getDescription());
     }
 
     private void activateTestUser() throws Exception {
