@@ -157,7 +157,7 @@ public class UserControllerTest {
         assertEquals(UserIdentityType.ACTIVATE_IDENTITY, identity.getType());
 
         // 发送用户激活请求
-        MvcResult mvcResult = mockMvc.perform(get("/user/account-activate/{identity}", identity.getIdentity()))
+        MvcResult mvcResult = mockMvc.perform(get("/user/account/activate/{identity}", identity.getIdentity()))
                 .andExpect(status().isOk())
                 .andDo(print())
                 .andReturn();
@@ -166,7 +166,7 @@ public class UserControllerTest {
         assertEquals("success", mv.getModel().get("result"));
 
         // 再次发送用户激活请求
-        mvcResult = mockMvc.perform(get("/user/account-activate/{identity}", identity.getIdentity()))
+        mvcResult = mockMvc.perform(get("/user/account/activate/{identity}", identity.getIdentity()))
                 .andExpect(status().isOk())
                 .andReturn();
         mv = mvcResult.getModelAndView();
@@ -200,7 +200,7 @@ public class UserControllerTest {
         UserIdentity identity = identities.get(0);
         assertEquals(UserIdentityType.ACTIVATE_IDENTITY, identity.getType());
 
-        MvcResult mvcResult = mockMvc.perform(get("/user/account-activate/{identity}", identity.getIdentity()))
+        MvcResult mvcResult = mockMvc.perform(get("/user/account/activate/{identity}", identity.getIdentity()))
                 .andExpect(status().isOk())
                 .andReturn();
         ModelAndView mv = mvcResult.getModelAndView();
@@ -458,5 +458,65 @@ public class UserControllerTest {
         UserUpdateLog updateLog = objectMapper.readValue(userLog.getDescription(), UserUpdateLog.class);
         assertEquals(updateLog.getOldValue(), "test");
         assertEquals(updateLog.getNewValue(), user.getName());
+    }
+
+    @Test
+    @Transactional
+    public void testCanceledAccount() throws Exception {
+        registerTestUser();
+        activateTestUser();
+
+        // 发送错误的注销账号请求：密码不正确
+        byte[] data = new EncryptionMockMvcBuilder(mockMvc, objectMapper)
+                .post("/user/account/cancel")
+                .formParams(mp(kv("email", "wutaoyx163@163.com"), kv("password", "12346")))
+                .sendRequest()
+                .expectStatusOk()
+                .print()
+                .buildByte();
+        GenericResult<Boolean> genericResult = objectMapper.readValue(data,
+                new TypeReference<GenericResult<Boolean>>() {
+                });
+        assertFalse(genericResult.getData());
+
+        // 发送注销账号请求
+        data = new EncryptionMockMvcBuilder(mockMvc, objectMapper)
+                .post("/user/account/cancel")
+                .formParams(mp(kv("email", "wutaoyx163@163.com"), kv("password", "12345")))
+                .sendRequest()
+                .expectStatusOk()
+                .print()
+                .buildByte();
+        genericResult = objectMapper.readValue(data,
+                new TypeReference<GenericResult<Boolean>>() {
+                });
+        assertTrue(genericResult.getData());
+
+        // 发送根据用户名称登录请求
+        data = new EncryptionMockMvcBuilder(mockMvc, objectMapper)
+                .post("/user/login/name")
+                .formParams(mp(kv("name", "test"), kv("password", "12345")))
+                .sendRequest()
+                .expectStatusOk()
+                .print()
+                .buildByte();
+        GenericResult<Object> result = objectMapper.readValue(data,
+                new TypeReference<GenericResult<Object>>() {
+                });
+        assertEquals(ResultCode.USER_NOT_EXIST.getCode(), result.getCode());
+
+        // 发送根据用户邮箱登录请求
+        data = new EncryptionMockMvcBuilder(mockMvc, objectMapper)
+                .post("/user/login/email")
+                .formParams(mp(kv("email", "wutaoyx163@163.com"), kv("password", "12345"),
+                        kv("rememberDays", 10), kv("source", "source")))
+                .sendRequest()
+                .expectStatusOk()
+                .print()
+                .buildByte();
+        result = objectMapper.readValue(data,
+                new TypeReference<GenericResult<Object>>() {
+                });
+        assertEquals(ResultCode.USER_NOT_EXIST.getCode(), result.getCode());
     }
 }

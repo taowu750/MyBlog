@@ -269,8 +269,6 @@ public class UserService {
                 params.ipLocInfo);
     }
 
-    public static final User USER_CANCELED = new User();
-
     // 登录还需要检查用户状态，是否为已注销。封禁了还能登录，只是不能做除浏览外的其他操作
     UserAndIdentity loginUser(String loginType, User user, String password,
                               int rememberDays, String source, IpLocInfo ipLocInfo)
