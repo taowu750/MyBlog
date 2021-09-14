@@ -32,4 +32,29 @@ public class FileUtil {
     public static String randomFileName(String extension) {
         return randomFileName() + "." + (extension.startsWith(".") ? extension.substring(1) : extension);
     }
+
+    public static String randomFileName(String extension, Object ...appends) {
+        StringBuilder sb = new StringBuilder().append(System.currentTimeMillis());
+        for (Object append : appends) {
+            sb.append(append);
+        }
+        sb.append(ThreadLocalRandom.current().nextInt(1000, 1000000))
+                .append(extension.startsWith(".") ? extension.substring(1) : extension);
+
+        return sb.toString();
+    }
+
+    public static String truncateFileName(String fileName, int maxLength) {
+        if (fileName.length() <= maxLength) {
+            return fileName;
+        } else {
+            int extensionIdx = fileName.lastIndexOf(".");
+            if (extensionIdx >= 0) {
+                String extension = fileName.substring(extensionIdx);
+                return fileName.substring(0, maxLength - extension.length()) + extension;
+            } else {
+                return fileName.substring(0, maxLength);
+            }
+        }
+    }
 }

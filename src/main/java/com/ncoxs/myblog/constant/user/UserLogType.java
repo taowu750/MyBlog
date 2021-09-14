@@ -31,7 +31,7 @@ public interface UserLogType {
     int MODIFY_NAME = 5;
 
     /**
-     * 上传博客
+     * 创建博客草稿
      */
-    int UPLOAD_BLOG = 6;
+    int CREATE_BLOG_DRAFT = 6;
 }

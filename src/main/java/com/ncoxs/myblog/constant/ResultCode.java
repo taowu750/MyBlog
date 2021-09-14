@@ -28,6 +28,7 @@ public enum ResultCode {
     USER_EMAIL_IS_BIND(205, "邮箱已绑定在其他账号上"),
     USER_ACCOUNT_BANNED(206, "用户账号被禁用"),
     USER_ACCOUNT_CANCELED(207, "用户账号已注销"),
+    USER_ACCESS_ERROR(208, "用户访问失败"),
     /*
     300-399：客户端请求错误码
      */
@@ -41,6 +42,11 @@ public enum ResultCode {
     ENCRYPTION_RSA_KEY_EXPIRE(402, "RSA 秘钥已过期"),
     ENCRYPTION_RSA_ERROR(403, "RSA 加解密错误"),
     ENCRYPTION_AES_ERROR(404, "AES 加解密错误"),
+    /*
+    500-599: 文件相关错误码
+     */
+    FILE_UPLOAD_IMAGE_ERROR(500, "上传图片为空或格式错误"),
+    FILE_SAVE_IMAGE_ERROR(501, "保存图片出错"),
     /*
     1000-1099: 服务器内部错误码
      */

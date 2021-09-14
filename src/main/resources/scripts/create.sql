@@ -108,6 +108,37 @@ create table if not exists `blog`
     key (user_id)
 );
 
+# 博客草稿
+create table if not exists `blog_draft`
+(
+    `id`               int primary key auto_increment,
+    `user_id`          int          not null,
+    `title`            varchar(50)  not null default '',
+    `markdown_body`    text         not null,
+    `cover_path`       varchar(150) not null default '' comment '封面图片路径',
+    `is_allow_reprint` bool         not null default false comment '是否允许转载',
+    `expire`           timestamp    not null,
+
+    `create_time`      timestamp    not null default current_timestamp,
+    `modify_time`      timestamp    not null default current_timestamp on update current_timestamp,
+
+    key (user_id)
+);
+
+# 上传的图片
+create table if not exists `upload_img`
+(
+    `id`               int primary key auto_increment,
+    `target_type`      int          not null comment '包含图片的对象类型：1 博客，2 博客草稿，3 专栏介绍，4 评论',
+    `target_id`        int          not null,
+    `file_name`        varchar(40)  not null comment '图片在服务器上的名称',
+    `origin_file_name` varchar(150) not null comment '图片上传时的名称',
+
+    `create_time`      timestamp    not null default current_timestamp,
+
+    key (`target_id`, `target_type`)
+);
+
 # 标签
 create table if not exists `tag`
 (

@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ncoxs.myblog.dao.mysql.BlogDraftDao">
+    <resultMap id="BaseResultMap" type="com.ncoxs.myblog.model.pojo.BlogDraft">
+        <id column="id" jdbcType="INTEGER" property="id"/>
+        <result column="user_id" jdbcType="INTEGER" property="userId"/>
+        <result column="title" jdbcType="VARCHAR" property="title"/>
+        <result column="markdown_body" jdbcType="VARCHAR" property="markdownBody"/>
+        <result column="cover_path" jdbcType="VARCHAR" property="coverPath"/>
+        <result column="is_allow_reprint" jdbcType="BOOLEAN" property="isAllowReprint"/>
+        <result column="expire" jdbcType="TIMESTAMP" property="expire"/>
+        <result column="create_time" jdbcType="TIMESTAMP" property="createTime"/>
+        <result column="modify_time" jdbcType="TIMESTAMP" property="modifyTime"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        id, user_id, title, markdown_body, cover_path, is_allow_reprint, `expire`, create_time,
+    modify_time
+    </sql>
+
+    <select id="selectById" parameterType="java.lang.Integer" resultMap="BaseResultMap">
+        select
+        <include refid="Base_Column_List"/>
+        from blog_draft
+        where id = #{id,jdbcType=INTEGER}
+    </select>
+
+    <insert id="insert" keyColumn="id" keyProperty="id" parameterType="com.ncoxs.myblog.model.pojo.BlogDraft"
+            useGeneratedKeys="true">
+        insert into blog_draft(user_id, `expire`, markdown_body)
+        values (#{userId,jdbcType=INTEGER}, #{expire,jdbcType=TIMESTAMP}, '')
+    </insert>
+
+    <update id="updateByIdSelective" parameterType="com.ncoxs.myblog.model.pojo.BlogDraft">
+        update blog_draft
+        <set>
+            <if test="userId != null">
+                user_id = #{userId,jdbcType=INTEGER},
+            </if>
+            <if test="title != null">
+                title = #{title,jdbcType=VARCHAR},
+            </if>
+            <if test="markdownBody != null">
+                markdown_body = #{markdownBody,jdbcType=VARCHAR},
+            </if>
+            <if test="coverPath != null">
+                cover_path = #{coverPath,jdbcType=VARCHAR},
+            </if>
+            <if test="isAllowReprint != null">
+                is_allow_reprint = #{isAllowReprint,jdbcType=BOOLEAN},
+            </if>
+            <if test="expire != null">
+                `expire` = #{expire,jdbcType=TIMESTAMP},
+            </if>
+            <if test="createTime != null">
+                create_time = #{createTime,jdbcType=TIMESTAMP},
+            </if>
+            <if test="modifyTime != null">
+                modify_time = #{modifyTime,jdbcType=TIMESTAMP},
+            </if>
+        </set>
+        where id = #{id,jdbcType=INTEGER}
+    </update>
+
+    <delete id="deleteById" parameterType="java.lang.Integer">
+        delete
+        from blog_draft
+        where id = #{id,jdbcType=INTEGER}
+    </delete>
+</mapper>
