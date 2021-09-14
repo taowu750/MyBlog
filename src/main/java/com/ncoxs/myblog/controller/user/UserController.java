@@ -8,6 +8,7 @@ import com.ncoxs.myblog.constant.user.UserLogType;
 import com.ncoxs.myblog.handler.encryption.Encryption;
 import com.ncoxs.myblog.model.dto.GenericResult;
 import com.ncoxs.myblog.model.dto.IpLocInfo;
+import com.ncoxs.myblog.model.dto.UserAccessParams;
 import com.ncoxs.myblog.model.dto.UserAndIdentity;
 import com.ncoxs.myblog.model.pojo.User;
 import com.ncoxs.myblog.service.user.UserService;
@@ -40,13 +41,21 @@ public class UserController {
     }
 
 
+    @Data
+    public static class RegisterParams {
+
+        public User user;
+
+        public IpLocInfo ipLocInfo;
+    }
+
     @PostMapping("/register")
     @ResponseBody
     @Encryption
-    public GenericResult<Object> register(User user, IpLocInfo ipLocInfo)
+    public GenericResult<Object> register(@RequestBody RegisterParams params)
             throws MessagingException, JsonProcessingException {
-        int exists = userService.existsUser(user.getName(), user.getEmail());
-        if (exists == 0 && userService.registerUser(user, ipLocInfo)) {
+        int exists = userService.existsUser(params.user.getName(), params.user.getEmail());
+        if (exists == 0 && userService.registerUser(params.user, params.ipLocInfo)) {
             return GenericResult.success();
         }
 
@@ -115,7 +124,7 @@ public class UserController {
     @PostMapping("/login/name")
     @ResponseBody
     @Encryption
-    public GenericResult<UserAndIdentity> loginByName(LoginByNameParams loginByNameParams) throws JsonProcessingException {
+    public GenericResult<UserAndIdentity> loginByName(@RequestBody LoginByNameParams loginByNameParams) throws JsonProcessingException {
         loginByNameParams.rememberDays = loginByNameParams.rememberDays != null ? loginByNameParams.rememberDays : 0;
         loginByNameParams.source = loginByNameParams.source != null ? loginByNameParams.source : "";
         UserAndIdentity userAndIdentity = userService.loginUserByName(loginByNameParams);
@@ -134,7 +143,7 @@ public class UserController {
     @PostMapping("/login/email")
     @ResponseBody
     @Encryption
-    public GenericResult<UserAndIdentity> loginByEmail(LoginByEmailParams loginByEmailParams) throws JsonProcessingException {
+    public GenericResult<UserAndIdentity> loginByEmail(@RequestBody LoginByEmailParams loginByEmailParams) throws JsonProcessingException {
         loginByEmailParams.rememberDays = loginByEmailParams.rememberDays != null ? loginByEmailParams.rememberDays : 0;
         loginByEmailParams.source = loginByEmailParams.source != null ? loginByEmailParams.source : "";
         UserAndIdentity userAndIdentity = userService.loginUserByEmail(loginByEmailParams);
@@ -151,27 +160,42 @@ public class UserController {
         }
     }
 
+    @Data
+    public static class LoginByIdentityParams {
+
+        @NotBlank(message = ParamValidateMsg.USER_IDENTITY_BLANK)
+        public String identity;
+
+        @NotBlank(message = ParamValidateMsg.USER_IDENTITY_SOURCE_BLANK)
+        public String source;
+
+        public IpLocInfo ipLocInfo;
+    }
+
     @PostMapping("/login/identity")
     @ResponseBody
     @Encryption
-    public GenericResult<User> loginByIdentity(@NotBlank(message = ParamValidateMsg.USER_IDENTITY_BLANK)
-                                                       String identity,
-                                               @NotBlank(message = ParamValidateMsg.USER_IDENTITY_SOURCE_BLANK)
-                                                       String source,
-                                               IpLocInfo ipLocInfo) throws JsonProcessingException {
-        return GenericResult.success(userService.loginByIdentity(identity, source, ipLocInfo));
+    public GenericResult<User> loginByIdentity(@RequestBody LoginByIdentityParams params) throws JsonProcessingException {
+        return GenericResult.success(userService.loginByIdentity(params.identity, params.source, params.ipLocInfo));
+    }
+
+    @Data
+    public static class SendForgetPasswordEmailParams {
+
+        @NotBlank(message = ParamValidateMsg.USER_EMAIL_BLANK)
+        @Pattern(regexp = ParamValidateRule.EMAIL_REGEX, message = ParamValidateMsg.USER_EMAIL_FORMAT)
+        String email;
+
+        @NotBlank(message = ParamValidateMsg.USER_PASSWORD_BLANK)
+        @Pattern(regexp = ParamValidateRule.PASSWORD_REGEX, message = ParamValidateMsg.USER_PASSWORD_FORMAT)
+        String newPassword;
     }
 
     @PostMapping("/password/send-forget")
     @ResponseBody
-    public GenericResult<Boolean> sendForgetPasswordEmail(@NotBlank(message = ParamValidateMsg.USER_EMAIL_BLANK)
-                                                          @Pattern(regexp = ParamValidateRule.EMAIL_REGEX, message = ParamValidateMsg.USER_EMAIL_FORMAT)
-                                                                  String email,
-                                                          @NotBlank(message = ParamValidateMsg.USER_PASSWORD_BLANK)
-                                                          @Pattern(regexp = ParamValidateRule.PASSWORD_REGEX, message = ParamValidateMsg.USER_PASSWORD_FORMAT)
-                                                                  String newPassword)
+    public GenericResult<Boolean> sendForgetPasswordEmail(@RequestBody SendForgetPasswordEmailParams params)
             throws MessagingException, GeneralSecurityException, UnsupportedEncodingException {
-        return GenericResult.success(userService.sendForgetPasswordMail(email, newPassword));
+        return GenericResult.success(userService.sendForgetPasswordMail(params.email, params.newPassword));
     }
 
     @GetMapping("/password/forget/{encryptedParams}")
@@ -217,7 +241,7 @@ public class UserController {
 
     @PostMapping("/password/modify")
     @ResponseBody
-    public GenericResult<Boolean> modifyPassword(ModifyPasswordParams params) throws JsonProcessingException {
+    public GenericResult<Boolean> modifyPassword(@RequestBody ModifyPasswordParams params) throws JsonProcessingException {
         return GenericResult.success(userService.modifyPassword(params));
     }
 
@@ -239,18 +263,13 @@ public class UserController {
 
     @PostMapping("/name/modify")
     @ResponseBody
-    public GenericResult<Boolean> modifyName(ModifyNameParams params) throws JsonProcessingException {
+    public GenericResult<Boolean> modifyName(@RequestBody ModifyNameParams params) throws JsonProcessingException {
         return GenericResult.success(userService.modifyName(params));
     }
 
     @PostMapping("/account/cancel")
     @ResponseBody
-    public GenericResult<Boolean> canceledAccount(@NotBlank(message = ParamValidateMsg.USER_EMAIL_BLANK)
-                                                  @Pattern(regexp = ParamValidateRule.EMAIL_REGEX, message = ParamValidateMsg.USER_EMAIL_FORMAT)
-                                                          String email,
-                                                  @NotBlank(message = ParamValidateMsg.USER_PASSWORD_BLANK)
-                                                  @Pattern(regexp = ParamValidateRule.PASSWORD_REGEX, message = ParamValidateMsg.USER_PASSWORD_FORMAT)
-                                                          String password) {
-        return GenericResult.success(userService.canceledAccount(email, password));
+    public GenericResult<Boolean> canceledAccount(@RequestBody UserAccessParams params) {
+        return GenericResult.success(userService.canceledAccount(params.getEmail(), params.getPassword()));
     }
 }

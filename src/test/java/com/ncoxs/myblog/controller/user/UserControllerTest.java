@@ -99,10 +99,15 @@ public class UserControllerTest {
     public void testRegister() throws Exception {
         registerTestUser();
 
+        User user = new User();
+        user.setName("test");
+        user.setEmail("wutaoyx163@163.com");
+        user.setPassword("12345");
+
         // 发送注册用户请求
         GenericResult<Map<String, Object>> result = new EncryptionMockMvcBuilder(mockMvc, objectMapper)
                 .post("/user/register")
-                .formParams(mp(kv("name", "test"), kv("email", "wutaoyx163@163.com"), kv("password", "12345")))
+                .jsonParams(mp("user", user))
                 .sendRequest()
                 .expectStatusOk()
                 .print()
@@ -110,7 +115,7 @@ public class UserControllerTest {
         assertEquals(ResultCode.USER_HAS_EXISTED.getCode(), result.getCode());
 
         // 从数据库中读取用户和用户标识
-        User user = userDao.selectByName("test");
+        user = userDao.selectByName("test");
         List<UserIdentity> userIdentities = userIdentityDao.selectByUserId(user.getId());
 
         // assert 用户对象和用户标识
@@ -139,7 +144,7 @@ public class UserControllerTest {
         // 注册用户
         GenericResult<Map<String, Object>> result = new EncryptionMockMvcBuilder(mockMvc, objectMapper)
                 .post("/user/register")
-                .formParams(mp(kv("name", "test"), kv("email", "wutaoyx163@163.com"), kv("password", "12345")))
+                .jsonParams(mp("user", user))
                 .sendRequest()
                 .expectStatusOk()
                 .print()
@@ -226,7 +231,7 @@ public class UserControllerTest {
         // 发送根据用户名称登录请求
         byte[] data = new EncryptionMockMvcBuilder(mockMvc, objectMapper)
                 .post("/user/login/name")
-                .formParams(mp(kv("name", "test"), kv("password", "12345")))
+                .jsonParams(mp(kv("name", "test"), kv("password", "12345")))
                 .sendRequest()
                 .expectStatusOk()
                 .print()
@@ -256,7 +261,7 @@ public class UserControllerTest {
         // 发送根据用户邮箱登录请求
         data = new EncryptionMockMvcBuilder(mockMvc, objectMapper)
                 .post("/user/login/email")
-                .formParams(mp(kv("email", "wutaoyx163@163.com"), kv("password", "12345"),
+                .jsonParams(mp(kv("email", "wutaoyx163@163.com"), kv("password", "12345"),
                         kv("rememberDays", 10), kv("source", "source")))
                 .sendRequest()
                 .expectStatusOk()
@@ -287,7 +292,7 @@ public class UserControllerTest {
         // 发送根据用户标识登录请求
         data = new EncryptionMockMvcBuilder(mockMvc, objectMapper)
                 .post("/user/login/identity")
-                .formParams(mp(kv("identity", userAndIdentity.getIdentity()), kv("source", "source")))
+                .jsonParams(mp(kv("identity", userAndIdentity.getIdentity()), kv("source", "source")))
                 .sendRequest()
                 .expectStatusOk()
                 .print()
@@ -324,7 +329,7 @@ public class UserControllerTest {
         // 发送错误的用户发送忘记密码邮件请求：新密码和旧密码相同
         byte[] data = new EncryptionMockMvcBuilder(mockMvc, objectMapper)
                 .post("/user/password/send-forget")
-                .formParams(mp(kv("email", "wutaoyx163@163.com"), kv("newPassword", "12345")))
+                .jsonParams(mp(kv("email", "wutaoyx163@163.com"), kv("newPassword", "12345")))
                 .sendRequest()
                 .expectStatusOk()
                 .print()
@@ -337,7 +342,7 @@ public class UserControllerTest {
         // 发送用户发送忘记密码邮件请求
         data = new EncryptionMockMvcBuilder(mockMvc, objectMapper)
                 .post("/user/password/send-forget")
-                .formParams(mp(kv("email", "wutaoyx163@163.com"), kv("newPassword", "23456")))
+                .jsonParams(mp(kv("email", "wutaoyx163@163.com"), kv("newPassword", "23456")))
                 .sendRequest()
                 .expectStatusOk()
                 .print()
@@ -385,7 +390,7 @@ public class UserControllerTest {
         // 发送错误的修改密码请求：原密码不正确
         byte[] data = new EncryptionMockMvcBuilder(mockMvc, objectMapper)
                 .post("/user/password/modify")
-                .formParams(mp(kv("email", "wutaoyx163@163.com"), kv("oldPassword", "12346"),
+                .jsonParams(mp(kv("email", "wutaoyx163@163.com"), kv("oldPassword", "12346"),
                         kv("newPassword", "12347")))
                 .sendRequest()
                 .expectStatusOk()
@@ -399,7 +404,7 @@ public class UserControllerTest {
         // 发送修改密码请求
         data = new EncryptionMockMvcBuilder(mockMvc, objectMapper)
                 .post("/user/password/modify")
-                .formParams(mp(kv("email", "wutaoyx163@163.com"), kv("oldPassword", "12345"),
+                .jsonParams(mp(kv("email", "wutaoyx163@163.com"), kv("oldPassword", "12345"),
                         kv("newPassword", "23456")))
                 .sendRequest()
                 .expectStatusOk()
@@ -432,7 +437,7 @@ public class UserControllerTest {
         // 发送错误的修改名称请求：原密码不正确
         byte[] data = new EncryptionMockMvcBuilder(mockMvc, objectMapper)
                 .post("/user/name/modify")
-                .formParams(mp(kv("oldName", "test"), kv("newName", "wutao"),
+                .jsonParams(mp(kv("oldName", "test"), kv("newName", "wutao"),
                         kv("password", "12347")))
                 .sendRequest()
                 .expectStatusOk()
@@ -446,7 +451,7 @@ public class UserControllerTest {
         // 发送修改名称请求
         data = new EncryptionMockMvcBuilder(mockMvc, objectMapper)
                 .post("/user/name/modify")
-                .formParams(mp(kv("oldName", "test"), kv("newName", "wutao"),
+                .jsonParams(mp(kv("oldName", "test"), kv("newName", "wutao"),
                         kv("password", "12345")))
                 .sendRequest()
                 .expectStatusOk()
@@ -478,7 +483,7 @@ public class UserControllerTest {
         // 发送错误的注销账号请求：密码不正确
         byte[] data = new EncryptionMockMvcBuilder(mockMvc, objectMapper)
                 .post("/user/account/cancel")
-                .formParams(mp(kv("email", "wutaoyx163@163.com"), kv("password", "12346")))
+                .jsonParams(mp(kv("email", "wutaoyx163@163.com"), kv("password", "12346")))
                 .sendRequest()
                 .expectStatusOk()
                 .print()
@@ -491,7 +496,7 @@ public class UserControllerTest {
         // 发送注销账号请求
         data = new EncryptionMockMvcBuilder(mockMvc, objectMapper)
                 .post("/user/account/cancel")
-                .formParams(mp(kv("email", "wutaoyx163@163.com"), kv("password", "12345")))
+                .jsonParams(mp(kv("email", "wutaoyx163@163.com"), kv("password", "12345")))
                 .sendRequest()
                 .expectStatusOk()
                 .print()
@@ -504,7 +509,7 @@ public class UserControllerTest {
         // 发送根据用户名称登录请求
         data = new EncryptionMockMvcBuilder(mockMvc, objectMapper)
                 .post("/user/login/name")
-                .formParams(mp(kv("name", "test"), kv("password", "12345")))
+                .jsonParams(mp(kv("name", "test"), kv("password", "12345")))
                 .sendRequest()
                 .expectStatusOk()
                 .print()
@@ -517,7 +522,7 @@ public class UserControllerTest {
         // 发送根据用户邮箱登录请求
         data = new EncryptionMockMvcBuilder(mockMvc, objectMapper)
                 .post("/user/login/email")
-                .formParams(mp(kv("email", "wutaoyx163@163.com"), kv("password", "12345"),
+                .jsonParams(mp(kv("email", "wutaoyx163@163.com"), kv("password", "12345"),
                         kv("rememberDays", 10), kv("source", "source")))
                 .sendRequest()
                 .expectStatusOk()
