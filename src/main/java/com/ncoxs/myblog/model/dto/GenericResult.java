@@ -52,4 +52,12 @@ public class GenericResult<T> implements Serializable {
     public static <T> GenericResult<T> error(ResultCode code, T data) {
         return new GenericResult<>(code, data);
     }
+
+    public static <T> GenericResult<T> byCode(ResultCode code) {
+        if (code == ResultCode.SUCCESS) {
+            return success();
+        } else {
+            return error(code);
+        }
+    }
 }

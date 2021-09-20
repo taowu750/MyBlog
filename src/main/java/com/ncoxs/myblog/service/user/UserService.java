@@ -3,6 +3,7 @@ package com.ncoxs.myblog.service.user;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ncoxs.myblog.constant.EmailTemplate;
+import com.ncoxs.myblog.constant.ResultCode;
 import com.ncoxs.myblog.constant.user.UserIdentityType;
 import com.ncoxs.myblog.constant.user.UserLogType;
 import com.ncoxs.myblog.constant.user.UserStatus;
@@ -18,7 +19,7 @@ import com.ncoxs.myblog.model.bo.UserLoginLog;
 import com.ncoxs.myblog.model.bo.UserRegisterLog;
 import com.ncoxs.myblog.model.bo.UserUpdateLog;
 import com.ncoxs.myblog.model.dto.IpLocInfo;
-import com.ncoxs.myblog.model.dto.UserAndIdentity;
+import com.ncoxs.myblog.model.dto.UserLoginResp;
 import com.ncoxs.myblog.model.pojo.User;
 import com.ncoxs.myblog.model.pojo.UserBasicInfo;
 import com.ncoxs.myblog.model.pojo.UserIdentity;
@@ -33,18 +34,24 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 import org.thymeleaf.context.Context;
 
 import javax.mail.MessagingException;
+import javax.servlet.http.HttpSession;
 import java.io.UnsupportedEncodingException;
 import java.security.GeneralSecurityException;
 import java.util.Date;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
 
 // TODO: 考虑和官方用户账号的兼容问题
 // TODO: 密码强度验证
 // TODO: 要有定时清理数据库中过期数据的机制
+
+// TODO: 添加用户退出登录功能
 
 @Service
 public class UserService {
@@ -120,6 +127,14 @@ public class UserService {
     public void setObjectMapper(ObjectMapper objectMapper) {
         this.objectMapper = objectMapper;
     }
+
+
+    public static final String USER_LOGIN_SESSION_KEY = "userLoginToken";
+    /**
+     * 用户每次登录，会生成一个 session 级别的 token，调用其他接口时需要使用这个 token 进行访问。
+     * token 和用户对象的映射关系存在这个 map 中。
+     */
+    private static final ConcurrentHashMap<String, User> USER_LOGIN_MAP = new ConcurrentHashMap<>();
 
 
     /**
@@ -258,7 +273,7 @@ public class UserService {
      * 否则登录成功
      */
     @Transactional(isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
-    public UserAndIdentity loginUserByName(UserController.LoginByNameParams params) throws JsonProcessingException {
+    public UserLoginResp loginUserByName(UserController.LoginByNameParams params) throws JsonProcessingException {
         User user = redisUserDao.getUserByName(params.name);
         if (user == null) {
             user = userDao.selectByName(params.name);
@@ -278,7 +293,7 @@ public class UserService {
      * 否则登录成功
      */
     @Transactional(isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
-    public UserAndIdentity loginUserByEmail(UserController.LoginByEmailParams params) throws JsonProcessingException {
+    public UserLoginResp loginUserByEmail(UserController.LoginByEmailParams params) throws JsonProcessingException {
         User user = redisUserDao.getUserByEmail(params.email);
         if (user == null) {
             user = userDao.selectByEmail(params.email);
@@ -292,10 +307,10 @@ public class UserService {
     }
 
     // 登录还需要检查用户状态，是否为已注销。封禁了还能登录，只是不能做除浏览外的其他操作
-    UserAndIdentity loginUser(String loginType, User user, String password,
-                              int rememberDays, String source, IpLocInfo ipLocInfo)
+    UserLoginResp loginUser(String loginType, User user, String password,
+                            int rememberDays, String source, IpLocInfo ipLocInfo)
             throws JsonProcessingException {
-        UserAndIdentity result = new UserAndIdentity();
+        UserLoginResp result = new UserLoginResp();
         // 比对密码是否相同
         if (passwordEquals(user, password)) {
             // 不需要检查用户是否已注销，因为已注销的用户不会被查询到
@@ -319,6 +334,8 @@ public class UserService {
                 // 新的登录标识缓存到 redis 中
                 redisUserDao.setIdentity2Id(identity, source, user.getId());
             }
+
+            result.setToken(saveUserWithToken(user));
         } else {
             // 插入登录密码错误日志
             userLogDao.insert(new UserLog(user.getId(), UserLogType.LOGIN, objectMapper.writeValueAsString(
@@ -329,6 +346,19 @@ public class UserService {
     }
 
     /**
+     * 生成用户此次登录的 token，和用户对象相关联，并保存到 session 中。
+     */
+    private String saveUserWithToken(User user) {
+        String userLoginToken = UUIDUtil.generate();
+        HttpSession session = ((ServletRequestAttributes) RequestContextHolder.getRequestAttributes())
+                .getRequest().getSession();
+        session.setAttribute(USER_LOGIN_SESSION_KEY, session);
+        USER_LOGIN_MAP.put(userLoginToken, user);
+
+        return userLoginToken;
+    }
+
+    /**
      * 根据用户标识和来源进行登录。如果不存在、标识或来源不对、已过期则返回 null。
      *
      * @param loginIdentity 用户登录标识
@@ -336,7 +366,7 @@ public class UserService {
      * @return 登录成功返回 User 对象，否则返回 null
      */
     @Transactional(isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
-    public User loginByIdentity(@NonNull String loginIdentity, @NonNull String source, @Nullable IpLocInfo ipLocInfo)
+    public UserLoginResp loginByIdentity(@NonNull String loginIdentity, @NonNull String source, @Nullable IpLocInfo ipLocInfo)
             throws JsonProcessingException {
         User user = redisUserDao.getUserByIdentity(loginIdentity, source);
         if (user == null) {
@@ -365,7 +395,25 @@ public class UserService {
         userLogDao.insert(new UserLog(user.getId(), UserLogType.LOGIN, objectMapper.writeValueAsString(
                 new UserLoginLog("success", "identity", DeviceUtil.fillIpLocInfo(ipLocInfo)))));
 
-        return user;
+        UserLoginResp result = new UserLoginResp();
+        result.setUser(user);
+        result.setToken(saveUserWithToken(user));
+
+        return result;
+    }
+
+    /**
+     * 通过用户登录 token 获取用户对象。
+     */
+    public User accessByToken(String token) {
+        return USER_LOGIN_MAP.get(token);
+    }
+
+    /**
+     * 当用户关闭所有网页，或主动退出登录时，需要删除登录 token
+     */
+    public void quitByToken(String token) {
+        USER_LOGIN_MAP.remove(token);
     }
 
     /**
@@ -400,32 +448,34 @@ public class UserService {
      * @throws MessagingException
      * @throws UnsupportedEncodingException
      */
-    public boolean sendForgetPasswordMail(@NonNull String email, @NonNull String newPassword)
+    public ResultCode sendForgetPasswordMail(@NonNull String email, @NonNull String newPassword)
             throws GeneralSecurityException, MessagingException, UnsupportedEncodingException {
-        boolean exists = redisUserDao.existsEmail(email) || userDao.existsEmail(email);
-        if (exists) {
-            User user = redisUserDao.getUserByEmail(email);
-            if (user == null) {
-                user = userDao.selectByEmail(email);
-            }
-
-            // 新密码和老密码相同，返回 false
-            if (passwordEquals(user, newPassword)) {
-                return false;
-            }
-
-            // 拼接参数并加密
-            String params = email + " " + newPassword + " " + TimeUtil.changeDateTime(forgetPasswordExpire, TimeUnit.HOURS).getTime();
-            String encryptedParams = URLUtil.encryptParams(forgetPasswordAesKey, params);
-            Context context = new Context();
-            context.setVariable("username", user.getName());
-            context.setVariable("resetPasswordUrl", forgetPasswordUrl + encryptedParams);
-            // 发送重置密码邮件
-            mailService.sendTemplateEmail(EmailTemplate.FORGET_PASSWORD_NAME, mailSender, email,
-                    EmailTemplate.FORGET_PASSWORD_SUBJECT, context);
+        if (!redisUserDao.existsEmail(email) && !userDao.existsEmail(email)) {
+            return ResultCode.USER_NOT_EXIST;
         }
 
-        return exists;
+        User user = redisUserDao.getUserByEmail(email);
+        if (user == null) {
+            user = userDao.selectByEmail(email);
+        }
+
+        // 新密码和老密码相同
+        if (passwordEquals(user, newPassword)) {
+            return ResultCode.PARAM_MODIFY_SAME;
+        }
+
+        String token = saveUserWithToken(user);
+        // 拼接参数并加密
+        String params = token + " " + newPassword + " " + TimeUtil.changeDateTime(forgetPasswordExpire, TimeUnit.HOURS).getTime();
+        String encryptedParams = URLUtil.encryptParams(forgetPasswordAesKey, params);
+        Context context = new Context();
+        context.setVariable("username", user.getName());
+        context.setVariable("resetPasswordUrl", forgetPasswordUrl + encryptedParams);
+        // 发送重置密码邮件
+        mailService.sendTemplateEmail(EmailTemplate.FORGET_PASSWORD_NAME, mailSender, email,
+                EmailTemplate.FORGET_PASSWORD_SUBJECT, context);
+
+        return ResultCode.SUCCESS;
     }
 
     /**
@@ -436,24 +486,25 @@ public class UserService {
     }
 
     /**
-     * 判断是否存在 email
-     */
-    public boolean existsEmail(@NonNull String email) {
-        return redisUserDao.existsEmail(email) || userDao.existsEmail(email);
-    }
-
-    /**
-     * 为指定的邮箱账号，设置新的密码
+     * 通过用户登录 token，为用户设置新的密码。
      */
     @Transactional(isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
-    public boolean setNewPassword(int userLogType, @NonNull String email, @NonNull String newPassword)
+    public ResultCode setNewPassword(int userLogType, String token, String newPassword)
             throws JsonProcessingException {
-        User user = redisUserDao.getUserByEmail(email);
+        // 用户未登录
+        User user = USER_LOGIN_MAP.get(token);
         if (user == null) {
-            user = userDao.selectByEmail(email);
+            return ResultCode.USER_ACCESS_ERROR;
         }
-        if (user == null) {
-            return false;
+
+        // 新旧密码相同
+        if (passwordEquals(user, newPassword)) {
+            return ResultCode.PARAM_MODIFY_SAME;
+        }
+
+        // 在修改密码时，用户不是正常状态
+        if (userLogType == UserLogType.MODIFY_PASSWORD && user.getStatus() != UserStatus.NORMAL) {
+            return ResultCode.USER_STATUS_INVALID;
         }
 
         // 更新数据库中的用户密码
@@ -466,91 +517,73 @@ public class UserService {
         userLogDao.insert(new UserLog(user.getId(), userLogType, objectMapper.writeValueAsString(
                 new UserUpdateLog(user.getPassword(), updated.getPassword()))));
 
-        // 更新 Redis 中的用户密码
+        // 清除缓存
+        redisUserDao.deleteUserById(user.getId());
+
+        // 最后在修改 map 中的用户密码
         user.setSalt(updated.getSalt());
         user.setPassword(updated.getPassword());
-        redisUserDao.setUser(user);
 
-        return true;
-    }
-
-    /**
-     * 修改用户密码。
-     *
-     * @return 如果邮箱和老密码存在，并且新旧密码不相同，返回 true；否则返回 false
-     */
-    @Transactional(isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
-    public boolean modifyPassword(UserController.ModifyPasswordParams params) throws JsonProcessingException {
-        if (!params.oldPassword.equals(params.newPassword)
-                && userDao.existsByEmailPassword(params.email, params.oldPassword)) {
-            return setNewPassword(UserLogType.MODIFY_PASSWORD, params.email, params.newPassword);
-        }
-
-        return false;
+        return ResultCode.SUCCESS;
     }
 
     /**
      * 修改用户名称。
      */
     @Transactional(isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
-    public boolean modifyName(UserController.ModifyNameParams params) throws JsonProcessingException {
-        // 如果新旧名称相同，返回 false
-        if (params.oldName.equals(params.newName)) {
-            return false;
-        }
-
-        User user = redisUserDao.getUserByName(params.oldName);
+    public ResultCode modifyName(UserController.ModifyNameParams params) throws JsonProcessingException {
+        // 用户未登录
+        User user = USER_LOGIN_MAP.get(params.token);
         if (user == null) {
-            user = userDao.selectByName(params.oldName);
+            return ResultCode.USER_ACCESS_ERROR;
         }
 
-        // 如果老用户名和密码匹配
-        if (user != null && passwordEquals(user, params.password)) {
-            // 更新数据库中的用户名
-            User update = new User();
-            update.setId(user.getId());
-            update.setName(params.newName);
-            userDao.updateByIdSelective(update);
-
-            // 写入用户更新名称日志
-            userLogDao.insert(new UserLog(user.getId(), UserLogType.MODIFY_NAME, objectMapper.writeValueAsString(
-                    new UserUpdateLog(params.oldName, params.newName))));
-
-            // 更新 redis 中的用户名
-            user.setName(params.newName);
-            redisUserDao.setUser(user);
-
-            return true;
+        // 如果新旧名称相同
+        if (params.newName.equals(user.getName())) {
+            return ResultCode.PARAM_MODIFY_SAME;
         }
 
-        return false;
+        // 用户不是正常状态
+        if (user.getStatus() != UserStatus.NORMAL) {
+            return ResultCode.USER_STATUS_INVALID;
+        }
+
+        // 更新数据库中的用户名
+        User update = new User();
+        update.setId(user.getId());
+        update.setName(params.newName);
+        userDao.updateByIdSelective(update);
+
+        // 写入用户更新名称日志
+        userLogDao.insert(new UserLog(user.getId(), UserLogType.MODIFY_NAME, objectMapper.writeValueAsString(
+                new UserUpdateLog(params.newName, params.newName))));
+
+        // 删除缓存
+        redisUserDao.deleteUserById(user.getId());
+
+        // 最后在修改 map 中的用户名称
+        user.setName(params.newName);
+
+        return ResultCode.SUCCESS;
     }
 
     /**
      * 注销账号。
      */
     @Transactional(isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
-    public boolean canceledAccount(@NonNull String email, @NonNull String password) {
-        User user = redisUserDao.getUserByEmail(email);
+    public ResultCode canceledAccount(String token) {
+        // 用户未登录
+        User user = USER_LOGIN_MAP.get(token);
         if (user == null) {
-            user = userDao.selectByEmail(email);
-            if (user == null) {
-                return false;
-            }
+            return ResultCode.USER_ACCESS_ERROR;
         }
 
-        if (!passwordEquals(user, password)) {
-            return false;
-        }
-
+        // 用户不是正常状态
         if (user.getStatus() != UserStatus.NORMAL) {
-            return false;
+            return ResultCode.USER_STATUS_INVALID;
         }
 
-        // 删除 redis 中已注销账号的数据
-        redisUserDao.deleteUserById(user.getId());
-
-        // 删除用户的 token
+        // 删除用户的所有标识
         userIdentityDao.deleteByUserId(user.getId());
 
         // 更新用户的状态
@@ -559,7 +592,13 @@ public class UserService {
         update.setStatus(UserStatus.CANCELLED);
         userDao.updateByIdSelective(update);
 
-        return true;
+        // 删除 redis 中已注销账号的数据
+        redisUserDao.deleteUserById(user.getId());
+
+        // 最后在删除用户 token
+        USER_LOGIN_MAP.remove(token);
+
+        return ResultCode.SUCCESS;
     }
 
     public boolean passwordEquals(User user, String password) {

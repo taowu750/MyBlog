@@ -3,39 +3,33 @@
 <mapper namespace="com.ncoxs.myblog.dao.mysql.UploadImageDao">
     <resultMap id="BaseResultMap" type="com.ncoxs.myblog.model.pojo.UploadImage">
         <id column="id" jdbcType="INTEGER" property="id"/>
+        <result column="token" jdbcType="VARCHAR" property="token"/>
         <result column="target_type" jdbcType="INTEGER" property="targetType"/>
-        <result column="target_id" jdbcType="INTEGER" property="targetId"/>
         <result column="file_name" jdbcType="VARCHAR" property="fileName"/>
         <result column="origin_file_name" jdbcType="VARCHAR" property="originFileName"/>
         <result column="create_time" jdbcType="TIMESTAMP" property="createTime"/>
     </resultMap>
 
     <sql id="Base_Column_List">
-        id, target_type, target_id, file_name, origin_file_name, create_time
+        id, token, target_type, file_name, origin_file_name, create_time
     </sql>
 
-    <select id="selectByTypeId" parameterType="java.lang.Integer" resultMap="BaseResultMap">
+    <select id="selectByToken" parameterType="java.lang.Integer" resultMap="BaseResultMap">
         select
         <include refid="Base_Column_List"/>
         from upload_image
-        where target_id=#{targetId} and target_type=#{targetType}
+        where token=#{token}
     </select>
 
     <insert id="insert" keyColumn="id" keyProperty="id" parameterType="com.ncoxs.myblog.model.pojo.UploadImage"
             useGeneratedKeys="true">
-        insert into upload_image (target_type, target_id, file_name, origin_file_name)
-        values (#{targetType,jdbcType=INTEGER}, #{targetId,jdbcType=INTEGER}, #{fileName,jdbcType=VARCHAR},
-                #{originFileName,jdbcType=VARCHAR})
+        insert into upload_image (token, target_type, file_name, origin_file_name)
+        values (#{token}, #{targetType}, #{fileName,jdbcType=VARCHAR}, #{originFileName,jdbcType=VARCHAR})
     </insert>
 
-    <delete id="deleteById" parameterType="java.lang.Integer">
+    <delete id="deleteByToken" parameterType="java.lang.String">
         delete
         from upload_image
-        where id = #{id,jdbcType=INTEGER}
-    </delete>
-
-    <delete id="deleteByTypeId">
-        delete from upload_image
-        where target_id=#{targetId} and target_type=#{targetType}
+        where token=#{token}
     </delete>
 </mapper>

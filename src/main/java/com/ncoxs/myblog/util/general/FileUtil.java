@@ -44,7 +44,7 @@ public class FileUtil {
         return sb.toString();
     }
 
-    public static String truncateFileName(String fileName, int maxLength) {
+    public static String truncatefilename(String fileName, int maxLength) {
         if (fileName.length() <= maxLength) {
             return fileName;
         } else {

@@ -51,7 +51,7 @@ myapp:
       - "/blog/editor-md-img/upload"
 
   image:
-    origin-file-name-max-length: 150
+    origin-filename-max-length: 150
 
   blog:
     draft:

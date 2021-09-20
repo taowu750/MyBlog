@@ -8,11 +8,9 @@ import java.util.List;
 @Mapper
 public interface UploadImageDao {
 
-    List<UploadImage> selectByTypeId(int targetType, int targetId);
+    List<UploadImage> selectByToken(String token);
 
     int insert(UploadImage record);
 
-    boolean deleteById(Integer id);
-
-    int deleteByTypeId(int targetType, int targetId);
+    int deleteByToken(String token);
 }

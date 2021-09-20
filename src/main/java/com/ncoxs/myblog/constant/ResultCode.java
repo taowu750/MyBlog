@@ -17,6 +17,7 @@ public enum ResultCode {
     PARAM_NOT_COMPLETE(101, "参数缺失"),
     PARAM_TYPE_BIND_ERROR(102, "参数类型错误"),
     PARAM_IS_INVALID(103, "参数格式错误"),
+    PARAM_MODIFY_SAME(104, "需要修改的新、旧参数值一样"),
     /*
     200-299: 用户错误状态码
      */
@@ -26,9 +27,10 @@ public enum ResultCode {
     USER_LOGIN_VERIFICATION_ERROR(203, "用户名或密码错误"),
     USER_HAS_EXISTED(204, "用户已存在"),
     USER_EMAIL_IS_BIND(205, "邮箱已绑定在其他账号上"),
-    USER_ACCOUNT_BANNED(206, "用户账号被禁用"),
-    USER_ACCOUNT_CANCELED(207, "用户账号已注销"),
-    USER_ACCESS_ERROR(208, "用户访问失败"),
+    USER_ACCESS_ERROR(206, "用户访问失败"),
+    USER_ACCOUNT_BANNED(207, "用户账号被禁用"),
+    USER_ACCOUNT_CANCELED(208, "用户账号已注销"),
+    USER_STATUS_INVALID(209, "用户账号状态不正常"),
     /*
     300-399：客户端请求错误码
      */

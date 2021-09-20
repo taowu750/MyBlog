@@ -24,6 +24,8 @@ public interface ParamValidateMsg {
     String USER_LOGIN_REMEMBER_DAYS_MAX = "user.loginRememberDays.range:用户登录状态保留天数不能大于 "
             + ParamValidateRule.LOGIN_REMEMBER_DAYS_MAX;
 
+    String USER_LOGIN_TOKEN_BLANK = "user.login.token.blank:用户登录 token 不能为空";
+
     String IP_FORMAT = "device.ip:客户端 IP 格式错误";
 
     String BLOG_TITLE_BLANK = "blog.title.blank:博客标题不能为空";

@@ -15,7 +15,7 @@ import com.ncoxs.myblog.model.bo.UserLoginLog;
 import com.ncoxs.myblog.model.bo.UserRegisterLog;
 import com.ncoxs.myblog.model.bo.UserUpdateLog;
 import com.ncoxs.myblog.model.dto.GenericResult;
-import com.ncoxs.myblog.model.dto.UserAndIdentity;
+import com.ncoxs.myblog.model.dto.UserLoginResp;
 import com.ncoxs.myblog.model.pojo.User;
 import com.ncoxs.myblog.model.pojo.UserBasicInfo;
 import com.ncoxs.myblog.model.pojo.UserIdentity;
@@ -236,22 +236,22 @@ public class UserControllerTest {
                 .expectStatusOk()
                 .print()
                 .buildByte();
-        GenericResult<UserAndIdentity> result = objectMapper.readValue(data,
-                new TypeReference<GenericResult<UserAndIdentity>>() {
+        GenericResult<UserLoginResp> result = objectMapper.readValue(data,
+                new TypeReference<GenericResult<UserLoginResp>>() {
                 });
 
         // assert 登录结果
         assertNotNull(result);
         assertNotNull(result.getData());
 
-        UserAndIdentity userAndIdentity = result.getData();
-        assertNotNull(userAndIdentity.getUser());
-        assertNull(userAndIdentity.getIdentity());
-        assertEquals("test", userAndIdentity.getUser().getName());
-        assertNull(userAndIdentity.getUser().getPassword());
+        UserLoginResp userLoginResp = result.getData();
+        assertNotNull(userLoginResp.getUser());
+        assertNull(userLoginResp.getIdentity());
+        assertEquals("test", userLoginResp.getUser().getName());
+        assertNull(userLoginResp.getUser().getPassword());
 
         // assert 用户登录日志
-        UserLog userLog = userLogDao.selectByUserIdTypeLatest(userAndIdentity.getUser().getId(), UserLogType.LOGIN);
+        UserLog userLog = userLogDao.selectByUserIdTypeLatest(userLoginResp.getUser().getId(), UserLogType.LOGIN);
         UserLoginLog userLoginLog = objectMapper.readValue(userLog.getDescription(), UserLoginLog.class);
         assertEquals("success", userLoginLog.getStatus());
         assertEquals("name", userLoginLog.getType());
@@ -268,21 +268,21 @@ public class UserControllerTest {
                 .print()
                 .buildByte();
         result = objectMapper.readValue(data,
-                new TypeReference<GenericResult<UserAndIdentity>>() {
+                new TypeReference<GenericResult<UserLoginResp>>() {
                 });
 
         // assert 登录结果
         assertNotNull(result);
         assertNotNull(result.getData());
 
-        userAndIdentity = result.getData();
-        assertNotNull(userAndIdentity.getUser());
-        assertNotNull(userAndIdentity.getIdentity());
-        assertEquals("test", userAndIdentity.getUser().getName());
-        assertNull(userAndIdentity.getUser().getPassword());
+        userLoginResp = result.getData();
+        assertNotNull(userLoginResp.getUser());
+        assertNotNull(userLoginResp.getIdentity());
+        assertEquals("test", userLoginResp.getUser().getName());
+        assertNull(userLoginResp.getUser().getPassword());
 
         // assert 用户登录日志
-        userLog = userLogDao.selectByUserIdTypeLatest(userAndIdentity.getUser().getId(), UserLogType.LOGIN);
+        userLog = userLogDao.selectByUserIdTypeLatest(userLoginResp.getUser().getId(), UserLogType.LOGIN);
         userLoginLog = objectMapper.readValue(userLog.getDescription(), UserLoginLog.class);
         assertEquals("success", userLoginLog.getStatus());
         assertEquals("email", userLoginLog.getType());
@@ -292,7 +292,7 @@ public class UserControllerTest {
         // 发送根据用户标识登录请求
         data = new EncryptionMockMvcBuilder(mockMvc, objectMapper)
                 .post("/user/login/identity")
-                .jsonParams(mp(kv("identity", userAndIdentity.getIdentity()), kv("source", "source")))
+                .jsonParams(mp(kv("identity", userLoginResp.getIdentity()), kv("source", "source")))
                 .sendRequest()
                 .expectStatusOk()
                 .print()
@@ -313,8 +313,8 @@ public class UserControllerTest {
         assertEquals("success", userLoginLog.getStatus());
         assertEquals("identity", userLoginLog.getType());
 
-        User savedUser = userDao.selectByIdentity(userAndIdentity.getIdentity(), "source");
-        assertEquals(userAndIdentity.getUser().getId(), savedUser.getId());
+        User savedUser = userDao.selectByIdentity(userLoginResp.getIdentity(), "source");
+        assertEquals(userLoginResp.getUser().getId(), savedUser.getId());
     }
 
     @Test

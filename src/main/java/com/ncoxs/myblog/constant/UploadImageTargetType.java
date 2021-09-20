@@ -22,6 +22,11 @@ public interface UploadImageTargetType {
      */
     int COMMENT = 4;
 
+    /**
+     * 用户头像
+     */
+    int USER_PROFILE_PICTURE = 5;
+
     static String toStr(int targetType) {
         switch (targetType) {
             case BLOG:
@@ -33,6 +38,9 @@ public interface UploadImageTargetType {
 
             case COMMENT:
                 return "comment";
+
+            case USER_PROFILE_PICTURE:
+                return "user-profile-picture";
 
             default:
                 throw new IllegalArgumentException("non-exists targetType: " + targetType);
