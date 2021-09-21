@@ -4,20 +4,16 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ncoxs.myblog.constant.EmailTemplate;
 import com.ncoxs.myblog.constant.ResultCode;
-import com.ncoxs.myblog.constant.user.UserIdentityType;
-import com.ncoxs.myblog.constant.user.UserLogType;
-import com.ncoxs.myblog.constant.user.UserStatus;
-import com.ncoxs.myblog.constant.user.UserType;
+import com.ncoxs.myblog.constant.user.*;
 import com.ncoxs.myblog.controller.user.UserController;
 import com.ncoxs.myblog.dao.mysql.UserBasicInfoDao;
 import com.ncoxs.myblog.dao.mysql.UserDao;
 import com.ncoxs.myblog.dao.mysql.UserIdentityDao;
 import com.ncoxs.myblog.dao.mysql.UserLogDao;
 import com.ncoxs.myblog.dao.redis.RedisUserDao;
+import com.ncoxs.myblog.exception.ImpossibleError;
 import com.ncoxs.myblog.exception.UserLogException;
-import com.ncoxs.myblog.model.bo.UserLoginLog;
-import com.ncoxs.myblog.model.bo.UserRegisterLog;
-import com.ncoxs.myblog.model.bo.UserUpdateLog;
+import com.ncoxs.myblog.model.bo.*;
 import com.ncoxs.myblog.model.dto.IpLocInfo;
 import com.ncoxs.myblog.model.dto.UserLoginResp;
 import com.ncoxs.myblog.model.pojo.User;
@@ -34,8 +30,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
-import org.springframework.web.context.request.RequestContextHolder;
-import org.springframework.web.context.request.ServletRequestAttributes;
 import org.thymeleaf.context.Context;
 
 import javax.mail.MessagingException;
@@ -43,7 +37,7 @@ import javax.servlet.http.HttpSession;
 import java.io.UnsupportedEncodingException;
 import java.security.GeneralSecurityException;
 import java.util.Date;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.Enumeration;
 import java.util.concurrent.TimeUnit;
 
 
@@ -51,9 +45,7 @@ import java.util.concurrent.TimeUnit;
 // TODO: 密码强度验证
 // TODO: 要有定时清理数据库中过期数据的机制
 
-// TODO: 增加用户下线日志
 // TODO: 注销账号前需要询问
-// TODO: 添加用户退出登录功能
 // TODO: 添加注册、登录验证码校验功能
 
 @Service
@@ -132,12 +124,10 @@ public class UserService {
     }
 
 
-    public static final String USER_LOGIN_SESSION_KEY = "userLoginToken";
     /**
      * 用户每次登录，会生成一个 session 级别的 token，调用其他接口时需要使用这个 token 进行访问。
-     * token 和用户对象的映射关系存在这个 map 中。
      */
-    private static final ConcurrentHashMap<String, User> USER_LOGIN_MAP = new ConcurrentHashMap<>();
+    private static final String USER_LOGIN_SESSION_TOKEN = "userToken";
 
 
     /**
@@ -322,8 +312,9 @@ public class UserService {
             redisUserDao.setUser(user);
 
             // 插入登录成功日志
-            userLogDao.insert(new UserLog(user.getId(), UserLogType.LOGIN, objectMapper.writeValueAsString(
-                    new UserLoginLog("success", loginType, DeviceUtil.fillIpLocInfo(ipLocInfo)))));
+            UserLog userLog = new UserLog(user.getId(), UserLogType.LOGIN, objectMapper.writeValueAsString(
+                    new UserLoginLog("success", loginType, DeviceUtil.fillIpLocInfo(ipLocInfo))));
+            userLogDao.insert(userLog);
 
             // 如果登录时选择了“记住我”的选项，则删除上一个登录标识，插入新的登录标识
             if (rememberDays > 0 && StringUtils.hasText(source)) {
@@ -338,8 +329,7 @@ public class UserService {
             }
 
             result.setUser(user);
-            // 注意，返回的 user 对象会被 FilterBlank 将密码设置为空，所以这里需要克隆一个
-            result.setToken(saveUserWithToken(user.clone()));
+            result.setToken(saveUserWithToken(user, userLog.getId()));
         } else {
             // 插入登录密码错误日志
             userLogDao.insert(new UserLog(user.getId(), UserLogType.LOGIN, objectMapper.writeValueAsString(
@@ -349,18 +339,20 @@ public class UserService {
         return result;
     }
 
-    private String saveUserWithToken(User user) {
-        return saveUserWithToken(user, UUIDUtil.generate());
+    /**
+     * 用户每次登录，会生成一个 session 级别的 token，调用其他接口时需要使用这个 token 进行访问。
+     */
+    private String saveUserWithToken(User user, int loginId) {
+        return saveUserWithToken(user, UUIDUtil.generate(), loginId);
     }
 
     /**
      * 生成用户此次登录的 token，和用户对象相关联，并保存到 session 中。
      */
-    private String saveUserWithToken(User user, String token) {
-        HttpSession session = ((ServletRequestAttributes) RequestContextHolder.getRequestAttributes())
-                .getRequest().getSession();
-        session.setAttribute(USER_LOGIN_SESSION_KEY, session);
-        USER_LOGIN_MAP.put(token, user);
+    private String saveUserWithToken(User user, String token, Integer loginId) {
+        HttpSession session = SpringUtil.currentSession();
+        // 注意，返回的 user 对象会被 FilterBlank 将密码设置为空，所以这里需要克隆一个
+        session.setAttribute(USER_LOGIN_SESSION_TOKEN + token, new UserLoginHolder(user, loginId));
 
         return token;
     }
@@ -399,30 +391,69 @@ public class UserService {
         }
 
         // 插入登录成功日志
-        userLogDao.insert(new UserLog(user.getId(), UserLogType.LOGIN, objectMapper.writeValueAsString(
-                new UserLoginLog("success", "identity", DeviceUtil.fillIpLocInfo(ipLocInfo)))));
+        UserLog userLog = new UserLog(user.getId(), UserLogType.LOGIN, objectMapper.writeValueAsString(
+                new UserLoginLog("success", "identity", DeviceUtil.fillIpLocInfo(ipLocInfo))));
+        userLogDao.insert(userLog);
 
         UserLoginResp result = new UserLoginResp();
         result.setUser(user);
         result.setIdentity(loginIdentity);
         // 注意，返回的 user 对象会被 FilterBlank 将密码设置为空，所以这里需要克隆一个
-        result.setToken(saveUserWithToken(user.clone()));
+        result.setToken(saveUserWithToken(user, userLog.getId()));
 
         return result;
     }
 
     /**
-     * 通过用户登录 token 获取用户对象。
+     * 通过 token 访问用户信息
      */
     public User accessByToken(String token) {
-        return USER_LOGIN_MAP.get(token);
+        Object obj = SpringUtil.currentSession().getAttribute(USER_LOGIN_SESSION_TOKEN + token);
+        if (obj instanceof UserLoginHolder) {
+            return ((UserLoginHolder) obj).getUser();
+        }
+
+        return null;
     }
 
     /**
      * 当用户关闭所有网页、或主动退出登录、或 session 过期时，需要删除登录 token
      */
-    public void quitByToken(String token) {
-        USER_LOGIN_MAP.remove(token);
+    public boolean quitByToken(HttpSession session, String token, Integer logoutType) throws JsonProcessingException {
+        Object obj = session.getAttribute(USER_LOGIN_SESSION_TOKEN + token);
+        if (obj instanceof UserLoginHolder) {
+            session.removeAttribute(token);
+            // 记录登出日志
+            if (logoutType != null) {
+                UserLoginHolder holder = (UserLoginHolder) obj;
+                userLogDao.insert(new UserLog(holder.getUser().getId(), UserLogType.LOGOUT, objectMapper.writeValueAsString(
+                        new UserLogoutLog(logoutType, holder.getLoginLogId()))));
+            }
+        }
+
+        return obj instanceof UserLoginHolder;
+    }
+
+    public void quitByToken(HttpSession session) throws JsonProcessingException {
+        Enumeration<String> attrs = session.getAttributeNames();
+        while (attrs.hasMoreElements()) {
+            String attrName = attrs.nextElement();
+            if (attrName.startsWith(USER_LOGIN_SESSION_TOKEN)) {
+                quitByToken(session, attrName, UserLogoutType.INTERRUPTED);
+            }
+        }
+    }
+
+    public boolean quitByToken(String token, Integer logoutType) throws JsonProcessingException {
+        return quitByToken(SpringUtil.currentSession(), token, logoutType);
+    }
+
+    public boolean quitByToken(String token) {
+        try {
+            return quitByToken(token, null);
+        } catch (JsonProcessingException e) {
+            throw new ImpossibleError(e);
+        }
     }
 
     /**
@@ -473,7 +504,7 @@ public class UserService {
         }
 
         // 注意，返回的 user 对象会被 FilterBlank 将密码设置为空，所以这里需要克隆一个
-        saveUserWithToken(user.clone(), email);
+        saveUserWithToken(user.clone(), email, null);
         // 拼接参数并加密
         String params = email + " " + newPassword + " " + TimeUtil.changeDateTime(forgetPasswordExpire, TimeUnit.HOURS).getTime();
         String encryptedParams = URLUtil.encryptParams(forgetPasswordAesKey, params);
@@ -501,7 +532,7 @@ public class UserService {
     public ResultCode setNewPassword(int userLogType, String token, String oldPassword, String newPassword)
             throws JsonProcessingException {
         // 用户未登录
-        User user = USER_LOGIN_MAP.get(token);
+        User user = accessByToken(token);
         if (user == null) {
             return ResultCode.USER_ACCESS_ERROR;
         }
@@ -554,7 +585,7 @@ public class UserService {
     @Transactional(isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
     public ResultCode modifyName(UserController.ModifyNameParams params) throws JsonProcessingException {
         // 用户未登录
-        User user = USER_LOGIN_MAP.get(params.token);
+        User user = accessByToken(params.token);
         if (user == null) {
             return ResultCode.USER_ACCESS_ERROR;
         }
@@ -597,9 +628,9 @@ public class UserService {
      * 注销账号。
      */
     @Transactional(isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
-    public ResultCode canceledAccount(String token, String password) {
+    public ResultCode canceledAccount(String token, String password) throws JsonProcessingException {
         // 用户未登录
-        User user = USER_LOGIN_MAP.get(token);
+        User user = accessByToken(token);
         if (user == null) {
             return ResultCode.USER_ACCESS_ERROR;
         }
@@ -627,10 +658,7 @@ public class UserService {
         redisUserDao.deleteUserById(user.getId());
 
         // 最后在删除用户 token
-        HttpSession session = ((ServletRequestAttributes) RequestContextHolder.getRequestAttributes())
-                .getRequest().getSession();
-        session.removeAttribute(USER_LOGIN_SESSION_KEY);
-        USER_LOGIN_MAP.remove(token);
+        quitByToken(token, UserLogoutType.CANCELLED);
 
         return ResultCode.SUCCESS;
     }

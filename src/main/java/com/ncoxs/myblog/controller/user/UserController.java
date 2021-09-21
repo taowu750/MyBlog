@@ -179,6 +179,25 @@ public class UserController {
     }
 
     @Data
+    public static class LogoutParams {
+
+        @NotBlank(message = ParamValidateMsg.USER_LOGIN_TOKEN_BLANK)
+        public String token;
+
+        public int logoutType;
+    }
+
+    @PostMapping("/logout")
+    @ResponseBody
+    public GenericResult<?> logout(@RequestBody LogoutParams params) throws JsonProcessingException {
+        if (userService.quitByToken(params.token, params.logoutType)) {
+            return GenericResult.success();
+        } else {
+            return GenericResult.error(ResultCode.USER_ACCESS_ERROR);
+        }
+    }
+
+    @Data
     public static class SendForgetPasswordEmailParams {
 
         @NotBlank(message = ParamValidateMsg.USER_EMAIL_BLANK)
@@ -273,7 +292,7 @@ public class UserController {
 
     @PostMapping("/account/cancel")
     @ResponseBody
-    public GenericResult<?> canceledAccount(@RequestBody AccessParams params) {
+    public GenericResult<?> canceledAccount(@RequestBody AccessParams params) throws JsonProcessingException {
         return GenericResult.byCode(userService.canceledAccount(params.token, params.password));
     }
 }

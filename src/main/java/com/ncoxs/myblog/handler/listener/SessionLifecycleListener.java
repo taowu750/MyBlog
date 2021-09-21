@@ -1,5 +1,7 @@
 package com.ncoxs.myblog.handler.listener;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.ncoxs.myblog.exception.ImpossibleError;
 import com.ncoxs.myblog.service.user.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -11,7 +13,7 @@ import javax.servlet.http.HttpSessionListener;
 
 @WebListener
 @Component
-public class SessionLifeCycleListener implements HttpSessionListener {
+public class SessionLifecycleListener implements HttpSessionListener {
 
     private UserService userService;
 
@@ -20,13 +22,14 @@ public class SessionLifeCycleListener implements HttpSessionListener {
         this.userService = userService;
     }
 
+
     @Override
     public void sessionDestroyed(HttpSessionEvent se) {
-        // 在 session 销毁时，删除用户 token
         HttpSession session = se.getSession();
-        String token = (String) session.getAttribute(UserService.USER_LOGIN_SESSION_KEY);
-        if (token != null) {
-            userService.quitByToken(token);
+        try {
+            userService.quitByToken(session);
+        } catch (JsonProcessingException e) {
+            throw new ImpossibleError(e);
         }
     }
 }
