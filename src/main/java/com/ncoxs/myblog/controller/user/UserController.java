@@ -206,16 +206,16 @@ public class UserController {
         if (params.length != 3) {
             mv.addObject("result", "params-error");
         } else {
-            String token = params[0], newPassword = params[1];
+            String email = params[0], newPassword = params[1];
             long expire = Long.parseLong(params[2]);
             if (expire < System.currentTimeMillis()) {
                 mv.addObject("result", "expired");
-                // 已过期，删除用户 token
-                userService.quitByToken(token);
-            } else if (userService.setNewPassword(UserLogType.FORGET_PASSWORD, token, newPassword) == ResultCode.SUCCESS) {
+                // 已过期，删除用户登录 email
+                userService.quitByToken(email);
+            } else if (userService.setNewPassword(UserLogType.FORGET_PASSWORD, email, newPassword) == ResultCode.SUCCESS) {
                 mv.addObject("result", "success");
             } else {
-                // token 不存在或新旧密码相同则失败
+                // email 不存在或新旧密码相同则失败
                 mv.addObject("result", "failed");
             }
         }
@@ -232,20 +232,33 @@ public class UserController {
 
         @NotBlank(message = ParamValidateMsg.USER_PASSWORD_BLANK)
         @Pattern(regexp = ParamValidateRule.PASSWORD_REGEX, message = ParamValidateMsg.USER_PASSWORD_FORMAT)
+        public String oldPassword;
+
+        @NotBlank(message = ParamValidateMsg.USER_PASSWORD_BLANK)
+        @Pattern(regexp = ParamValidateRule.PASSWORD_REGEX, message = ParamValidateMsg.USER_PASSWORD_FORMAT)
         public String newPassword;
     }
 
     @PostMapping("/password/modify")
     @ResponseBody
     public GenericResult<?> modifyPassword(@RequestBody ModifyPasswordParams params) throws JsonProcessingException {
-        return GenericResult.byCode(userService.setNewPassword(UserLogType.MODIFY_PASSWORD, params.token, params.newPassword));
+        return GenericResult.byCode(userService.setNewPassword(UserLogType.MODIFY_PASSWORD, params.token,
+                params.oldPassword, params.newPassword));
     }
 
     @Data
-    public static class ModifyNameParams {
+    public static class AccessParams {
 
         @NotBlank(message = ParamValidateMsg.USER_LOGIN_TOKEN_BLANK)
         public String token;
+
+        @NotBlank(message = ParamValidateMsg.USER_PASSWORD_BLANK)
+        @Pattern(regexp = ParamValidateRule.PASSWORD_REGEX, message = ParamValidateMsg.USER_PASSWORD_FORMAT)
+        public String password;
+    }
+
+    @Data
+    public static class ModifyNameParams extends AccessParams {
 
         @NotBlank(message = ParamValidateMsg.USER_NAME_BLANK)
         @Pattern(regexp = ParamValidateRule.NAME_REGEX, message = ParamValidateMsg.USER_NAME_FORMAT)
@@ -260,7 +273,7 @@ public class UserController {
 
     @PostMapping("/account/cancel")
     @ResponseBody
-    public GenericResult<?> canceledAccount(@RequestBody String token) {
-        return GenericResult.byCode(userService.canceledAccount(token));
+    public GenericResult<?> canceledAccount(@RequestBody AccessParams params) {
+        return GenericResult.byCode(userService.canceledAccount(params.token, params.password));
     }
 }

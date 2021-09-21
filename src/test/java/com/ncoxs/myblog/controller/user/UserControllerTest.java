@@ -246,6 +246,7 @@ public class UserControllerTest {
 
         UserLoginResp userLoginResp = result.getData();
         assertNotNull(userLoginResp.getUser());
+        assertNotNull(userLoginResp.getToken());
         assertNull(userLoginResp.getIdentity());
         assertEquals("test", userLoginResp.getUser().getName());
         assertNull(userLoginResp.getUser().getPassword());
@@ -277,6 +278,7 @@ public class UserControllerTest {
 
         userLoginResp = result.getData();
         assertNotNull(userLoginResp.getUser());
+        assertNotNull(userLoginResp.getToken());
         assertNotNull(userLoginResp.getIdentity());
         assertEquals("test", userLoginResp.getUser().getName());
         assertNull(userLoginResp.getUser().getPassword());
@@ -297,18 +299,22 @@ public class UserControllerTest {
                 .expectStatusOk()
                 .print()
                 .buildByte();
-        GenericResult<User> identityResult = objectMapper.readValue(data,
-                new TypeReference<GenericResult<User>>() {
+        result = objectMapper.readValue(data,
+                new TypeReference<GenericResult<UserLoginResp>>() {
                 });
 
         // assert 登录结果
-        assertNotNull(identityResult);
-        assertNotNull(identityResult.getData());
-        assertEquals("test", identityResult.getData().getName());
-        assertNull(identityResult.getData().getPassword());
+        assertNotNull(result);
+        assertNotNull(result.getData());
+
+        userLoginResp = result.getData();
+        assertNotNull(userLoginResp.getUser());
+        assertNotNull(userLoginResp.getToken());
+        assertEquals("test", userLoginResp.getUser().getName());
+        assertNull(userLoginResp.getUser().getPassword());
 
         // assert 用户登录日志
-        userLog = userLogDao.selectByUserIdTypeLatest(identityResult.getData().getId(), UserLogType.LOGIN);
+        userLog = userLogDao.selectByUserIdTypeLatest(userLoginResp.getUser().getId(), UserLogType.LOGIN);
         userLoginLog = objectMapper.readValue(userLog.getDescription(), UserLoginLog.class);
         assertEquals("success", userLoginLog.getStatus());
         assertEquals("identity", userLoginLog.getType());
@@ -334,10 +340,10 @@ public class UserControllerTest {
                 .expectStatusOk()
                 .print()
                 .buildByte();
-        GenericResult<Boolean> genericResult = objectMapper.readValue(data,
-                new TypeReference<GenericResult<Boolean>>() {
+        GenericResult<?> genericResult = objectMapper.readValue(data,
+                new TypeReference<GenericResult<?>>() {
                 });
-        assertFalse(genericResult.getData());
+        assertEquals(ResultCode.PARAM_MODIFY_SAME.getCode(), genericResult.getCode());
 
         // 发送用户发送忘记密码邮件请求
         data = new EncryptionMockMvcBuilder(mockMvc, objectMapper)
@@ -348,9 +354,9 @@ public class UserControllerTest {
                 .print()
                 .buildByte();
         genericResult = objectMapper.readValue(data,
-                new TypeReference<GenericResult<Boolean>>() {
+                new TypeReference<GenericResult<?>>() {
                 });
-        assertTrue(genericResult.getData());
+        assertEquals(ResultCode.SUCCESS.getCode(), genericResult.getCode());
 
         // 拼接忘记密码参数并加密
         String encryptedParams = URLUtil.encryptParams(forgetPasswordAesKey, "wutaoyx163@163.com 23456 " +
@@ -368,8 +374,7 @@ public class UserControllerTest {
         // assert 用户数据
         user = userDao.selectByName("test");
         assertEquals(user.getPassword(), PasswordUtil.encrypt("23456" + user.getSalt()));
-        user = redisUserDao.getUserByName("test");
-        assertEquals(user.getPassword(), PasswordUtil.encrypt("23456" + user.getSalt()));
+        assertNull(redisUserDao.getUserByName("test"));
 
         // assert 用户日志
         UserLog userLog = userLogDao.selectByUserIdTypeLatest(user.getId(), UserLogType.FORGET_PASSWORD);
@@ -378,48 +383,63 @@ public class UserControllerTest {
         assertEquals(updateLog.getNewValue(), user.getPassword());
     }
 
+    private UserLoginResp login() throws Exception {
+        byte[] data = new EncryptionMockMvcBuilder(mockMvc, objectMapper)
+                .post("/user/login/name")
+                .jsonParams(mp(kv("name", "test"), kv("password", "12345")))
+                .sendRequest()
+                .expectStatusOk()
+                .print()
+                .buildByte();
+        GenericResult<UserLoginResp> result = objectMapper.readValue(data,
+                new TypeReference<GenericResult<UserLoginResp>>() {
+                });
+
+        return result.getData();
+    }
+
     @Test
     @Transactional
     public void testModifyPassword() throws Exception {
         registerTestUser();
         activateTestUser();
 
+        UserLoginResp userLoginResp = login();
         User user = userDao.selectByName("test");
         String oldPassword = user.getPassword();
 
         // 发送错误的修改密码请求：原密码不正确
         byte[] data = new EncryptionMockMvcBuilder(mockMvc, objectMapper)
                 .post("/user/password/modify")
-                .jsonParams(mp(kv("email", "wutaoyx163@163.com"), kv("oldPassword", "12346"),
+                .jsonParams(mp(kv("token", userLoginResp.getToken()), kv("oldPassword", "12346"),
                         kv("newPassword", "12347")))
                 .sendRequest()
                 .expectStatusOk()
                 .print()
                 .buildByte();
-        GenericResult<Boolean> genericResult = objectMapper.readValue(data,
-                new TypeReference<GenericResult<Boolean>>() {
+        GenericResult<?> genericResult = objectMapper.readValue(data,
+                new TypeReference<GenericResult<?>>() {
                 });
-        assertFalse(genericResult.getData());
+        assertEquals(ResultCode.USER_PASSWORD_ERROR.getCode(), genericResult.getCode());
 
         // 发送修改密码请求
         data = new EncryptionMockMvcBuilder(mockMvc, objectMapper)
                 .post("/user/password/modify")
-                .jsonParams(mp(kv("email", "wutaoyx163@163.com"), kv("oldPassword", "12345"),
+                .jsonParams(mp(kv("token", userLoginResp.getToken()), kv("oldPassword", "12345"),
                         kv("newPassword", "23456")))
                 .sendRequest()
                 .expectStatusOk()
                 .print()
                 .buildByte();
         genericResult = objectMapper.readValue(data,
-                new TypeReference<GenericResult<Boolean>>() {
+                new TypeReference<GenericResult<?>>() {
                 });
-        assertTrue(genericResult.getData());
+        assertEquals(ResultCode.SUCCESS.getCode(), genericResult.getCode());
 
         // assert 用户数据
         user = userDao.selectByName("test");
         assertEquals(user.getPassword(), PasswordUtil.encrypt("23456" + user.getSalt()));
-        user = redisUserDao.getUserByName("test");
-        assertEquals(user.getPassword(), PasswordUtil.encrypt("23456" + user.getSalt()));
+        assertNull(redisUserDao.getUserByName("test"));
 
         // assert 用户日志
         UserLog userLog = userLogDao.selectByUserIdTypeLatest(user.getId(), UserLogType.MODIFY_PASSWORD);
@@ -434,24 +454,26 @@ public class UserControllerTest {
         registerTestUser();
         activateTestUser();
 
-        // 发送错误的修改名称请求：原密码不正确
+        UserLoginResp userLoginResp = login();
+
+        // 发送错误的修改名称请求：密码错误
         byte[] data = new EncryptionMockMvcBuilder(mockMvc, objectMapper)
                 .post("/user/name/modify")
-                .jsonParams(mp(kv("oldName", "test"), kv("newName", "wutao"),
+                .jsonParams(mp(kv("token", userLoginResp.getToken()), kv("newName", "wutao"),
                         kv("password", "12347")))
                 .sendRequest()
                 .expectStatusOk()
                 .print()
                 .buildByte();
-        GenericResult<Boolean> genericResult = objectMapper.readValue(data,
-                new TypeReference<GenericResult<Boolean>>() {
+        GenericResult<?> genericResult = objectMapper.readValue(data,
+                new TypeReference<GenericResult<?>>() {
                 });
-        assertFalse(genericResult.getData());
+        assertEquals(ResultCode.USER_PASSWORD_ERROR.getCode(), genericResult.getCode());
 
         // 发送修改名称请求
         data = new EncryptionMockMvcBuilder(mockMvc, objectMapper)
                 .post("/user/name/modify")
-                .jsonParams(mp(kv("oldName", "test"), kv("newName", "wutao"),
+                .jsonParams(mp(kv("token", userLoginResp.getToken()), kv("newName", "wutao"),
                         kv("password", "12345")))
                 .sendRequest()
                 .expectStatusOk()
@@ -460,7 +482,7 @@ public class UserControllerTest {
         genericResult = objectMapper.readValue(data,
                 new TypeReference<GenericResult<Boolean>>() {
                 });
-        assertTrue(genericResult.getData());
+        assertEquals(ResultCode.SUCCESS.getCode(), genericResult.getCode());
 
         // assert 用户数据
         assertNull(userDao.selectByName("test"));
@@ -470,7 +492,7 @@ public class UserControllerTest {
         // assert 用户日志
         UserLog userLog = userLogDao.selectByUserIdTypeLatest(user.getId(), UserLogType.MODIFY_NAME);
         UserUpdateLog updateLog = objectMapper.readValue(userLog.getDescription(), UserUpdateLog.class);
-        assertEquals(updateLog.getOldValue(), "test");
+        assertEquals("test", updateLog.getOldValue());
         assertEquals(updateLog.getNewValue(), user.getName());
     }
 
@@ -480,23 +502,25 @@ public class UserControllerTest {
         registerTestUser();
         activateTestUser();
 
+        UserLoginResp userLoginResp = login();
+
         // 发送错误的注销账号请求：密码不正确
         byte[] data = new EncryptionMockMvcBuilder(mockMvc, objectMapper)
                 .post("/user/account/cancel")
-                .jsonParams(mp(kv("email", "wutaoyx163@163.com"), kv("password", "12346")))
+                .jsonParams(mp(kv("token", userLoginResp.getToken()), kv("password", "12346")))
                 .sendRequest()
                 .expectStatusOk()
                 .print()
                 .buildByte();
-        GenericResult<Boolean> genericResult = objectMapper.readValue(data,
-                new TypeReference<GenericResult<Boolean>>() {
+        GenericResult<?> genericResult = objectMapper.readValue(data,
+                new TypeReference<GenericResult<?>>() {
                 });
-        assertFalse(genericResult.getData());
+        assertEquals(ResultCode.USER_PASSWORD_ERROR.getCode(), genericResult.getCode());
 
         // 发送注销账号请求
         data = new EncryptionMockMvcBuilder(mockMvc, objectMapper)
                 .post("/user/account/cancel")
-                .jsonParams(mp(kv("email", "wutaoyx163@163.com"), kv("password", "12345")))
+                .jsonParams(mp(kv("token", userLoginResp.getToken()), kv("password", "12345")))
                 .sendRequest()
                 .expectStatusOk()
                 .print()
@@ -504,7 +528,7 @@ public class UserControllerTest {
         genericResult = objectMapper.readValue(data,
                 new TypeReference<GenericResult<Boolean>>() {
                 });
-        assertTrue(genericResult.getData());
+        assertEquals(ResultCode.SUCCESS.getCode(), genericResult.getCode());
 
         // 发送根据用户名称登录请求
         data = new EncryptionMockMvcBuilder(mockMvc, objectMapper)
@@ -514,8 +538,8 @@ public class UserControllerTest {
                 .expectStatusOk()
                 .print()
                 .buildByte();
-        GenericResult<Object> result = objectMapper.readValue(data,
-                new TypeReference<GenericResult<Object>>() {
+        GenericResult<?> result = objectMapper.readValue(data,
+                new TypeReference<GenericResult<?>>() {
                 });
         assertEquals(ResultCode.USER_NOT_EXIST.getCode(), result.getCode());
 
@@ -529,7 +553,7 @@ public class UserControllerTest {
                 .print()
                 .buildByte();
         result = objectMapper.readValue(data,
-                new TypeReference<GenericResult<Object>>() {
+                new TypeReference<GenericResult<?>>() {
                 });
         assertEquals(ResultCode.USER_NOT_EXIST.getCode(), result.getCode());
     }

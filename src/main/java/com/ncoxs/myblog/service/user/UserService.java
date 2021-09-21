@@ -51,7 +51,10 @@ import java.util.concurrent.TimeUnit;
 // TODO: 密码强度验证
 // TODO: 要有定时清理数据库中过期数据的机制
 
+// TODO: 增加用户下线日志
+// TODO: 注销账号前需要询问
 // TODO: 添加用户退出登录功能
+// TODO: 添加注册、登录验证码校验功能
 
 @Service
 public class UserService {
@@ -318,7 +321,6 @@ public class UserService {
             // 将数据库中的用户数据再次缓存到 Redis 中
             redisUserDao.setUser(user);
 
-            result.setUser(user);
             // 插入登录成功日志
             userLogDao.insert(new UserLog(user.getId(), UserLogType.LOGIN, objectMapper.writeValueAsString(
                     new UserLoginLog("success", loginType, DeviceUtil.fillIpLocInfo(ipLocInfo)))));
@@ -335,7 +337,9 @@ public class UserService {
                 redisUserDao.setIdentity2Id(identity, source, user.getId());
             }
 
-            result.setToken(saveUserWithToken(user));
+            result.setUser(user);
+            // 注意，返回的 user 对象会被 FilterBlank 将密码设置为空，所以这里需要克隆一个
+            result.setToken(saveUserWithToken(user.clone()));
         } else {
             // 插入登录密码错误日志
             userLogDao.insert(new UserLog(user.getId(), UserLogType.LOGIN, objectMapper.writeValueAsString(
@@ -345,17 +349,20 @@ public class UserService {
         return result;
     }
 
+    private String saveUserWithToken(User user) {
+        return saveUserWithToken(user, UUIDUtil.generate());
+    }
+
     /**
      * 生成用户此次登录的 token，和用户对象相关联，并保存到 session 中。
      */
-    private String saveUserWithToken(User user) {
-        String userLoginToken = UUIDUtil.generate();
+    private String saveUserWithToken(User user, String token) {
         HttpSession session = ((ServletRequestAttributes) RequestContextHolder.getRequestAttributes())
                 .getRequest().getSession();
         session.setAttribute(USER_LOGIN_SESSION_KEY, session);
-        USER_LOGIN_MAP.put(userLoginToken, user);
+        USER_LOGIN_MAP.put(token, user);
 
-        return userLoginToken;
+        return token;
     }
 
     /**
@@ -397,7 +404,9 @@ public class UserService {
 
         UserLoginResp result = new UserLoginResp();
         result.setUser(user);
-        result.setToken(saveUserWithToken(user));
+        result.setIdentity(loginIdentity);
+        // 注意，返回的 user 对象会被 FilterBlank 将密码设置为空，所以这里需要克隆一个
+        result.setToken(saveUserWithToken(user.clone()));
 
         return result;
     }
@@ -410,7 +419,7 @@ public class UserService {
     }
 
     /**
-     * 当用户关闭所有网页，或主动退出登录时，需要删除登录 token
+     * 当用户关闭所有网页、或主动退出登录、或 session 过期时，需要删除登录 token
      */
     public void quitByToken(String token) {
         USER_LOGIN_MAP.remove(token);
@@ -443,7 +452,6 @@ public class UserService {
      *
      * @param email       需要重置密码的用户邮箱
      * @param newPassword 新密码
-     * @return 邮箱不存在，或新密码和旧密码相同，则返回 false；否则返回 true
      * @throws GeneralSecurityException
      * @throws MessagingException
      * @throws UnsupportedEncodingException
@@ -464,9 +472,10 @@ public class UserService {
             return ResultCode.PARAM_MODIFY_SAME;
         }
 
-        String token = saveUserWithToken(user);
+        // 注意，返回的 user 对象会被 FilterBlank 将密码设置为空，所以这里需要克隆一个
+        saveUserWithToken(user.clone(), email);
         // 拼接参数并加密
-        String params = token + " " + newPassword + " " + TimeUtil.changeDateTime(forgetPasswordExpire, TimeUnit.HOURS).getTime();
+        String params = email + " " + newPassword + " " + TimeUtil.changeDateTime(forgetPasswordExpire, TimeUnit.HOURS).getTime();
         String encryptedParams = URLUtil.encryptParams(forgetPasswordAesKey, params);
         Context context = new Context();
         context.setVariable("username", user.getName());
@@ -486,15 +495,20 @@ public class UserService {
     }
 
     /**
-     * 通过用户登录 token，为用户设置新的密码。
+     * 通过用户登录 token，为用户设置新的密码。先需要校验旧密码。
      */
     @Transactional(isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
-    public ResultCode setNewPassword(int userLogType, String token, String newPassword)
+    public ResultCode setNewPassword(int userLogType, String token, String oldPassword, String newPassword)
             throws JsonProcessingException {
         // 用户未登录
         User user = USER_LOGIN_MAP.get(token);
         if (user == null) {
             return ResultCode.USER_ACCESS_ERROR;
+        }
+
+        // 旧密码错误
+        if (oldPassword != null && !passwordEquals(user, oldPassword)) {
+            return ResultCode.USER_PASSWORD_ERROR;
         }
 
         // 新旧密码相同
@@ -528,6 +542,13 @@ public class UserService {
     }
 
     /**
+     * 通过用户登录 token，为用户设置新的密码。
+     */
+    public ResultCode setNewPassword(int userLogType, String token, String newPassword) throws JsonProcessingException {
+        return setNewPassword(userLogType, token, null, newPassword);
+    }
+
+    /**
      * 修改用户名称。
      */
     @Transactional(isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
@@ -536,6 +557,11 @@ public class UserService {
         User user = USER_LOGIN_MAP.get(params.token);
         if (user == null) {
             return ResultCode.USER_ACCESS_ERROR;
+        }
+
+        // 密码错误
+        if (!passwordEquals(user, params.password)) {
+            return ResultCode.USER_PASSWORD_ERROR;
         }
 
         // 如果新旧名称相同
@@ -556,7 +582,7 @@ public class UserService {
 
         // 写入用户更新名称日志
         userLogDao.insert(new UserLog(user.getId(), UserLogType.MODIFY_NAME, objectMapper.writeValueAsString(
-                new UserUpdateLog(params.newName, params.newName))));
+                new UserUpdateLog(user.getName(), params.newName))));
 
         // 删除缓存
         redisUserDao.deleteUserById(user.getId());
@@ -571,11 +597,16 @@ public class UserService {
      * 注销账号。
      */
     @Transactional(isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
-    public ResultCode canceledAccount(String token) {
+    public ResultCode canceledAccount(String token, String password) {
         // 用户未登录
         User user = USER_LOGIN_MAP.get(token);
         if (user == null) {
             return ResultCode.USER_ACCESS_ERROR;
+        }
+
+        // 密码错误
+        if (!passwordEquals(user, password)) {
+            return ResultCode.USER_PASSWORD_ERROR;
         }
 
         // 用户不是正常状态
@@ -596,6 +627,9 @@ public class UserService {
         redisUserDao.deleteUserById(user.getId());
 
         // 最后在删除用户 token
+        HttpSession session = ((ServletRequestAttributes) RequestContextHolder.getRequestAttributes())
+                .getRequest().getSession();
+        session.removeAttribute(USER_LOGIN_SESSION_KEY);
         USER_LOGIN_MAP.remove(token);
 
         return ResultCode.SUCCESS;

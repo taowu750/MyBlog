@@ -15,7 +15,7 @@
     </resultMap>
 
     <sql id="Base_Column_List">
-        id, user_id, profile_picture_path, `description`, sex, age, birthday, profession, create_time,
+        user_id, profile_picture_path, `description`, sex, age, birthday, profession, create_time,
         modify_time
     </sql>
 

@@ -2,6 +2,7 @@ package com.ncoxs.myblog.model.pojo;
 
 import com.ncoxs.myblog.constant.ParamValidateMsg;
 import com.ncoxs.myblog.constant.ParamValidateRule;
+import com.ncoxs.myblog.exception.ImpossibleError;
 import com.ncoxs.myblog.handler.response.FilterBlank;
 import lombok.Data;
 
@@ -15,7 +16,7 @@ import java.util.Date;
  */
 @Data
 @FilterBlank
-public class User implements Serializable {
+public class User implements Serializable, Cloneable {
 
     private static final long serialVersionUID = -3923796704508413980L;
 
@@ -54,4 +55,14 @@ public class User implements Serializable {
      */
     private Date createTime;
     private Date modifyTime;
+
+
+    @Override
+    public User clone() {
+        try {
+            return (User) super.clone();
+        } catch (CloneNotSupportedException e) {
+            throw new ImpossibleError(e);
+        }
+    }
 }
