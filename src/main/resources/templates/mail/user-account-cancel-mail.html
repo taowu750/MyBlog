@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>注销账号</title>
+</head>
+<body>
+
+<p>
+    亲爱的<span th:text="${username}">用户</span>，要注销账号，请点击下方链接，
+    或者将网址复制到浏览器地址栏回车：
+</p>
+<a th:text="${cancelUrl}" th:href="${cancelUrl}">失效链接</a>
+
+</body>
+</html>

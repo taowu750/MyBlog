@@ -18,11 +18,12 @@ public enum ResultCode {
     PARAM_TYPE_BIND_ERROR(102, "参数类型错误"),
     PARAM_IS_INVALID(103, "参数格式错误"),
     PARAM_MODIFY_SAME(104, "需要修改的新、旧参数值一样"),
+    PARAMS_EXPIRED(105, "参数已过期"),
     /*
     200-299: 用户错误状态码
      */
     USER_NOT_LOGGED_IN(200, "用户未登录"),
-    USER_NOT_EXIST(201, "账号不存在"),
+    USER_NON_EXISTS(201, "账号不存在"),
     USER_PASSWORD_ERROR(202, "密码错误"),
     USER_LOGIN_VERIFICATION_ERROR(203, "用户名或密码错误"),
     USER_HAS_EXISTED(204, "用户已存在"),

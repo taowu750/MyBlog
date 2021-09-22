@@ -45,8 +45,8 @@ import java.util.concurrent.TimeUnit;
 // TODO: 密码强度验证
 // TODO: 要有定时清理数据库中过期数据的机制
 
-// TODO: 注销账号前需要发邮件确认
 // TODO: 添加注册、登录验证码校验功能
+// TODO: 登录密码错误的失败次数
 
 @Service
 public class UserService {
@@ -54,11 +54,20 @@ public class UserService {
     @Value("${spring.mail.username}")
     private String mailSender;
 
-    @Value("${myapp.user.activate-url}")
+    @Value("${myapp.user.activate.url}")
     private String activateUrl;
 
-    @Value("${myapp.user.activate-expire-time}")
+    @Value("${myapp.user.activate.expire-time}")
     private int activateExpireTime;
+
+    @Value("${myapp.user.cancel.url}")
+    private String cancelUrl;
+
+    @Value("${myapp.user.cancel.expire-time}")
+    private int cancelExpireTime;
+
+    @Value("${myapp.user.cancel.aes-key}")
+    private String cancelAesKey;
 
     @Value("${myapp.user.forget-password.aes-key}")
     private String forgetPasswordAesKey;
@@ -492,7 +501,7 @@ public class UserService {
     public ResultCode sendForgetPasswordMail(@NonNull String email, @NonNull String newPassword)
             throws GeneralSecurityException, MessagingException, UnsupportedEncodingException {
         if (!redisUserDao.existsEmail(email) && !userDao.existsEmail(email)) {
-            return ResultCode.USER_NOT_EXIST;
+            return ResultCode.USER_NON_EXISTS;
         }
 
         User user = redisUserDao.getUserByEmail(email);
@@ -582,29 +591,43 @@ public class UserService {
     }
 
     /**
-     * 修改用户名称。
+     * 验证用户的密码，以便确认用户状态。
      */
-    @Transactional(isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
-    public ResultCode modifyName(UserController.ModifyNameParams params) throws JsonProcessingException {
+    public ResultCode verifyPassword(String token, String password) {
         // 用户未登录
-        User user = accessByToken(params.token);
+        User user = accessByToken(token);
         if (user == null) {
             return ResultCode.USER_ACCESS_ERROR;
         }
 
         // 密码错误
-        if (!passwordEquals(user, params.password)) {
+        if (!passwordEquals(user, password)) {
             return ResultCode.USER_PASSWORD_ERROR;
-        }
-
-        // 如果新旧名称相同
-        if (params.newName.equals(user.getName())) {
-            return ResultCode.PARAM_MODIFY_SAME;
         }
 
         // 用户不是正常状态
         if (user.getStatus() != UserStatus.NORMAL) {
             return ResultCode.USER_STATUS_INVALID;
+        }
+
+        return ResultCode.SUCCESS;
+    }
+
+    /**
+     * 修改用户名称。
+     */
+    @Transactional(isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
+    public ResultCode modifyName(UserController.ModifyNameParams params) throws JsonProcessingException {
+        ResultCode result = verifyPassword(params.token, params.password);
+        if (result != ResultCode.SUCCESS) {
+            return result;
+        }
+
+        User user = accessByToken(params.token);
+
+        // 如果新旧名称相同
+        if (params.newName.equals(user.getName())) {
+            return ResultCode.PARAM_MODIFY_SAME;
         }
 
         // 更新数据库中的用户名
@@ -627,40 +650,73 @@ public class UserService {
     }
 
     /**
-     * 注销账号。
+     * 发送注销账号邮件。
      */
     @Transactional(isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
-    public ResultCode canceledAccount(String token, String password) throws JsonProcessingException {
-        // 用户未登录
+    public ResultCode sendCancelAccountEmail(String token, String password)
+            throws MessagingException, GeneralSecurityException, UnsupportedEncodingException {
+        ResultCode result = verifyPassword(token, password);
+        if (result != ResultCode.SUCCESS) {
+            return result;
+        }
+
         User user = accessByToken(token);
+
+        // 发送用户注销模板邮件
+        String encryptedParams = URLUtil.encryptParams(cancelAesKey, user.getId() + " " + token + " "
+                + TimeUtil.changeDateTime(cancelExpireTime, TimeUnit.HOURS).getTime());
+        Context context = new Context();
+        context.setVariable("username", user.getName());
+        context.setVariable("cancelUrl", cancelUrl + encryptedParams);
+        mailService.sendTemplateEmail(EmailTemplate.USER_ACCOUNT_CANCEL_NAME, mailSender,
+                user.getEmail(), EmailTemplate.USER_ACCOUNT_CANCEL_SUBJECT, context);
+
+        return ResultCode.SUCCESS;
+    }
+
+    /**
+     * 注销账号。
+     */
+    public ResultCode cancelAccount(String encryptedParams)
+            throws GeneralSecurityException, UnsupportedEncodingException, JsonProcessingException {
+        String[] params = URLUtil.decryptParams(cancelAesKey, encryptedParams).split(" ");
+        if (params.length != 3) {
+            return ResultCode.PARAM_IS_INVALID;
+        }
+
+        int userId = Integer.parseInt(params[0]);
+        String token = params[1];
+        long expireAt = Long.parseLong(params[2]);
+
+        User user = redisUserDao.getUserById(userId);
         if (user == null) {
-            return ResultCode.USER_ACCESS_ERROR;
+            user = userDao.selectById(userId);
         }
 
-        // 密码错误
-        if (!passwordEquals(user, password)) {
-            return ResultCode.USER_PASSWORD_ERROR;
+        if (user == null) {
+            return ResultCode.USER_NON_EXISTS;
         }
-
-        // 用户不是正常状态
         if (user.getStatus() != UserStatus.NORMAL) {
             return ResultCode.USER_STATUS_INVALID;
         }
+        if (expireAt < System.currentTimeMillis()) {
+            return ResultCode.PARAMS_EXPIRED;
+        }
 
         // 删除用户的所有标识
-        userIdentityDao.deleteByUserId(user.getId());
+        userIdentityDao.deleteByUserId(userId);
 
         // 更新用户的状态
         User update = new User();
-        update.setId(user.getId());
+        update.setId(userId);
         update.setStatus(UserStatus.CANCELLED);
         userDao.updateByIdSelective(update);
 
         // 删除 redis 中已注销账号的数据
-        redisUserDao.deleteUserById(user.getId());
+        redisUserDao.deleteUserById(userId);
 
         // 最后在删除用户 token
-        quitByToken(token, UserLogoutType.CANCELLED);
+        quitByToken(token, UserLogoutType.CANCEL);
 
         return ResultCode.SUCCESS;
     }

@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>用户账号注销结果</title>
+</head>
+<body>
+
+<!-- TODO: 增加图片和登录跳转 -->
+<div th:switch="${result}">
+  <h3 th:case="'params-invalid'">参数错误</h3>
+  <h3 th:case="'user-non-exists'">该用户不存在</h3>
+  <h3 th:case="'user-status-invalid'">您的账号处于禁用中，不能进行注销操作</h3>
+  <h3 th:case="'params-expired'">已过期</h3>
+  <h3 th:case="'success'">账号注销成功，最后感谢您对本站做出的贡献，希望以后再见O(∩_∩)O</h3>
+</div>
+
+</body>
+</html>

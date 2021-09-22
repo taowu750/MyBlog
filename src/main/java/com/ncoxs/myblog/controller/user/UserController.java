@@ -151,7 +151,7 @@ public class UserController {
 
     private GenericResult<UserLoginResp> checkUserAndIdentity(UserLoginResp userLoginResp) {
         if (userLoginResp == null) {
-            return GenericResult.error(ResultCode.USER_NOT_EXIST);
+            return GenericResult.error(ResultCode.USER_NON_EXISTS);
         } else if (userLoginResp.getUser() == null) {
             return GenericResult.error(ResultCode.USER_PASSWORD_ERROR);
         } else {
@@ -290,9 +290,47 @@ public class UserController {
         return GenericResult.byCode(userService.modifyName(params));
     }
 
-    @PostMapping("/account/cancel")
+    @PostMapping("/verify/password")
     @ResponseBody
-    public GenericResult<?> canceledAccount(@RequestBody AccessParams params) throws JsonProcessingException {
-        return GenericResult.byCode(userService.canceledAccount(params.token, params.password));
+    public GenericResult<?> verifyPassword(@RequestBody AccessParams params) {
+        return GenericResult.byCode(userService.verifyPassword(params.token, params.password));
+    }
+
+    @PostMapping("/account/send-cancel")
+    @ResponseBody
+    public GenericResult<?> sendCancelAccountEmail(@RequestBody AccessParams params)
+            throws MessagingException, GeneralSecurityException, UnsupportedEncodingException {
+        return GenericResult.byCode(userService.sendCancelAccountEmail(params.token, params.password));
+    }
+
+    @GetMapping("/account/cancel/{encryptedParams}")
+    public ModelAndView cancelAccount(@PathVariable("encryptedParams") String encryptedParams)
+            throws GeneralSecurityException, UnsupportedEncodingException, JsonProcessingException {
+        ResultCode result = userService.cancelAccount(encryptedParams);
+        ModelAndView mv = new ModelAndView();
+        switch (result) {
+            case PARAM_IS_INVALID:
+                mv.addObject("result", "params-invalid");
+                break;
+
+            case USER_NON_EXISTS:
+                mv.addObject("result", "user-non-exists");
+                break;
+
+            case USER_STATUS_INVALID:
+                mv.addObject("result", "user-status-invalid");
+                break;
+
+            case PARAMS_EXPIRED:
+                mv.addObject("result", "params-expired");
+                break;
+
+            case SUCCESS:
+                mv.addObject("result", "success");
+                break;
+        }
+        mv.setViewName("/view/user-account-cancel-result");
+
+        return mv;
     }
 }

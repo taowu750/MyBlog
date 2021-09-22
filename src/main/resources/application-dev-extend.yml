@@ -4,17 +4,25 @@ myapp:
     url: http://localhost:8080/my-blog/
 
   user:
-    # 用户注册网址链接
-    activate-url: http://localhost:8080/my-blog/user/account-activate/
-    # 用户注册激活过期时间，单位小时
-    activate-expire-time: 24
+    activate:
+      # 用户注册网址链接
+      url: http://localhost:8080/my-blog/user/account/activate/
+      # 用户注册激活过期时间，单位小时
+      expire-time: 24
+    cancel:
+      # 用户注销网址链接
+      url: http://localhost:8080/my-blog/user/account/cancel/
+      # 用户注销过期时间，单位小时
+      expire-time: 24
+      # 用来加解密“注销账号”参数的秘钥
+      aes-key: IJCXtl2g9SExirSEs0kueA==
 
     # 用户忘记密码请求发送网址
     forget-password:
       url: http://localhost:8080/my-blog/user/password/forget/
       # 用户忘记密码请求过期时间，单位小时
       url-expire: 1
-      # 用来加解密“忘记密码”信息的秘钥
+      # 用来加解密“忘记密码”参数的秘钥
       aes-key: xojDGXtVip8AuU4lj9KUJQ==
 
     # 用户头像基路径
@@ -57,7 +65,6 @@ myapp:
     draft:
       # 博客草稿过期时间，单位天
       expire-days: 14
-
 
   mail:
     # 是否启用发送邮件功能

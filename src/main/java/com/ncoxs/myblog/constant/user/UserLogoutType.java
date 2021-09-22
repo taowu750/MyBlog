@@ -23,5 +23,5 @@ public interface UserLogoutType {
     /**
      * 用户注销账号导致登出
      */
-    int CANCELLED = 4;
+    int CANCEL = 4;
 }
