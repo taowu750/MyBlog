@@ -225,16 +225,16 @@ public class UserController {
         if (params.length != 3) {
             mv.addObject("result", "params-error");
         } else {
-            String email = params[0], newPassword = params[1];
+            String token = params[0], newPassword = params[1];
             long expire = Long.parseLong(params[2]);
             if (expire < System.currentTimeMillis()) {
                 mv.addObject("result", "expired");
-                // 已过期，删除用户登录 email
-                userService.quitByToken(email);
-            } else if (userService.setNewPassword(UserLogType.FORGET_PASSWORD, email, newPassword) == ResultCode.SUCCESS) {
+                // 已过期，删除用户登录 token
+                userService.quitByToken(token);
+            } else if (userService.setNewPassword(UserLogType.FORGET_PASSWORD, token, newPassword) == ResultCode.SUCCESS) {
                 mv.addObject("result", "success");
             } else {
-                // email 不存在或新旧密码相同则失败
+                // token 不存在或新旧密码相同则失败
                 mv.addObject("result", "failed");
             }
         }

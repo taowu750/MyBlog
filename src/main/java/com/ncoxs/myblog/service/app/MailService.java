@@ -1,6 +1,7 @@
 package com.ncoxs.myblog.service.app;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
@@ -12,6 +13,9 @@ import javax.mail.internet.MimeMessage;
 
 @Service
 public class MailService {
+
+    @Value("${myapp.mail.enable}")
+    private boolean enable;
 
     private JavaMailSender javaMailSender;
     private TemplateEngine templateEngine;
@@ -31,6 +35,10 @@ public class MailService {
      */
     public void sendTemplateEmail(String templateName, String from, String to,
                                   String subject, Context context) throws MessagingException {
+        if (!enable) {
+            return;
+        }
+
         MimeMessage message = javaMailSender.createMimeMessage();
         MimeMessageHelper helper = new MimeMessageHelper(message, true);
         helper.setFrom(from);

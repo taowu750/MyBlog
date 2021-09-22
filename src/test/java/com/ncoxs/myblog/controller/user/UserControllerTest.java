@@ -5,15 +5,14 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ncoxs.myblog.constant.ResultCode;
 import com.ncoxs.myblog.constant.user.UserIdentityType;
 import com.ncoxs.myblog.constant.user.UserLogType;
+import com.ncoxs.myblog.constant.user.UserLogoutType;
 import com.ncoxs.myblog.constant.user.UserStatus;
 import com.ncoxs.myblog.dao.mysql.UserBasicInfoDao;
 import com.ncoxs.myblog.dao.mysql.UserDao;
 import com.ncoxs.myblog.dao.mysql.UserIdentityDao;
 import com.ncoxs.myblog.dao.mysql.UserLogDao;
 import com.ncoxs.myblog.dao.redis.RedisUserDao;
-import com.ncoxs.myblog.model.bo.UserLoginLog;
-import com.ncoxs.myblog.model.bo.UserRegisterLog;
-import com.ncoxs.myblog.model.bo.UserUpdateLog;
+import com.ncoxs.myblog.model.bo.*;
 import com.ncoxs.myblog.model.dto.GenericResult;
 import com.ncoxs.myblog.model.dto.UserLoginResp;
 import com.ncoxs.myblog.model.pojo.User;
@@ -24,6 +23,8 @@ import com.ncoxs.myblog.testutil.EncryptionMockMvcBuilder;
 import com.ncoxs.myblog.util.general.PasswordUtil;
 import com.ncoxs.myblog.util.general.TimeUtil;
 import com.ncoxs.myblog.util.general.URLUtil;
+import com.ncoxs.myblog.util.model.Tuple2;
+import com.ncoxs.myblog.util.model.Tuples;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -31,6 +32,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.mock.web.MockHttpSession;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.transaction.annotation.Transactional;
@@ -232,6 +234,7 @@ public class UserControllerTest {
         byte[] data = new EncryptionMockMvcBuilder(mockMvc, objectMapper)
                 .post("/user/login/name")
                 .jsonParams(mp(kv("name", "test"), kv("password", "12345")))
+                .cookie(mp("a", "a"))
                 .sendRequest()
                 .expectStatusOk()
                 .print()
@@ -323,6 +326,57 @@ public class UserControllerTest {
         assertEquals(userLoginResp.getUser().getId(), savedUser.getId());
     }
 
+    private Tuple2<UserLoginResp, MockHttpSession> login() throws Exception {
+        EncryptionMockMvcBuilder mvcBuilder = new EncryptionMockMvcBuilder(mockMvc, objectMapper);
+        MvcResult mvcResult = mvcBuilder
+                .post("/user/login/name")
+                .jsonParams(mp(kv("name", "test"), kv("password", "12345")))
+                .sendRequest()
+                .expectStatusOk()
+                .print()
+                .build();
+        byte[] data = EncryptionMockMvcBuilder.decryptData(mvcBuilder, mvcResult);
+        GenericResult<UserLoginResp> result = objectMapper.readValue(data,
+                new TypeReference<GenericResult<UserLoginResp>>() {
+                });
+
+        return Tuples.of(result.getData(), (MockHttpSession) mvcResult.getRequest().getSession());
+    }
+
+    @Test
+    @Transactional
+    public void testLogout() throws Exception {
+        registerTestUser();
+        activateTestUser();
+
+        Tuple2<UserLoginResp, MockHttpSession> tuple = login();
+        UserLoginResp userLoginResp = tuple.t1;
+        MockHttpSession session = tuple.t2;
+
+        assertNotNull(session.getAttribute(userLoginResp.getToken()));
+        int loginLogId = ((UserLoginHolder) session.getAttribute(userLoginResp.getToken())).getLoginLogId();
+
+        GenericResult<Map<String, Object>> result = new EncryptionMockMvcBuilder(mockMvc, objectMapper)
+                .post("/user/logout")
+                .jsonParams(mp(kv("token", userLoginResp.getToken()), kv("logoutType", UserLogoutType.PROACTIVE)))
+                .session(session)
+                .sendRequest()
+                .expectStatusOk()
+                .print()
+                .buildGR();
+        assertEquals(ResultCode.SUCCESS.getCode(), result.getCode());
+
+        //noinspection ConstantConditions
+        assertNull(session.getAttribute(userLoginResp.getToken()));
+
+        // assert 登出日志
+        List<UserLog> userLogs = userLogDao.selectByUserIdType(userLoginResp.getUser().getId(), UserLogType.LOGOUT);
+        assertEquals(1, userLogs.size());
+        UserLogoutLog userLogoutLog = objectMapper.readValue(userLogs.get(0).getDescription(), UserLogoutLog.class);
+        assertEquals(UserLogoutType.PROACTIVE, userLogoutLog.getType());
+        assertEquals(loginLogId, userLogoutLog.getLoginLogId());
+    }
+
     @Test
     @Transactional
     public void testForgetPassword() throws Exception {
@@ -383,28 +437,16 @@ public class UserControllerTest {
         assertEquals(updateLog.getNewValue(), user.getPassword());
     }
 
-    private UserLoginResp login() throws Exception {
-        byte[] data = new EncryptionMockMvcBuilder(mockMvc, objectMapper)
-                .post("/user/login/name")
-                .jsonParams(mp(kv("name", "test"), kv("password", "12345")))
-                .sendRequest()
-                .expectStatusOk()
-                .print()
-                .buildByte();
-        GenericResult<UserLoginResp> result = objectMapper.readValue(data,
-                new TypeReference<GenericResult<UserLoginResp>>() {
-                });
-
-        return result.getData();
-    }
-
     @Test
     @Transactional
     public void testModifyPassword() throws Exception {
         registerTestUser();
         activateTestUser();
 
-        UserLoginResp userLoginResp = login();
+        Tuple2<UserLoginResp, MockHttpSession> tuple = login();
+        UserLoginResp userLoginResp = tuple.t1;
+        MockHttpSession session = tuple.t2;
+
         User user = userDao.selectByName("test");
         String oldPassword = user.getPassword();
 
@@ -413,6 +455,7 @@ public class UserControllerTest {
                 .post("/user/password/modify")
                 .jsonParams(mp(kv("token", userLoginResp.getToken()), kv("oldPassword", "12346"),
                         kv("newPassword", "12347")))
+                .session(session)
                 .sendRequest()
                 .expectStatusOk()
                 .print()
@@ -427,6 +470,7 @@ public class UserControllerTest {
                 .post("/user/password/modify")
                 .jsonParams(mp(kv("token", userLoginResp.getToken()), kv("oldPassword", "12345"),
                         kv("newPassword", "23456")))
+                .session(session)
                 .sendRequest()
                 .expectStatusOk()
                 .print()
@@ -454,13 +498,16 @@ public class UserControllerTest {
         registerTestUser();
         activateTestUser();
 
-        UserLoginResp userLoginResp = login();
+        Tuple2<UserLoginResp, MockHttpSession> tuple = login();
+        UserLoginResp userLoginResp = tuple.t1;
+        MockHttpSession session = tuple.t2;
 
         // 发送错误的修改名称请求：密码错误
         byte[] data = new EncryptionMockMvcBuilder(mockMvc, objectMapper)
                 .post("/user/name/modify")
                 .jsonParams(mp(kv("token", userLoginResp.getToken()), kv("newName", "wutao"),
                         kv("password", "12347")))
+                .session(session)
                 .sendRequest()
                 .expectStatusOk()
                 .print()
@@ -475,6 +522,7 @@ public class UserControllerTest {
                 .post("/user/name/modify")
                 .jsonParams(mp(kv("token", userLoginResp.getToken()), kv("newName", "wutao"),
                         kv("password", "12345")))
+                .session(session)
                 .sendRequest()
                 .expectStatusOk()
                 .print()
@@ -502,12 +550,15 @@ public class UserControllerTest {
         registerTestUser();
         activateTestUser();
 
-        UserLoginResp userLoginResp = login();
+        Tuple2<UserLoginResp, MockHttpSession> tuple = login();
+        UserLoginResp userLoginResp = tuple.t1;
+        MockHttpSession session = tuple.t2;
 
         // 发送错误的注销账号请求：密码不正确
         byte[] data = new EncryptionMockMvcBuilder(mockMvc, objectMapper)
                 .post("/user/account/cancel")
                 .jsonParams(mp(kv("token", userLoginResp.getToken()), kv("password", "12346")))
+                .session(session)
                 .sendRequest()
                 .expectStatusOk()
                 .print()
@@ -521,6 +572,7 @@ public class UserControllerTest {
         data = new EncryptionMockMvcBuilder(mockMvc, objectMapper)
                 .post("/user/account/cancel")
                 .jsonParams(mp(kv("token", userLoginResp.getToken()), kv("password", "12345")))
+                .session(session)
                 .sendRequest()
                 .expectStatusOk()
                 .print()
@@ -534,6 +586,7 @@ public class UserControllerTest {
         data = new EncryptionMockMvcBuilder(mockMvc, objectMapper)
                 .post("/user/login/name")
                 .jsonParams(mp(kv("name", "test"), kv("password", "12345")))
+                .session(session)
                 .sendRequest()
                 .expectStatusOk()
                 .print()
@@ -548,6 +601,7 @@ public class UserControllerTest {
                 .post("/user/login/email")
                 .jsonParams(mp(kv("email", "wutaoyx163@163.com"), kv("password", "12345"),
                         kv("rememberDays", 10), kv("source", "source")))
+                .session(session)
                 .sendRequest()
                 .expectStatusOk()
                 .print()

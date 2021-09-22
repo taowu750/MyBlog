@@ -13,12 +13,14 @@ import com.ncoxs.myblog.util.general.ResourceUtil;
 import com.ncoxs.myblog.util.model.FormFormatter;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockHttpSession;
 import org.springframework.test.web.servlet.*;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 import org.springframework.test.web.servlet.result.MockMvcResultHandlers;
 import org.yaml.snakeyaml.Yaml;
 
+import javax.servlet.http.Cookie;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
@@ -75,9 +77,6 @@ public class EncryptionMockMvcBuilder {
         this.mockMvc = mockMvc;
         this.objectMapper = objectMapper;
 
-//        Properties props = new Properties();
-//        props.load(ResourceUtil.load("app-props.properties"));
-//        enable = Boolean.parseBoolean(props.getProperty("encryption.enable"));
         Yaml yaml = new Yaml();
         //noinspection unchecked
         Map<String, Map<String, Map<String, Object>>> properties = yaml.loadAs(ResourceUtil.load("application-dev-extend.yml"), HashMap.class);
@@ -266,6 +265,53 @@ public class EncryptionMockMvcBuilder {
         }
 
         return paramsMap;
+    }
+
+    /**
+     * 设置 session。
+     */
+    public EncryptionMockMvcBuilder session(MockHttpSession session) {
+        if (requestBuilder == null) {
+            throw new IllegalStateException("method not setting");
+        }
+        requestBuilder.session(session);
+
+        return this;
+    }
+
+    /**
+     * 设置 session 的属性。
+     */
+    public EncryptionMockMvcBuilder session(Map<String, Object> sessionAttrs) {
+        if (requestBuilder == null) {
+            throw new IllegalStateException("method not setting");
+        }
+        MockHttpSession session = new MockHttpSession();
+        sessionAttrs.forEach(session::setAttribute);
+        requestBuilder.session(session);
+
+        return this;
+    }
+
+    public EncryptionMockMvcBuilder cookie(Cookie... cookies) {
+        if (requestBuilder == null) {
+            throw new IllegalStateException("method not setting");
+        }
+        requestBuilder.cookie(cookies);
+
+        return this;
+    }
+
+    public EncryptionMockMvcBuilder cookie(Map<String, String> cookieValues) {
+        if (requestBuilder == null) {
+            throw new IllegalStateException("method not setting");
+        }
+        Cookie[] cookies = cookieValues.entrySet().stream()
+                .map(en -> new Cookie(en.getKey(), en.getValue()))
+                .toArray(Cookie[]::new);
+        requestBuilder.cookie(cookies);
+
+        return this;
     }
 
     /**

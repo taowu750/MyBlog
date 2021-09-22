@@ -45,7 +45,7 @@ import java.util.concurrent.TimeUnit;
 // TODO: 密码强度验证
 // TODO: 要有定时清理数据库中过期数据的机制
 
-// TODO: 注销账号前需要询问
+// TODO: 注销账号前需要发邮件确认
 // TODO: 添加注册、登录验证码校验功能
 
 @Service
@@ -350,9 +350,10 @@ public class UserService {
      * 生成用户此次登录的 token，和用户对象相关联，并保存到 session 中。
      */
     private String saveUserWithToken(User user, String token, Integer loginId) {
+        token = USER_LOGIN_SESSION_TOKEN + token;
         HttpSession session = SpringUtil.currentSession();
         // 注意，返回的 user 对象会被 FilterBlank 将密码设置为空，所以这里需要克隆一个
-        session.setAttribute(USER_LOGIN_SESSION_TOKEN + token, new UserLoginHolder(user, loginId));
+        session.setAttribute(token, new UserLoginHolder(user.clone(), loginId));
 
         return token;
     }
@@ -408,7 +409,7 @@ public class UserService {
      * 通过 token 访问用户信息
      */
     public User accessByToken(String token) {
-        Object obj = SpringUtil.currentSession().getAttribute(USER_LOGIN_SESSION_TOKEN + token);
+        Object obj = SpringUtil.currentSession().getAttribute(token);
         if (obj instanceof UserLoginHolder) {
             return ((UserLoginHolder) obj).getUser();
         }
@@ -420,7 +421,7 @@ public class UserService {
      * 当用户关闭所有网页、或主动退出登录、或 session 过期时，需要删除登录 token
      */
     public boolean quitByToken(HttpSession session, String token, Integer logoutType) throws JsonProcessingException {
-        Object obj = session.getAttribute(USER_LOGIN_SESSION_TOKEN + token);
+        Object obj = session.getAttribute(token);
         if (obj instanceof UserLoginHolder) {
             session.removeAttribute(token);
             // 记录登出日志
@@ -440,6 +441,7 @@ public class UserService {
             String attrName = attrs.nextElement();
             if (attrName.startsWith(USER_LOGIN_SESSION_TOKEN)) {
                 quitByToken(session, attrName, UserLogoutType.INTERRUPTED);
+                break;
             }
         }
     }
