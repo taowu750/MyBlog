@@ -87,6 +87,9 @@ public class UserControllerTest {
     @Value("${myapp.user.forget-password.url-expire}")
     private int forgetPasswordExpire;
 
+    @Value("${myapp.user.cancel.aes-key}")
+    private String cancelAccountAesKey;
+
 
     @AfterEach
     public void clear() {
@@ -554,39 +557,38 @@ public class UserControllerTest {
         UserLoginResp userLoginResp = tuple.t1;
         MockHttpSession session = tuple.t2;
 
-        // 发送错误的注销账号请求：密码不正确
-        byte[] data = new EncryptionMockMvcBuilder(mockMvc, objectMapper)
-                .post("/user/account/cancel")
-                .jsonParams(mp(kv("token", userLoginResp.getToken()), kv("password", "12346")))
-                .session(session)
-                .sendRequest()
-                .expectStatusOk()
-                .print()
-                .buildByte();
-        GenericResult<?> genericResult = objectMapper.readValue(data,
-                new TypeReference<GenericResult<?>>() {
-                });
-        assertEquals(ResultCode.USER_PASSWORD_ERROR.getCode(), genericResult.getCode());
-
-        // 发送注销账号请求
-        data = new EncryptionMockMvcBuilder(mockMvc, objectMapper)
-                .post("/user/account/cancel")
+        // 发送注销邮件
+        GenericResult<Map<String, Object>> mapResult = new EncryptionMockMvcBuilder(mockMvc, objectMapper)
+                .post("/user/account/send-cancel")
                 .jsonParams(mp(kv("token", userLoginResp.getToken()), kv("password", "12345")))
                 .session(session)
                 .sendRequest()
                 .expectStatusOk()
                 .print()
-                .buildByte();
-        genericResult = objectMapper.readValue(data,
-                new TypeReference<GenericResult<Boolean>>() {
-                });
-        assertEquals(ResultCode.SUCCESS.getCode(), genericResult.getCode());
+                .buildGR();
+        assertEquals(ResultCode.SUCCESS.getCode(), mapResult.getCode());
+
+        String encryptedParams = URLUtil.encryptParams(cancelAccountAesKey, userLoginResp.getUser().getId() + " "
+                + userLoginResp.getToken() + " " + TimeUtil.changeDateTime(1, TimeUnit.HOURS).getTime());
+        MvcResult mvcResult = new EncryptionMockMvcBuilder(mockMvc, objectMapper)
+                .get("/user/account/cancel/" + encryptedParams)
+                .session(session)
+                .sendRequest()
+                .expectStatusOk()
+                .print()
+                .build();
+        assertEquals("success", mvcResult.getModelAndView().getModel().get("result"));
+
+        // assert 登出日志
+        List<UserLog> userLogs = userLogDao.selectByUserIdType(userLoginResp.getUser().getId(), UserLogType.LOGOUT);
+        assertEquals(1, userLogs.size());
+        UserLogoutLog userLogoutLog = objectMapper.readValue(userLogs.get(0).getDescription(), UserLogoutLog.class);
+        assertEquals(UserLogoutType.CANCEL, userLogoutLog.getType());
 
         // 发送根据用户名称登录请求
-        data = new EncryptionMockMvcBuilder(mockMvc, objectMapper)
+        byte[] data = new EncryptionMockMvcBuilder(mockMvc, objectMapper)
                 .post("/user/login/name")
                 .jsonParams(mp(kv("name", "test"), kv("password", "12345")))
-                .session(session)
                 .sendRequest()
                 .expectStatusOk()
                 .print()
@@ -594,14 +596,13 @@ public class UserControllerTest {
         GenericResult<?> result = objectMapper.readValue(data,
                 new TypeReference<GenericResult<?>>() {
                 });
-        assertEquals(ResultCode.USER_NOT_EXIST.getCode(), result.getCode());
+        assertEquals(ResultCode.USER_NON_EXISTS.getCode(), result.getCode());
 
         // 发送根据用户邮箱登录请求
         data = new EncryptionMockMvcBuilder(mockMvc, objectMapper)
                 .post("/user/login/email")
                 .jsonParams(mp(kv("email", "wutaoyx163@163.com"), kv("password", "12345"),
                         kv("rememberDays", 10), kv("source", "source")))
-                .session(session)
                 .sendRequest()
                 .expectStatusOk()
                 .print()
@@ -609,6 +610,6 @@ public class UserControllerTest {
         result = objectMapper.readValue(data,
                 new TypeReference<GenericResult<?>>() {
                 });
-        assertEquals(ResultCode.USER_NOT_EXIST.getCode(), result.getCode());
+        assertEquals(ResultCode.USER_NON_EXISTS.getCode(), result.getCode());
     }
 }
