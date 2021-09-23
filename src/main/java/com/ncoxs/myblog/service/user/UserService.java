@@ -38,7 +38,9 @@ import java.io.UnsupportedEncodingException;
 import java.security.GeneralSecurityException;
 import java.util.Date;
 import java.util.Enumeration;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 
 // TODO: 考虑和官方用户账号的兼容问题
@@ -68,6 +70,12 @@ public class UserService {
 
     @Value("${myapp.user.cancel.aes-key}")
     private String cancelAesKey;
+
+    @Value("${myapp.user.password-error.max-count}")
+    private int passwordErrorMaxCount;
+
+    @Value("${myapp.user.password-error.limit-minutes}")
+    private int passwordErrorLimitMinutes;
 
     @Value("${myapp.user.forget-password.aes-key}")
     private String forgetPasswordAesKey;
@@ -137,6 +145,48 @@ public class UserService {
      * 用户每次登录，会生成一个 session 级别的 token，调用其他接口时需要使用这个 token 进行访问。
      */
     private static final String USER_LOGIN_SESSION_TOKEN = "userToken";
+
+    private class PasswordErrorCounter {
+
+        private final AtomicBoolean lock = new AtomicBoolean(false);
+
+        private int count;
+        private volatile long limitAt;
+
+        void tryReset() {
+            while (!lock.compareAndSet(false, true)) {
+            }
+
+            try {
+                if (limitAt != 0 && limitAt < System.currentTimeMillis()) {
+                    count = 0;
+                    limitAt = 0;
+                }
+            } finally {
+                lock.compareAndSet(true, false);
+            }
+        }
+
+        void addCount() {
+            while (!lock.compareAndSet(false, true)) {
+            }
+
+            try {
+                if (count < passwordErrorMaxCount) {
+                    count++;
+                } else if (limitAt == 0) {
+                    limitAt = System.currentTimeMillis() + TimeUnit.MINUTES.toMillis(passwordErrorLimitMinutes);
+                }
+            } finally {
+                lock.compareAndSet(true, false);
+            }
+        }
+    }
+
+    /**
+     * 用来记录某个用户密码错误次数和禁用时间的缓存 map。
+     */
+    private static final ConcurrentHashMap<Integer, PasswordErrorCounter> PASSWORD_ERROR_MAP = new ConcurrentHashMap<>();
 
 
     /**
@@ -269,6 +319,38 @@ public class UserService {
     }
 
     /**
+     * 判断用户密码重试次数是否超过最大次数。
+     */
+    public boolean canPasswordRetry(User user) {
+        PasswordErrorCounter counter = PASSWORD_ERROR_MAP.get(user.getId());
+        boolean result = counter == null || counter.limitAt < System.currentTimeMillis();
+
+        // 如果用户禁止访问时间已过期，则重置重试次数判断
+        if (result && counter != null) {
+            counter.tryReset();
+        }
+
+        return result;
+    }
+
+    /**
+     * 累计用户密码重试次数
+     */
+    private void countPasswordError(User user) {
+        PasswordErrorCounter counter;
+        if (PASSWORD_ERROR_MAP.containsKey(user.getId())) {
+            counter = PASSWORD_ERROR_MAP.get(user.getId());
+        } else {
+            counter = new PasswordErrorCounter();
+            PASSWORD_ERROR_MAP.put(user.getId(), counter);
+        }
+
+        counter.addCount();
+    }
+
+    public static final UserLoginResp PASSWORD_RETRY_ERROR = new UserLoginResp();
+
+    /**
      * 根据用户名和密码进行登录。如果选择了“记住我”，则还会返回新的登录标识。
      *
      * @return User 对象和登录标识。如果返回值为 null，表示用户名不存在；如果返回值 user 属性为空，表示用户密码错误；
@@ -312,6 +394,10 @@ public class UserService {
     UserLoginResp loginUser(String loginType, User user, String password,
                             int rememberDays, String source, IpLocInfo ipLocInfo)
             throws JsonProcessingException {
+        if (!canPasswordRetry(user)) {
+            return PASSWORD_RETRY_ERROR;
+        }
+
         UserLoginResp result = new UserLoginResp();
         // 比对密码是否相同
         if (passwordEquals(user, password)) {
@@ -343,6 +429,8 @@ public class UserService {
             // 插入登录密码错误日志
             userLogDao.insert(new UserLog(user.getId(), UserLogType.LOGIN, objectMapper.writeValueAsString(
                     new UserLoginLog("password-fail", loginType, DeviceUtil.fillIpLocInfo(ipLocInfo)))));
+            // 记录用户密码重试次数
+            countPasswordError(user);
         }
 
         return result;
@@ -408,7 +496,6 @@ public class UserService {
         UserLoginResp result = new UserLoginResp();
         result.setUser(user);
         result.setIdentity(loginIdentity);
-        // 注意，返回的 user 对象会被 FilterBlank 将密码设置为空，所以这里需要克隆一个
         result.setToken(saveUserWithToken(user, userLog.getId()));
 
         return result;
@@ -470,7 +557,7 @@ public class UserService {
     /**
      * 通过邮箱和密码获取用户信息
      *
-     * @param email 邮箱
+     * @param email    邮箱
      * @param password 密码
      * @return 用户不存在或密码错误返回 null
      */

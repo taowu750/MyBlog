@@ -17,6 +17,12 @@ myapp:
       # 用来加解密“注销账号”参数的秘钥
       aes-key: IJCXtl2g9SExirSEs0kueA==
 
+    password-error:
+      # 用户登录密码允许错误的最大次数
+      max-count: 5
+      # 用户密码错误超出次数后禁用的登录时长，单位分钟
+      limit-minutes: 10
+
     # 用户忘记密码请求发送网址
     forget-password:
       url: http://localhost:8080/my-blog/user/password/forget/

@@ -32,6 +32,7 @@ public enum ResultCode {
     USER_ACCOUNT_BANNED(207, "用户账号被禁用"),
     USER_ACCOUNT_CANCELED(208, "用户账号已注销"),
     USER_STATUS_INVALID(209, "用户账号状态不正常"),
+    USER_PASSWORD_RETRY_ERROR(210, "用户密码重试次数超过最大值，将封禁一段时间"),
     /*
     300-399：客户端请求错误码
      */

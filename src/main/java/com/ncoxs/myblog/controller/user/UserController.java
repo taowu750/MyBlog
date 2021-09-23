@@ -127,7 +127,7 @@ public class UserController {
         loginByNameParams.rememberDays = loginByNameParams.rememberDays != null ? loginByNameParams.rememberDays : 0;
         loginByNameParams.source = loginByNameParams.source != null ? loginByNameParams.source : "";
         UserLoginResp userLoginResp = userService.loginUserByName(loginByNameParams);
-        return checkUserAndIdentity(userLoginResp);
+        return checkUserLoginResp(userLoginResp);
     }
 
     @EqualsAndHashCode(callSuper = true)
@@ -146,12 +146,14 @@ public class UserController {
         loginByEmailParams.rememberDays = loginByEmailParams.rememberDays != null ? loginByEmailParams.rememberDays : 0;
         loginByEmailParams.source = loginByEmailParams.source != null ? loginByEmailParams.source : "";
         UserLoginResp userLoginResp = userService.loginUserByEmail(loginByEmailParams);
-        return checkUserAndIdentity(userLoginResp);
+        return checkUserLoginResp(userLoginResp);
     }
 
-    private GenericResult<UserLoginResp> checkUserAndIdentity(UserLoginResp userLoginResp) {
+    private GenericResult<UserLoginResp> checkUserLoginResp(UserLoginResp userLoginResp) {
         if (userLoginResp == null) {
             return GenericResult.error(ResultCode.USER_NON_EXISTS);
+        } else if (userLoginResp == UserService.PASSWORD_RETRY_ERROR) {
+            return GenericResult.error(ResultCode.USER_PASSWORD_RETRY_ERROR);
         } else if (userLoginResp.getUser() == null) {
             return GenericResult.error(ResultCode.USER_PASSWORD_ERROR);
         } else {
@@ -175,7 +177,7 @@ public class UserController {
     @ResponseBody
     @Encryption
     public GenericResult<UserLoginResp> loginByIdentity(@RequestBody LoginByIdentityParams params) throws JsonProcessingException {
-        return GenericResult.success(userService.loginByIdentity(params.identity, params.source, params.ipLocInfo));
+        return checkUserLoginResp(userService.loginByIdentity(params.identity, params.source, params.ipLocInfo));
     }
 
     @Data
