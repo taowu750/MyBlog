@@ -39,17 +39,6 @@ public class UserController {
         this.userService = userService;
     }
 
-
-    @Data
-    public static class VerificationCodeParams {
-
-        @NotBlank(message = ParamValidateMsg.VERIFICATION_CODE_BLANK)
-        public String token;
-
-        @NotBlank(message = ParamValidateMsg.VERIFICATION_CODE_BLANK)
-        public String code;
-    }
-
     @Data
     public static class RegisterParams {
 
@@ -57,7 +46,8 @@ public class UserController {
 
         public IpLocInfo ipLocInfo;
 
-        public VerificationCodeParams verification;
+        @NotBlank(message = ParamValidateMsg.VERIFICATION_CODE_BLANK)
+        public String verificationCode;
     }
 
     @PostMapping("/register")
@@ -122,7 +112,8 @@ public class UserController {
 
         public IpLocInfo ipLocInfo;
 
-        public VerificationCodeParams verificationParams;
+        @NotBlank(message = ParamValidateMsg.VERIFICATION_CODE_BLANK)
+        public String verificationCode;
     }
 
     @EqualsAndHashCode(callSuper = true)

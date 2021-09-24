@@ -224,7 +224,7 @@ public class UserService {
     @Transactional(isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
     public ResultCode registerUser(UserController.RegisterParams params)
             throws MessagingException, JsonProcessingException {
-        if (!verificationCodeService.verify(params.verification.token, params.verification.code)) {
+        if (!verificationCodeService.verify(VerificationCodeService.SESSION_KEY_PLAIN_REGISTER, params.verificationCode)) {
             return ResultCode.PARAMS_VERIFICATION_CODE_ERROR;
         }
 
@@ -377,7 +377,7 @@ public class UserService {
         }
 
         return loginUser("name", user, params.password, params.rememberDays, params.source,
-                params.ipLocInfo, params.verificationParams.token, params.verificationParams.code);
+                params.ipLocInfo, params.verificationCode);
     }
 
     /**
@@ -397,19 +397,19 @@ public class UserService {
         }
 
         return loginUser("email", user, params.password, params.rememberDays, params.source,
-                params.ipLocInfo, params.verificationParams.token, params.verificationParams.code);
+                params.ipLocInfo, params.verificationCode);
     }
 
     // 封禁了还能登录，只是不能做除浏览外的其他操作
     UserLoginResp loginUser(String loginType, User user, String password,
                             int rememberDays, String source, IpLocInfo ipLocInfo,
-                            String verificationToken, String verificationCode)
+                            String verificationCode)
             throws JsonProcessingException {
         if (!canPasswordRetry(user)) {
             return PASSWORD_RETRY_ERROR;
         }
 
-        if (!verificationCodeService.verify(verificationToken, verificationCode)) {
+        if (!verificationCodeService.verify(VerificationCodeService.SESSION_KEY_PLAIN_LOGIN, verificationCode)) {
             return VERIFICATION_CODE_ERROR;
         }
 

@@ -9,7 +9,6 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class VerificationCode {
 
-    private String token;
     private String code;
     private long expireAt;
 }

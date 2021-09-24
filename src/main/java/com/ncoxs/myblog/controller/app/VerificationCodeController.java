@@ -26,7 +26,7 @@ public class VerificationCodeController {
 
 
     @GetMapping("/generate/plain")
-    public GenericResult<VerificationCode> generate(@RequestBody String lastToken) {
-        return GenericResult.success(verificationCodeService.generatePlainCode(lastToken));
+    public GenericResult<VerificationCode> generate(@RequestBody String type) {
+        return GenericResult.success(verificationCodeService.generatePlainCode(type));
     }
 }
