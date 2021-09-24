@@ -41,11 +41,23 @@ public class UserController {
 
 
     @Data
+    public static class VerificationCodeParams {
+
+        @NotBlank(message = ParamValidateMsg.VERIFICATION_CODE_BLANK)
+        public String token;
+
+        @NotBlank(message = ParamValidateMsg.VERIFICATION_CODE_BLANK)
+        public String code;
+    }
+
+    @Data
     public static class RegisterParams {
 
         public User user;
 
         public IpLocInfo ipLocInfo;
+
+        public VerificationCodeParams verification;
     }
 
     @PostMapping("/register")
@@ -54,7 +66,8 @@ public class UserController {
     public GenericResult<?> register(@RequestBody RegisterParams params)
             throws MessagingException, JsonProcessingException {
         int exists = userService.existsUser(params.user.getName(), params.user.getEmail());
-        if (exists == 0 && userService.registerUser(params.user, params.ipLocInfo)) {
+        ResultCode resultCode = ResultCode.SUCCESS;
+        if (exists == 0 && (resultCode = userService.registerUser(params)) == ResultCode.SUCCESS) {
             return GenericResult.success();
         }
 
@@ -67,9 +80,8 @@ public class UserController {
             case 4:
                 return GenericResult.error(ResultCode.USER_EMAIL_IS_BIND);
 
-            case 5:
             default:
-                return GenericResult.error(ResultCode.PARAM_NOT_COMPLETE);
+                return GenericResult.error(resultCode);
         }
     }
 
@@ -109,6 +121,8 @@ public class UserController {
         public String source;
 
         public IpLocInfo ipLocInfo;
+
+        public VerificationCodeParams verificationParams;
     }
 
     @EqualsAndHashCode(callSuper = true)
@@ -154,6 +168,8 @@ public class UserController {
             return GenericResult.error(ResultCode.USER_NON_EXISTS);
         } else if (userLoginResp == UserService.PASSWORD_RETRY_ERROR) {
             return GenericResult.error(ResultCode.USER_PASSWORD_RETRY_ERROR);
+        } else if (userLoginResp == UserService.VERIFICATION_CODE_ERROR) {
+            return GenericResult.error(ResultCode.PARAMS_VERIFICATION_CODE_ERROR);
         } else if (userLoginResp.getUser() == null) {
             return GenericResult.error(ResultCode.USER_PASSWORD_ERROR);
         } else {

@@ -19,6 +19,7 @@ public enum ResultCode {
     PARAM_IS_INVALID(103, "参数格式错误"),
     PARAM_MODIFY_SAME(104, "需要修改的新、旧参数值一样"),
     PARAMS_EXPIRED(105, "参数已过期"),
+    PARAMS_VERIFICATION_CODE_ERROR(106, "验证码错误"),
     /*
     200-299: 用户错误状态码
      */

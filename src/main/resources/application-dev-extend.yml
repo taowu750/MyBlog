@@ -75,3 +75,8 @@ myapp:
   mail:
     # 是否启用发送邮件功能
     enable: false
+
+  verification-code:
+    plain:
+      # 普通验证码过期时间，单位分钟
+      expireMinutes: 5

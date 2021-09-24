@@ -21,6 +21,7 @@ import com.ncoxs.myblog.model.pojo.UserBasicInfo;
 import com.ncoxs.myblog.model.pojo.UserIdentity;
 import com.ncoxs.myblog.model.pojo.UserLog;
 import com.ncoxs.myblog.service.app.MailService;
+import com.ncoxs.myblog.service.app.VerificationCodeService;
 import com.ncoxs.myblog.util.general.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -46,9 +47,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 // TODO: 考虑和官方用户账号的兼容问题
 // TODO: 密码强度验证
 // TODO: 要有定时清理数据库中过期数据的机制
-
-// TODO: 添加注册、登录验证码校验功能
-// TODO: 登录密码错误的失败次数
 
 @Service
 public class UserService {
@@ -99,6 +97,8 @@ public class UserService {
 
     private MailService mailService;
 
+    private VerificationCodeService verificationCodeService;
+
     private UserLogDao userLogDao;
 
     private UserBasicInfoDao userBasicInfoDao;
@@ -123,6 +123,11 @@ public class UserService {
     @Autowired
     public void setMailService(MailService mailService) {
         this.mailService = mailService;
+    }
+
+    @Autowired
+    public void setVerificationCodeService(VerificationCodeService verificationCodeService) {
+        this.verificationCodeService = verificationCodeService;
     }
 
     @Autowired
@@ -154,15 +159,11 @@ public class UserService {
         private volatile long limitAt;
 
         void tryReset() {
-            while (!lock.compareAndSet(false, true)) {
-            }
-
-            try {
+            if (lock.compareAndSet(false, true)) {
                 if (limitAt != 0 && limitAt < System.currentTimeMillis()) {
                     count = 0;
                     limitAt = 0;
                 }
-            } finally {
                 lock.compareAndSet(true, false);
             }
         }
@@ -186,7 +187,7 @@ public class UserService {
     /**
      * 用来记录某个用户密码错误次数和禁用时间的缓存 map。
      */
-    private static final ConcurrentHashMap<Integer, PasswordErrorCounter> PASSWORD_ERROR_MAP = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<Integer, PasswordErrorCounter> passwordErrorMap = new ConcurrentHashMap<>();
 
 
     /**
@@ -221,14 +222,18 @@ public class UserService {
      * 调用此方法时，user 参数的 name、email、password 属性必须提供。
      */
     @Transactional(isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
-    public boolean registerUser(@NonNull User user, @Nullable IpLocInfo ipLocInfo)
+    public ResultCode registerUser(UserController.RegisterParams params)
             throws MessagingException, JsonProcessingException {
+        if (!verificationCodeService.verify(params.verification.token, params.verification.code)) {
+            return ResultCode.PARAMS_VERIFICATION_CODE_ERROR;
+        }
+
         // 先对客户端传递过来的用户对象初始化
-        user = initialUser(user);
+        User user = initialUser(params.user);
         // 尝试插入数据库，如果用户名或邮箱不重复则插入成功
         boolean isSuccess = userDao.insertSelective(user);
         if (!isSuccess)
-            return false;
+            return ResultCode.USER_HAS_EXISTED;
 
         // 生成用户激活标识（用户激活邮件中要用）
         String activateId = UUIDUtil.generate();
@@ -238,7 +243,7 @@ public class UserService {
 
         // 插入用户注册日志
         userLogDao.insert(new UserLog(user.getId(), UserLogType.REGISTER, userIdentity.getIdentity(),
-                objectMapper.writeValueAsString(new UserRegisterLog(user.getStatus(), DeviceUtil.fillIpLocInfo(ipLocInfo)))));
+                objectMapper.writeValueAsString(new UserRegisterLog(user.getStatus(), DeviceUtil.fillIpLocInfo(params.ipLocInfo)))));
 
         // 将用户信息插入到 Redis 中
         redisUserDao.setNonActivateUser(activateId, user);
@@ -250,7 +255,7 @@ public class UserService {
         mailService.sendTemplateEmail(EmailTemplate.USER_ACTIVATE_NAME, mailSender,
                 user.getEmail(), EmailTemplate.USER_ACTIVATE_SUBJECT, context);
 
-        return true;
+        return ResultCode.SUCCESS;
     }
 
     public static final User USER_ACTIVATED = new User();
@@ -321,8 +326,8 @@ public class UserService {
     /**
      * 判断用户密码重试次数是否超过最大次数。
      */
-    public boolean canPasswordRetry(User user) {
-        PasswordErrorCounter counter = PASSWORD_ERROR_MAP.get(user.getId());
+    private boolean canPasswordRetry(User user) {
+        PasswordErrorCounter counter = passwordErrorMap.get(user.getId());
         boolean result = counter == null || counter.limitAt < System.currentTimeMillis();
 
         // 如果用户禁止访问时间已过期，则重置重试次数判断
@@ -338,17 +343,18 @@ public class UserService {
      */
     private void countPasswordError(User user) {
         PasswordErrorCounter counter;
-        if (PASSWORD_ERROR_MAP.containsKey(user.getId())) {
-            counter = PASSWORD_ERROR_MAP.get(user.getId());
+        if (passwordErrorMap.containsKey(user.getId())) {
+            counter = passwordErrorMap.get(user.getId());
         } else {
             counter = new PasswordErrorCounter();
-            PASSWORD_ERROR_MAP.put(user.getId(), counter);
+            passwordErrorMap.put(user.getId(), counter);
         }
 
         counter.addCount();
     }
 
     public static final UserLoginResp PASSWORD_RETRY_ERROR = new UserLoginResp();
+    public static final UserLoginResp VERIFICATION_CODE_ERROR = new UserLoginResp();
 
     /**
      * 根据用户名和密码进行登录。如果选择了“记住我”，则还会返回新的登录标识。
@@ -367,7 +373,7 @@ public class UserService {
         }
 
         return loginUser("name", user, params.password, params.rememberDays, params.source,
-                params.ipLocInfo);
+                params.ipLocInfo, params.verificationParams.token, params.verificationParams.code);
     }
 
     /**
@@ -387,15 +393,20 @@ public class UserService {
         }
 
         return loginUser("email", user, params.password, params.rememberDays, params.source,
-                params.ipLocInfo);
+                params.ipLocInfo, params.verificationParams.token, params.verificationParams.code);
     }
 
-    // 登录还需要检查用户状态，是否为已注销。封禁了还能登录，只是不能做除浏览外的其他操作
+    // 封禁了还能登录，只是不能做除浏览外的其他操作
     UserLoginResp loginUser(String loginType, User user, String password,
-                            int rememberDays, String source, IpLocInfo ipLocInfo)
+                            int rememberDays, String source, IpLocInfo ipLocInfo,
+                            String verificationToken, String verificationCode)
             throws JsonProcessingException {
         if (!canPasswordRetry(user)) {
             return PASSWORD_RETRY_ERROR;
+        }
+
+        if (!verificationCodeService.verify(verificationToken, verificationCode)) {
+            return VERIFICATION_CODE_ERROR;
         }
 
         UserLoginResp result = new UserLoginResp();

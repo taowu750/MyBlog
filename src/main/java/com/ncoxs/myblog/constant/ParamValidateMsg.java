@@ -34,4 +34,6 @@ public interface ParamValidateMsg {
     String BLOG_CONTENT_LEN = "blog.content.len:博客内容长度超出最大长度限制 " + ParamValidateRule.BLOG_CONTENT_MAX_LEN;
     String BLOG_WORD_COUNT_RANGE = "blog.wordCount.range:博客字数应在 " + ParamValidateRule.BLOG_WORD_COUNT_MIN + " 到 " +
             ParamValidateRule.BLOG_WORD_COUNT_MAX + " 字之间";
+
+    String VERIFICATION_CODE_BLANK = "verificationCode.blank:验证码不能为空";
 }
