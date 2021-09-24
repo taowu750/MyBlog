@@ -19,6 +19,7 @@ import com.ncoxs.myblog.model.pojo.User;
 import com.ncoxs.myblog.model.pojo.UserBasicInfo;
 import com.ncoxs.myblog.model.pojo.UserIdentity;
 import com.ncoxs.myblog.model.pojo.UserLog;
+import com.ncoxs.myblog.service.app.VerificationCodeService;
 import com.ncoxs.myblog.testutil.EncryptionMockMvcBuilder;
 import com.ncoxs.myblog.util.general.PasswordUtil;
 import com.ncoxs.myblog.util.general.TimeUtil;
@@ -38,6 +39,7 @@ import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.servlet.ModelAndView;
 
+import javax.servlet.http.HttpSession;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -102,17 +104,50 @@ public class UserControllerTest {
     @Test
     @Transactional
     public void testRegister() throws Exception {
-        registerTestUser();
+        Tuple2<VerificationCode, MockHttpSession> vs = getVerificationCode(VerificationCodeService.SESSION_KEY_PLAIN_REGISTER);
+        VerificationCode verificationCode = vs.t1;
+        MockHttpSession session = vs.t2;
 
         User user = new User();
         user.setName("test");
         user.setEmail("wutaoyx163@163.com");
         user.setPassword("12345");
 
-        // 发送注册用户请求
+        // 错误的注册用户请求，验证码错误
         GenericResult<Map<String, Object>> result = new EncryptionMockMvcBuilder(mockMvc, objectMapper)
                 .post("/user/register")
-                .jsonParams(mp("user", user))
+                .jsonParams(mp(kv("user", user), kv("verificationCode", "error")))
+                .session(session)
+                .sendRequest()
+                .expectStatusOk()
+                .print()
+                .buildGR();
+        assertEquals(ResultCode.PARAMS_VERIFICATION_CODE_ERROR.getCode(), result.getCode());
+
+        vs = getVerificationCode(VerificationCodeService.SESSION_KEY_PLAIN_REGISTER);
+        verificationCode = vs.t1;
+        session = vs.t2;
+
+        // 发送注册用户请求
+        result = new EncryptionMockMvcBuilder(mockMvc, objectMapper)
+                .post("/user/register")
+                .jsonParams(mp(kv("user", user), kv("verificationCode", verificationCode.getCode())))
+                .session(session)
+                .sendRequest()
+                .expectStatusOk()
+                .print()
+                .buildGR();
+        assertEquals(ResultCode.SUCCESS.getCode(), result.getCode());
+
+        vs = getVerificationCode(VerificationCodeService.SESSION_KEY_PLAIN_REGISTER);
+        verificationCode = vs.t1;
+        session = vs.t2;
+
+        // 发送错误的注册用户请求：用户已存在
+        result = new EncryptionMockMvcBuilder(mockMvc, objectMapper)
+                .post("/user/register")
+                .jsonParams(mp(kv("user", user), kv("verificationCode", verificationCode.getCode())))
+                .session(session)
                 .sendRequest()
                 .expectStatusOk()
                 .print()
@@ -140,7 +175,28 @@ public class UserControllerTest {
         System.out.println(userRegisterLog.getIpLocInfo());
     }
 
+    private Tuple2<VerificationCode, MockHttpSession> getVerificationCode(String type) throws Exception {
+        // 获取验证码
+        MvcResult mvcResult = new EncryptionMockMvcBuilder(mockMvc, objectMapper)
+                .get("/app/verification-code/generate/plain")
+                .formParams(mp("type", type))
+                .sendRequest()
+                .expectStatusOk()
+                .print()
+                .build();
+        GenericResult<VerificationCode> verificationCode = objectMapper.readValue(mvcResult.getResponse().getContentAsString(),
+                new TypeReference<GenericResult<VerificationCode>>() {
+                });
+        HttpSession session = mvcResult.getRequest().getSession();
+
+        return Tuples.of(verificationCode.getData(), (MockHttpSession) session);
+    }
+
     private User registerTestUser() throws Exception {
+        Tuple2<VerificationCode, MockHttpSession> vs = getVerificationCode(VerificationCodeService.SESSION_KEY_PLAIN_REGISTER);
+        VerificationCode verificationCode = vs.t1;
+        MockHttpSession session = vs.t2;
+
         User user = new User();
         user.setName("test");
         user.setEmail("wutaoyx163@163.com");
@@ -149,10 +205,10 @@ public class UserControllerTest {
         // 注册用户
         GenericResult<Map<String, Object>> result = new EncryptionMockMvcBuilder(mockMvc, objectMapper)
                 .post("/user/register")
-                .jsonParams(mp("user", user))
+                .jsonParams(mp(kv("user", user), kv("verificationCode", verificationCode.getCode())))
+                .session(session)
                 .sendRequest()
                 .expectStatusOk()
-                .print()
                 .buildGR();
         assertEquals(ResultCode.SUCCESS.getCode(), result.getCode());
 
@@ -233,11 +289,15 @@ public class UserControllerTest {
         registerTestUser();
         activateTestUser();
 
+        Tuple2<VerificationCode, MockHttpSession> vs = getVerificationCode(VerificationCodeService.SESSION_KEY_PLAIN_LOGIN);
+        VerificationCode verificationCode = vs.t1;
+        MockHttpSession session = vs.t2;
+
         // 发送根据用户名称登录请求
         byte[] data = new EncryptionMockMvcBuilder(mockMvc, objectMapper)
                 .post("/user/login/name")
-                .jsonParams(mp(kv("name", "test"), kv("password", "12345")))
-                .cookie(mp("a", "a"))
+                .jsonParams(mp(kv("name", "test"), kv("password", "12345"), kv("verificationCode", verificationCode.getCode())))
+                .session(session)
                 .sendRequest()
                 .expectStatusOk()
                 .print()
@@ -265,11 +325,16 @@ public class UserControllerTest {
 
         TimeUnit.SECONDS.sleep(1);
 
+        vs = getVerificationCode(VerificationCodeService.SESSION_KEY_PLAIN_LOGIN);
+        verificationCode = vs.t1;
+        session = vs.t2;
+
         // 发送根据用户邮箱登录请求
         data = new EncryptionMockMvcBuilder(mockMvc, objectMapper)
                 .post("/user/login/email")
                 .jsonParams(mp(kv("email", "wutaoyx163@163.com"), kv("password", "12345"),
-                        kv("rememberDays", 10), kv("source", "source")))
+                        kv("rememberDays", 10), kv("source", "source"), kv("verificationCode", verificationCode.getCode())))
+                .session(session)
                 .sendRequest()
                 .expectStatusOk()
                 .print()
@@ -330,13 +395,17 @@ public class UserControllerTest {
     }
 
     private Tuple2<UserLoginResp, MockHttpSession> login() throws Exception {
+        Tuple2<VerificationCode, MockHttpSession> vs = getVerificationCode(VerificationCodeService.SESSION_KEY_PLAIN_LOGIN);
+        VerificationCode verificationCode = vs.t1;
+        MockHttpSession session = vs.t2;
+
         EncryptionMockMvcBuilder mvcBuilder = new EncryptionMockMvcBuilder(mockMvc, objectMapper);
         MvcResult mvcResult = mvcBuilder
                 .post("/user/login/name")
-                .jsonParams(mp(kv("name", "test"), kv("password", "12345")))
+                .jsonParams(mp(kv("name", "test"), kv("password", "12345"), kv("verificationCode", verificationCode.getCode())))
+                .session(session)
                 .sendRequest()
                 .expectStatusOk()
-                .print()
                 .build();
         byte[] data = EncryptionMockMvcBuilder.decryptData(mvcBuilder, mvcResult);
         GenericResult<UserLoginResp> result = objectMapper.readValue(data,

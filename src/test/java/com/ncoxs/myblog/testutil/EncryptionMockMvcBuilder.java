@@ -180,11 +180,12 @@ public class EncryptionMockMvcBuilder {
         }
     }
 
+
     /**
-     * 设置 Json 请求体，参数 Map。
+     * 设置 Json 请求体。
      */
-    public EncryptionMockMvcBuilder jsonParams(Map<String, Object> params)
-            throws GeneralSecurityException, JsonProcessingException {
+    public EncryptionMockMvcBuilder jsonParams(Object params)
+            throws GeneralSecurityException, JsonProcessingException, IllegalAccessException {
         if (requestBuilder == null) {
             throw new IllegalStateException("method not setting");
         }
@@ -199,19 +200,11 @@ public class EncryptionMockMvcBuilder {
         requestBuilder.header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_UTF8_VALUE);
         byte[] encryptedParams = objectMapper.writeValueAsBytes(params);
         if (enable) {
-             encryptedParams = AESUtil.encrypt(aesKey, encryptedParams);
+            encryptedParams = AESUtil.encrypt(aesKey, encryptedParams);
         }
         requestBuilder.content(encryptedParams);
 
         return this;
-    }
-
-    /**
-     * 设置 Json 请求体，参数对象。
-     */
-    public EncryptionMockMvcBuilder jsonParams(Object params)
-            throws GeneralSecurityException, JsonProcessingException, IllegalAccessException {
-        return jsonParams(obj2map(params));
     }
 
     /**
