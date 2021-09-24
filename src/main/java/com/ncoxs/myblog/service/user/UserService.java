@@ -353,6 +353,10 @@ public class UserService {
         counter.addCount();
     }
 
+    private void removePasswordError(User user) {
+        passwordErrorMap.remove(user.getId());
+    }
+
     public static final UserLoginResp PASSWORD_RETRY_ERROR = new UserLoginResp();
     public static final UserLoginResp VERIFICATION_CODE_ERROR = new UserLoginResp();
 
@@ -433,6 +437,9 @@ public class UserService {
                 // 新的登录标识缓存到 redis 中
                 redisUserDao.setIdentity2Id(identity, source, user.getId());
             }
+
+            // 清除用户密码错误的重试次数
+            removePasswordError(user);
 
             result.setUser(user);
             result.setToken(saveUserWithToken(user, userLog.getId()));
