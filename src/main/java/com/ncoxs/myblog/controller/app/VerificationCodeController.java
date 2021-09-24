@@ -1,12 +1,12 @@
 package com.ncoxs.myblog.controller.app;
 
 
+import com.ncoxs.myblog.handler.encryption.Encryption;
 import com.ncoxs.myblog.model.bo.VerificationCode;
 import com.ncoxs.myblog.model.dto.GenericResult;
 import com.ncoxs.myblog.service.app.VerificationCodeService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -26,7 +26,8 @@ public class VerificationCodeController {
 
 
     @GetMapping("/generate/plain")
-    public GenericResult<VerificationCode> generate(@RequestBody String type) {
+    @Encryption
+    public GenericResult<VerificationCode> generate(String type) {
         return GenericResult.success(verificationCodeService.generatePlainCode(type));
     }
 }

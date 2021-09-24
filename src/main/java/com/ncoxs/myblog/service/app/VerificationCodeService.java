@@ -19,12 +19,18 @@ public class VerificationCodeService {
     @Value("${myapp.verification-code.plain.expireMinutes}")
     private int plainCodeExpire;
 
+    @Value("${myapp.verification-code.enable}")
+    private boolean enable;
+
 
     private static final char[] DIGITS = "0123456789".toCharArray();
     private static final char[] WORDS = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ".toCharArray();
 
     public static final String SESSION_KEY_PLAIN_REGISTER = "plainRegisterVerificationCode";
     public static final String SESSION_KEY_PLAIN_LOGIN = "plainLoginVerificationCode";
+
+    private static final VerificationCode EMPTY = new VerificationCode();
+
 
     /**
      * 生成普通的验证码。
@@ -44,6 +50,10 @@ public class VerificationCodeService {
     }
 
     public boolean verify(String type, String code) {
+        if (!enable) {
+            return true;
+        }
+
         HttpSession session = SpringUtil.currentSession();
         VerificationCode verificationCode = (VerificationCode) session.getAttribute(type);
         // 验证码是一次性的，验证完后就删除
@@ -56,6 +66,10 @@ public class VerificationCodeService {
     }
 
     private VerificationCode save(String type, String code) {
+        if (!enable) {
+            return EMPTY;
+        }
+
         VerificationCode verificationCode = new VerificationCode(code,
                 TimeUtil.changeDateTime(plainCodeExpire, TimeUnit.MINUTES).getTime());
         SpringUtil.currentSession().setAttribute(type, verificationCode);
