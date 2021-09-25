@@ -182,7 +182,6 @@ public class UserControllerTest {
                 .formParams(mp("type", type))
                 .sendRequest()
                 .expectStatusOk()
-                .print()
                 .build();
         GenericResult<VerificationCode> verificationCode = objectMapper.readValue(mvcResult.getResponse().getContentAsString(),
                 new TypeReference<GenericResult<VerificationCode>>() {

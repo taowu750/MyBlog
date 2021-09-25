@@ -23,6 +23,7 @@ import com.ncoxs.myblog.model.pojo.UserLog;
 import com.ncoxs.myblog.service.app.MailService;
 import com.ncoxs.myblog.service.app.VerificationCodeService;
 import com.ncoxs.myblog.util.general.*;
+import com.ncoxs.myblog.util.singleton.ExpiringMapSingleton;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.lang.NonNull;
@@ -623,6 +624,8 @@ public class UserService {
         return user;
     }
 
+    private static final String EXPIRING_MAP_KEY_PREFIX_FORGET_PASSWORD = "forgetPassword::";
+
     /**
      * 发送“忘记密码”邮件，用户点击邮件中的链接后即可使用设置的新密码。
      *
@@ -648,8 +651,10 @@ public class UserService {
             return ResultCode.PARAM_MODIFY_SAME;
         }
 
-        // 注意，返回的 user 对象会被 FilterBlank 将密码设置为空，所以这里需要克隆一个
-        saveUserWithToken(user.clone(), email, null);
+        // 缓存忘记密码信息
+        ExpiringMapSingleton.get().put(EXPIRING_MAP_KEY_PREFIX_FORGET_PASSWORD + email, user,
+                forgetPasswordExpire, TimeUnit.HOURS);
+
         // 拼接参数并加密
         String params = email + " " + newPassword + " " + TimeUtil.changeDateTime(forgetPasswordExpire, TimeUnit.HOURS).getTime();
         String encryptedParams = URLUtil.encryptParams(forgetPasswordAesKey, params);
@@ -671,32 +676,20 @@ public class UserService {
     }
 
     /**
-     * 通过用户登录 token，为用户设置新的密码。先需要校验旧密码。
+     * 忘记密码后重设密码。
      */
-    @Transactional(isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
-    public ResultCode setNewPassword(int userLogType, String token, String oldPassword, String newPassword)
-            throws JsonProcessingException {
-        // 用户未登录
-        User user = accessByToken(token);
+    public boolean resetPassword(String email, String newPassword) throws JsonProcessingException {
+        User user = (User) ExpiringMapSingleton.get().get(EXPIRING_MAP_KEY_PREFIX_FORGET_PASSWORD + email);
         if (user == null) {
-            return ResultCode.USER_ACCESS_ERROR;
+            return false;
         }
 
-        // 旧密码错误
-        if (oldPassword != null && !passwordEquals(user, oldPassword)) {
-            return ResultCode.USER_PASSWORD_ERROR;
-        }
+        updatePassword(user, newPassword, UserLogType.FORGET_PASSWORD);
 
-        // 新旧密码相同
-        if (passwordEquals(user, newPassword)) {
-            return ResultCode.PARAM_MODIFY_SAME;
-        }
+        return true;
+    }
 
-        // 在修改密码时，用户不是正常状态
-        if (userLogType == UserLogType.MODIFY_PASSWORD && user.getStatus() != UserStatus.NORMAL) {
-            return ResultCode.USER_STATUS_INVALID;
-        }
-
+    private void updatePassword(User user, String newPassword, int userLogType) throws JsonProcessingException {
         // 更新数据库中的用户密码
         User updated = new User();
         updated.setId(user.getId());
@@ -713,15 +706,28 @@ public class UserService {
         // 最后在修改 map 中的用户密码
         user.setSalt(updated.getSalt());
         user.setPassword(updated.getPassword());
-
-        return ResultCode.SUCCESS;
     }
 
     /**
-     * 通过用户登录 token，为用户设置新的密码。
+     * 通过用户登录 token，为用户设置新的密码。先需要校验旧密码。
      */
-    public ResultCode setNewPassword(int userLogType, String token, String newPassword) throws JsonProcessingException {
-        return setNewPassword(userLogType, token, null, newPassword);
+    @Transactional(isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
+    public ResultCode setNewPassword(String token, String oldPassword, String newPassword) throws JsonProcessingException {
+        ResultCode verify = verifyPassword(token, oldPassword);
+        if (verify != ResultCode.SUCCESS) {
+            return verify;
+        }
+
+        User user = accessByToken(token);
+
+        // 新旧密码相同
+        if (passwordEquals(user, newPassword)) {
+            return ResultCode.PARAM_MODIFY_SAME;
+        }
+
+        updatePassword(user, newPassword, UserLogType.MODIFY_PASSWORD);
+
+        return ResultCode.SUCCESS;
     }
 
     /**

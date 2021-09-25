@@ -4,7 +4,6 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.ncoxs.myblog.constant.ParamValidateMsg;
 import com.ncoxs.myblog.constant.ParamValidateRule;
 import com.ncoxs.myblog.constant.ResultCode;
-import com.ncoxs.myblog.constant.user.UserLogType;
 import com.ncoxs.myblog.handler.encryption.Encryption;
 import com.ncoxs.myblog.model.dto.GenericResult;
 import com.ncoxs.myblog.model.dto.IpLocInfo;
@@ -236,16 +235,14 @@ public class UserController {
         if (params.length != 3) {
             mv.addObject("result", "params-error");
         } else {
-            String token = params[0], newPassword = params[1];
+            String email = params[0], newPassword = params[1];
             long expire = Long.parseLong(params[2]);
             if (expire < System.currentTimeMillis()) {
                 mv.addObject("result", "expired");
-                // 已过期，删除用户登录 token
-                userService.quitByToken(token);
-            } else if (userService.setNewPassword(UserLogType.FORGET_PASSWORD, token, newPassword) == ResultCode.SUCCESS) {
+            } else if (userService.resetPassword(email, newPassword)) {
                 mv.addObject("result", "success");
             } else {
-                // token 不存在或新旧密码相同则失败
+                // email 不存在则失败
                 mv.addObject("result", "failed");
             }
         }
@@ -272,8 +269,7 @@ public class UserController {
     @PostMapping("/password/modify")
     @ResponseBody
     public GenericResult<?> modifyPassword(@RequestBody ModifyPasswordParams params) throws JsonProcessingException {
-        return GenericResult.byCode(userService.setNewPassword(UserLogType.MODIFY_PASSWORD, params.token,
-                params.oldPassword, params.newPassword));
+        return GenericResult.byCode(userService.setNewPassword(params.token, params.oldPassword, params.newPassword));
     }
 
     @Data
