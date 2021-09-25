@@ -38,7 +38,6 @@ import javax.servlet.http.HttpSession;
 import java.io.UnsupportedEncodingException;
 import java.security.GeneralSecurityException;
 import java.util.Date;
-import java.util.Enumeration;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -149,7 +148,7 @@ public class UserService {
     /**
      * 用户每次登录，会生成一个 session 级别的 token，调用其他接口时需要使用这个 token 进行访问。
      */
-    private static final String USER_LOGIN_SESSION_TOKEN = "userToken";
+    private static final String SESSION_KEY_USER_LOGIN_TOKEN = "userLoginToken";
 
     private class PasswordErrorCounter {
 
@@ -359,6 +358,7 @@ public class UserService {
 
     public static final UserLoginResp PASSWORD_RETRY_ERROR = new UserLoginResp();
     public static final UserLoginResp VERIFICATION_CODE_ERROR = new UserLoginResp();
+    public static final UserLoginResp ALREADY_LOGIN = new UserLoginResp();
 
     /**
      * 根据用户名和密码进行登录。如果选择了“记住我”，则还会返回新的登录标识。
@@ -368,6 +368,10 @@ public class UserService {
      */
     @Transactional(isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
     public UserLoginResp loginUserByName(UserController.LoginByNameParams params) throws JsonProcessingException {
+        if (isAlreadyLogin()) {
+            return ALREADY_LOGIN;
+        }
+
         User user = redisUserDao.getUserByName(params.name);
         if (user == null) {
             user = userDao.selectByName(params.name);
@@ -388,6 +392,10 @@ public class UserService {
      */
     @Transactional(isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
     public UserLoginResp loginUserByEmail(UserController.LoginByEmailParams params) throws JsonProcessingException {
+        if (isAlreadyLogin()) {
+            return ALREADY_LOGIN;
+        }
+
         User user = redisUserDao.getUserByEmail(params.email);
         if (user == null) {
             user = userDao.selectByEmail(params.email);
@@ -455,22 +463,92 @@ public class UserService {
     }
 
     /**
-     * 用户每次登录，会生成一个 session 级别的 token，调用其他接口时需要使用这个 token 进行访问。
+     * 生成用户此次登录的 token，和用户对象相关联，并将用户对象保存到 session 中，以便以后进行验证等操作。
+     * 最后返回生成的 token。
      */
     private String saveUserWithToken(User user, int loginId) {
         return saveUserWithToken(user, UUIDUtil.generate(), loginId);
     }
 
     /**
-     * 生成用户此次登录的 token，和用户对象相关联，并保存到 session 中。
+     * 使用指定的 token 和用户对象相关联，并保存到 session 中。
      */
     private String saveUserWithToken(User user, String token, Integer loginId) {
-        token = USER_LOGIN_SESSION_TOKEN + token;
         HttpSession session = SpringUtil.currentSession();
+        session.setAttribute(SESSION_KEY_USER_LOGIN_TOKEN, token);
         // 注意，返回的 user 对象会被 FilterBlank 将密码设置为空，所以这里需要克隆一个
         session.setAttribute(token, new UserLoginHolder(user.clone(), loginId));
 
         return token;
+    }
+
+    /**
+     * 检查用户是否已经登录。
+     */
+    private boolean isAlreadyLogin() {
+        HttpSession session = SpringUtil.currentSession();
+        String token = (String) session.getAttribute(SESSION_KEY_USER_LOGIN_TOKEN);
+
+        return token != null;
+    }
+
+    /**
+     * 通过 token 获取用户对象。
+     */
+    public User accessByToken(String token) {
+        Object obj = SpringUtil.currentSession().getAttribute(token);
+        if (obj instanceof UserLoginHolder) {
+            return ((UserLoginHolder) obj).getUser();
+        }
+
+        return null;
+    }
+
+    /**
+     * 当用户关闭所有网页、或主动退出登录、或 session 过期时，需要删除登录 token。
+     */
+    public boolean quitByToken(HttpSession session, String token, Integer logoutType) throws JsonProcessingException {
+        Object obj = session.getAttribute(token);
+        if (obj instanceof UserLoginHolder) {
+            session.removeAttribute(SESSION_KEY_USER_LOGIN_TOKEN);
+            session.removeAttribute(token);
+            // 记录登出日志
+            if (logoutType != null) {
+                UserLoginHolder holder = (UserLoginHolder) obj;
+                userLogDao.insert(new UserLog(holder.getUser().getId(), UserLogType.LOGOUT, objectMapper.writeValueAsString(
+                        new UserLogoutLog(logoutType, holder.getLoginLogId()))));
+            }
+        }
+
+        return obj instanceof UserLoginHolder;
+    }
+
+    /**
+     * 用在 session 销毁时
+     */
+    public void quitByToken(HttpSession session) throws JsonProcessingException {
+        String token = (String) session.getAttribute(SESSION_KEY_USER_LOGIN_TOKEN);
+        if (token != null) {
+            quitByToken(session, token, UserLogoutType.INTERRUPTED);
+        }
+    }
+
+    /**
+     * 用在正常退出时
+     */
+    public boolean quitByToken(String token, Integer logoutType) throws JsonProcessingException {
+        return quitByToken(SpringUtil.currentSession(), token, logoutType);
+    }
+
+    /**
+     * 用在不是登出的时候
+     */
+    public boolean quitByToken(String token) {
+        try {
+            return quitByToken(token, null);
+        } catch (JsonProcessingException e) {
+            throw new ImpossibleError(e);
+        }
     }
 
     /**
@@ -483,6 +561,10 @@ public class UserService {
     @Transactional(isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
     public UserLoginResp loginByIdentity(@NonNull String loginIdentity, @NonNull String source, @Nullable IpLocInfo ipLocInfo)
             throws JsonProcessingException {
+        if (isAlreadyLogin()) {
+            return ALREADY_LOGIN;
+        }
+
         User user = redisUserDao.getUserByIdentity(loginIdentity, source);
         if (user == null) {
             UserIdentity userIdentity = userIdentityDao.selectByIdentity(loginIdentity, source);
@@ -517,59 +599,6 @@ public class UserService {
         result.setToken(saveUserWithToken(user, userLog.getId()));
 
         return result;
-    }
-
-    /**
-     * 通过 token 访问用户信息
-     */
-    public User accessByToken(String token) {
-        Object obj = SpringUtil.currentSession().getAttribute(token);
-        if (obj instanceof UserLoginHolder) {
-            return ((UserLoginHolder) obj).getUser();
-        }
-
-        return null;
-    }
-
-    /**
-     * 当用户关闭所有网页、或主动退出登录、或 session 过期时，需要删除登录 token
-     */
-    public boolean quitByToken(HttpSession session, String token, Integer logoutType) throws JsonProcessingException {
-        Object obj = session.getAttribute(token);
-        if (obj instanceof UserLoginHolder) {
-            session.removeAttribute(token);
-            // 记录登出日志
-            if (logoutType != null) {
-                UserLoginHolder holder = (UserLoginHolder) obj;
-                userLogDao.insert(new UserLog(holder.getUser().getId(), UserLogType.LOGOUT, objectMapper.writeValueAsString(
-                        new UserLogoutLog(logoutType, holder.getLoginLogId()))));
-            }
-        }
-
-        return obj instanceof UserLoginHolder;
-    }
-
-    public void quitByToken(HttpSession session) throws JsonProcessingException {
-        Enumeration<String> attrs = session.getAttributeNames();
-        while (attrs.hasMoreElements()) {
-            String attrName = attrs.nextElement();
-            if (attrName.startsWith(USER_LOGIN_SESSION_TOKEN)) {
-                quitByToken(session, attrName, UserLogoutType.INTERRUPTED);
-                break;
-            }
-        }
-    }
-
-    public boolean quitByToken(String token, Integer logoutType) throws JsonProcessingException {
-        return quitByToken(SpringUtil.currentSession(), token, logoutType);
-    }
-
-    public boolean quitByToken(String token) {
-        try {
-            return quitByToken(token, null);
-        } catch (JsonProcessingException e) {
-            throw new ImpossibleError(e);
-        }
     }
 
     /**

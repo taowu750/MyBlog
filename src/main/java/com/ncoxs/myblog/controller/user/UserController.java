@@ -161,6 +161,8 @@ public class UserController {
             return GenericResult.error(ResultCode.USER_PASSWORD_RETRY_ERROR);
         } else if (userLoginResp == UserService.VERIFICATION_CODE_ERROR) {
             return GenericResult.error(ResultCode.PARAMS_VERIFICATION_CODE_ERROR);
+        } else if (userLoginResp == UserService.ALREADY_LOGIN) {
+            return GenericResult.error(ResultCode.USER_ALREADY_LOGIN);
         } else if (userLoginResp.getUser() == null) {
             return GenericResult.error(ResultCode.USER_PASSWORD_ERROR);
         } else {

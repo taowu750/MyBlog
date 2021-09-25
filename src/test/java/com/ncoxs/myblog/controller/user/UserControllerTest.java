@@ -392,6 +392,28 @@ public class UserControllerTest {
 
         User savedUser = userDao.selectByIdentity(userLoginResp.getIdentity(), "source");
         assertEquals(userLoginResp.getUser().getId(), savedUser.getId());
+
+        Tuple2<UserLoginResp, MockHttpSession> tuple = login();
+        session = tuple.t2;
+
+        // 重复登录
+        vs = getVerificationCode(VerificationCodeService.SESSION_KEY_PLAIN_LOGIN);
+        verificationCode = vs.t1;
+        session.setAttribute(VerificationCodeService.SESSION_KEY_PLAIN_LOGIN,
+                vs.t2.getAttribute(VerificationCodeService.SESSION_KEY_PLAIN_LOGIN));
+
+        data = new EncryptionMockMvcBuilder(mockMvc, objectMapper)
+                .post("/user/login/name")
+                .jsonParams(mp(kv("name", "test"), kv("password", "12345"), kv("verificationCode", verificationCode.getCode())))
+                .session(session)
+                .sendRequest()
+                .expectStatusOk()
+                .print()
+                .buildByte();
+        result = objectMapper.readValue(data,
+                new TypeReference<GenericResult<UserLoginResp>>() {
+                });
+        assertEquals(ResultCode.USER_ALREADY_LOGIN.getCode(), result.getCode());
     }
 
     private Tuple2<UserLoginResp, MockHttpSession> login() throws Exception {
