@@ -92,6 +92,12 @@ public class UserControllerTest {
     @Value("${myapp.user.cancel.aes-key}")
     private String cancelAccountAesKey;
 
+    @Value("${myapp.user.password-retry.max-count}")
+    private int passwordRetryMaxCount;
+
+    @Value("${myapp.user.password-retry.limit-minutes}")
+    private int passwordRetryLimitMinutes;
+
 
     @AfterEach
     public void clear() {
@@ -434,6 +440,66 @@ public class UserControllerTest {
                 });
 
         return Tuples.of(result.getData(), (MockHttpSession) mvcResult.getRequest().getSession());
+    }
+
+    @Test
+    @Transactional
+    public void testPasswordRetry() throws Exception {
+        registerTestUser();
+        activateTestUser();
+
+        // 前 passwordRetryMaxCount 都失败
+        for (int i = 0; i < passwordRetryMaxCount; i++) {
+            Tuple2<VerificationCode, MockHttpSession> vs = getVerificationCode(VerificationCodeService.SESSION_KEY_PLAIN_LOGIN);
+            VerificationCode verificationCode = vs.t1;
+            MockHttpSession session = vs.t2;
+
+            byte[] data = new EncryptionMockMvcBuilder(mockMvc, objectMapper)
+                    .post("/user/login/name")
+                    .jsonParams(mp(kv("name", "test"), kv("password", "12346"), kv("verificationCode", verificationCode.getCode())))
+                    .session(session)
+                    .sendRequest()
+                    .expectStatusOk()
+                    .buildByte();
+            GenericResult<UserLoginResp> result = objectMapper.readValue(data,
+                    new TypeReference<GenericResult<UserLoginResp>>() {
+                    });
+            assertEquals(ResultCode.USER_PASSWORD_ERROR.getCode(), result.getCode());
+        }
+
+        Tuple2<VerificationCode, MockHttpSession> vs = getVerificationCode(VerificationCodeService.SESSION_KEY_PLAIN_LOGIN);
+        VerificationCode verificationCode = vs.t1;
+        MockHttpSession session = vs.t2;
+
+        // assert 这一次返回 USER_PASSWORD_RETRY_ERROR
+        byte[] data = new EncryptionMockMvcBuilder(mockMvc, objectMapper)
+                .post("/user/login/name")
+                .jsonParams(mp(kv("name", "test"), kv("password", "12346"), kv("verificationCode", verificationCode.getCode())))
+                .session(session)
+                .sendRequest()
+                .expectStatusOk()
+                .print()
+                .buildByte();
+        GenericResult<UserLoginResp> result = objectMapper.readValue(data,
+                new TypeReference<GenericResult<UserLoginResp>>() {
+                });
+        assertEquals(ResultCode.USER_PASSWORD_RETRY_ERROR.getCode(), result.getCode());
+
+        TimeUnit.MINUTES.sleep(passwordRetryLimitMinutes);
+
+        // assert 再次重试会返回 USER_PASSWORD_ERROR
+        data = new EncryptionMockMvcBuilder(mockMvc, objectMapper)
+                .post("/user/login/name")
+                .jsonParams(mp(kv("name", "test"), kv("password", "12346"), kv("verificationCode", verificationCode.getCode())))
+                .session(session)
+                .sendRequest()
+                .expectStatusOk()
+                .print()
+                .buildByte();
+        result = objectMapper.readValue(data,
+                new TypeReference<GenericResult<UserLoginResp>>() {
+                });
+        assertEquals(ResultCode.USER_PASSWORD_ERROR.getCode(), result.getCode());
     }
 
     @Test

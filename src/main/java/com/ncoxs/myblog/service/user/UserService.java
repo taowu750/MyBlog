@@ -24,6 +24,7 @@ import com.ncoxs.myblog.service.app.MailService;
 import com.ncoxs.myblog.service.app.VerificationCodeService;
 import com.ncoxs.myblog.util.general.*;
 import com.ncoxs.myblog.util.singleton.ExpiringMapSingleton;
+import net.jodah.expiringmap.ExpiringMap;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.lang.NonNull;
@@ -39,9 +40,8 @@ import javax.servlet.http.HttpSession;
 import java.io.UnsupportedEncodingException;
 import java.security.GeneralSecurityException;
 import java.util.Date;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 
 // TODO: 考虑和官方用户账号的兼容问题
@@ -69,11 +69,11 @@ public class UserService {
     @Value("${myapp.user.cancel.aes-key}")
     private String cancelAesKey;
 
-    @Value("${myapp.user.password-error.max-count}")
-    private int passwordErrorMaxCount;
+    @Value("${myapp.user.password-retry.max-count}")
+    private int passwordRetryMaxCount;
 
-    @Value("${myapp.user.password-error.limit-minutes}")
-    private int passwordErrorLimitMinutes;
+    @Value("${myapp.user.password-retry.limit-minutes}")
+    private int passwordRetryLimitMinutes;
 
     @Value("${myapp.user.forget-password.aes-key}")
     private String forgetPasswordAesKey;
@@ -151,43 +151,23 @@ public class UserService {
      */
     private static final String SESSION_KEY_USER_LOGIN_TOKEN = "userLoginToken";
 
-    private class PasswordErrorCounter {
-
-        private final AtomicBoolean lock = new AtomicBoolean(false);
-
-        private int count;
-        private volatile long limitAt;
-
-        void tryReset() {
-            if (lock.compareAndSet(false, true)) {
-                if (limitAt != 0 && limitAt < System.currentTimeMillis()) {
-                    count = 0;
-                    limitAt = 0;
-                }
-                lock.compareAndSet(true, false);
-            }
-        }
-
-        void addCount() {
-            while (!lock.compareAndSet(false, true)) {
-            }
-
-            try {
-                if (count < passwordErrorMaxCount) {
-                    count++;
-                } else if (limitAt == 0) {
-                    limitAt = System.currentTimeMillis() + TimeUnit.MINUTES.toMillis(passwordErrorLimitMinutes);
-                }
-            } finally {
-                lock.compareAndSet(true, false);
-            }
-        }
-    }
+    private static final String EXPIRING_MAP_KEY_PREFIX_PASSWORD_RETRY = "passwordRetry::";
 
     /**
-     * 用来记录某个用户密码错误次数和禁用时间的缓存 map。
+     * 用来记录用户的密码重试次数
      */
-    private final ConcurrentHashMap<Integer, PasswordErrorCounter> passwordErrorMap = new ConcurrentHashMap<>();
+    private class PasswordRetryCounter {
+
+        private final AtomicInteger count = new AtomicInteger();
+
+        void count() {
+            count.getAndIncrement();
+        }
+
+        boolean error() {
+            return count.get() >= passwordRetryMaxCount;
+        }
+    }
 
 
     /**
@@ -324,37 +304,31 @@ public class UserService {
     }
 
     /**
-     * 判断用户密码重试次数是否超过最大次数。
+     * 用户密码重试次数超过最大次数返回 true。
      */
-    private boolean canPasswordRetry(User user) {
-        PasswordErrorCounter counter = passwordErrorMap.get(user.getId());
-        boolean result = counter == null || counter.limitAt < System.currentTimeMillis();
-
-        // 如果用户禁止访问时间已过期，则重置重试次数判断
-        if (result && counter != null) {
-            counter.tryReset();
-        }
-
-        return result;
+    private boolean isPasswordRetryError(User user) {
+        PasswordRetryCounter counter = (PasswordRetryCounter) ExpiringMapSingleton.get()
+                .get(EXPIRING_MAP_KEY_PREFIX_PASSWORD_RETRY + user.getId());
+        return counter != null && counter.error();
     }
 
     /**
      * 累计用户密码重试次数
      */
-    private void countPasswordError(User user) {
-        PasswordErrorCounter counter;
-        if (passwordErrorMap.containsKey(user.getId())) {
-            counter = passwordErrorMap.get(user.getId());
-        } else {
-            counter = new PasswordErrorCounter();
-            passwordErrorMap.put(user.getId(), counter);
+    private void countPasswordRetry(User user) {
+        ExpiringMap<String, Object> expiringMap = ExpiringMapSingleton.get();
+        PasswordRetryCounter counter = (PasswordRetryCounter) expiringMap.get(EXPIRING_MAP_KEY_PREFIX_PASSWORD_RETRY + user.getId());
+        if (counter == null) {
+            counter = new PasswordRetryCounter();
+            expiringMap.put(EXPIRING_MAP_KEY_PREFIX_PASSWORD_RETRY + user.getId(), counter,
+                    passwordRetryLimitMinutes, TimeUnit.MINUTES);
         }
 
-        counter.addCount();
+        counter.count();
     }
 
-    private void removePasswordError(User user) {
-        passwordErrorMap.remove(user.getId());
+    private void removePasswordRetry(User user) {
+        ExpiringMapSingleton.get().remove(EXPIRING_MAP_KEY_PREFIX_PASSWORD_RETRY + user.getId());
     }
 
     public static final UserLoginResp PASSWORD_RETRY_ERROR = new UserLoginResp();
@@ -414,7 +388,7 @@ public class UserService {
                             int rememberDays, String source, IpLocInfo ipLocInfo,
                             String verificationCode)
             throws JsonProcessingException {
-        if (!canPasswordRetry(user)) {
+        if (isPasswordRetryError(user)) {
             return PASSWORD_RETRY_ERROR;
         }
 
@@ -448,7 +422,7 @@ public class UserService {
             }
 
             // 清除用户密码错误的重试次数
-            removePasswordError(user);
+            removePasswordRetry(user);
 
             result.setUser(user);
             result.setToken(saveUserWithToken(user, userLog.getId()));
@@ -457,7 +431,7 @@ public class UserService {
             userLogDao.insert(new UserLog(user.getId(), UserLogType.LOGIN, objectMapper.writeValueAsString(
                     new UserLoginLog("password-fail", loginType, DeviceUtil.fillIpLocInfo(ipLocInfo)))));
             // 记录用户密码重试次数
-            countPasswordError(user);
+            countPasswordRetry(user);
         }
 
         return result;
