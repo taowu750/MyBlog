@@ -307,7 +307,7 @@ public class UserService {
      * 用户密码重试次数超过最大次数返回 true。
      */
     private boolean isPasswordRetryError(User user) {
-        PasswordRetryCounter counter = (PasswordRetryCounter) ExpiringMapSingleton.get()
+        PasswordRetryCounter counter = (PasswordRetryCounter) ExpiringMapSingleton.getAccessed()
                 .get(EXPIRING_MAP_KEY_PREFIX_PASSWORD_RETRY + user.getId());
         return counter != null && counter.error();
     }
@@ -316,7 +316,7 @@ public class UserService {
      * 累计用户密码重试次数
      */
     private void countPasswordRetry(User user) {
-        ExpiringMap<String, Object> expiringMap = ExpiringMapSingleton.get();
+        ExpiringMap<String, Object> expiringMap = ExpiringMapSingleton.getAccessed();
         PasswordRetryCounter counter = (PasswordRetryCounter) expiringMap.get(EXPIRING_MAP_KEY_PREFIX_PASSWORD_RETRY + user.getId());
         if (counter == null) {
             counter = new PasswordRetryCounter();
@@ -328,7 +328,7 @@ public class UserService {
     }
 
     private void removePasswordRetry(User user) {
-        ExpiringMapSingleton.get().remove(EXPIRING_MAP_KEY_PREFIX_PASSWORD_RETRY + user.getId());
+        ExpiringMapSingleton.getAccessed().remove(EXPIRING_MAP_KEY_PREFIX_PASSWORD_RETRY + user.getId());
     }
 
     public static final UserLoginResp PASSWORD_RETRY_ERROR = new UserLoginResp();
@@ -626,7 +626,7 @@ public class UserService {
         }
 
         // 缓存忘记密码信息
-        ExpiringMapSingleton.get().put(EXPIRING_MAP_KEY_PREFIX_FORGET_PASSWORD + email, user,
+        ExpiringMapSingleton.getCreated().put(EXPIRING_MAP_KEY_PREFIX_FORGET_PASSWORD + email, user,
                 forgetPasswordExpire, TimeUnit.HOURS);
 
         // 拼接参数并加密
@@ -653,7 +653,7 @@ public class UserService {
      * 忘记密码后重设密码。
      */
     public boolean resetPassword(String email, String newPassword) throws JsonProcessingException {
-        User user = (User) ExpiringMapSingleton.get().get(EXPIRING_MAP_KEY_PREFIX_FORGET_PASSWORD + email);
+        User user = (User) ExpiringMapSingleton.getCreated().get(EXPIRING_MAP_KEY_PREFIX_FORGET_PASSWORD + email);
         if (user == null) {
             return false;
         }

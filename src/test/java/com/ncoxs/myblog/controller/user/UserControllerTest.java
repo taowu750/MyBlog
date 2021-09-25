@@ -486,6 +486,7 @@ public class UserControllerTest {
         assertEquals(ResultCode.USER_PASSWORD_RETRY_ERROR.getCode(), result.getCode());
 
         TimeUnit.MINUTES.sleep(passwordRetryLimitMinutes);
+        TimeUnit.SECONDS.sleep(1);
 
         // assert 再次重试会返回 USER_PASSWORD_ERROR
         data = new EncryptionMockMvcBuilder(mockMvc, objectMapper)
