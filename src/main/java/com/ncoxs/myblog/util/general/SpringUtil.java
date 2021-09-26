@@ -15,4 +15,9 @@ public class SpringUtil {
     public static HttpSession currentSession() {
         return currentRequest().getSession();
     }
+
+    public static boolean hasSession() {
+        HttpServletRequest request = currentRequest();
+        return request.getSession(false) != null;
+    }
 }

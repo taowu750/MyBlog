@@ -471,6 +471,11 @@ public class UserService {
      * 通过 token 获取用户对象。
      */
     public User accessByToken(String token) {
+        // session 不存在，则用户肯定未登录，这样避免了创建 session
+        if (!SpringUtil.hasSession()) {
+            return null;
+        }
+
         Object obj = SpringUtil.currentSession().getAttribute(token);
         if (obj instanceof UserLoginHolder) {
             return ((UserLoginHolder) obj).getUser();
