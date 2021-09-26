@@ -11,7 +11,7 @@ create table if not exists `user`
 
     # 账号状态信息
     `status`      int          not null comment '状态：1 正常，2 未激活，3 被封禁，4 已注销',
-    `limit_time`  timestamp             default null,
+    `limit_time`  timestamp             default '1970-01-01 08:00:01',
 
     # 时间信息
     `create_time` timestamp    not null default current_timestamp,
@@ -129,9 +129,10 @@ create table if not exists `blog_draft`
 create table if not exists `upload_image`
 (
     `id`               int primary key auto_increment,
-    `token`            varchar(36)  not null comment '一组图片的唯一标识。token 可以是 UUID，也可以是 type_targetId',
+    `token`            varchar(36)  not null comment '一组图片的唯一标识',
     `target_type`      int          not null comment '图片所属的对象类别：1 博客，2 博客草稿，3 专栏简介，4 评论，5 用户(头像、空间背景等)',
-    `file_name`        varchar(40)  not null comment '图片在服务器上的名称',
+    `target_id`        int          not null default 0 comment '图片对应的对象 id，如果图片上传时对象还不存在则默认为 0',
+    `file_path`        varchar(40)  not null comment '图片在服务器上相对路径',
     `origin_file_name` varchar(150) not null comment '图片上传时的名称',
 
     `create_time`      timestamp    not null default current_timestamp,
