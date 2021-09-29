@@ -19,4 +19,13 @@ public interface HttpHeaderConst {
         return ENCRYPTION_MODE_FULL.equals(encryptionMode)
                 || ENCRYPTION_MODE_NONE.equals(encryptionMode);
     }
+
+    /**
+     * 压缩模式：zip
+     */
+    String COMPRESS_MODE_ZIP = "zip";
+
+    static boolean isCompressMode(String compressMode) {
+        return COMPRESS_MODE_ZIP.equals(compressMode);
+    }
 }

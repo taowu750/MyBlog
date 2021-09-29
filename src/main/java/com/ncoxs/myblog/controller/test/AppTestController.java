@@ -52,4 +52,12 @@ public class AppTestController {
     public GenericResult<Map<String, Object>> testEncryptionGet(String message, int code, User user) {
         return GenericResult.success(mp(kv("message", message), kv("code", code), kv("user", user)));
     }
+
+    /**
+     * 测试解压功能。
+     */
+    @PostMapping("/decompress")
+    public GenericResult<Map<String, Object>> testDecompress(String message, int code, User user) {
+        return GenericResult.success(mp(kv("message", message), kv("code", code), kv("user", user)));
+    }
 }

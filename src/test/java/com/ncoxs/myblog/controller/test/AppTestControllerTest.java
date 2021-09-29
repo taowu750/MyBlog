@@ -1,13 +1,21 @@
 package com.ncoxs.myblog.controller.test;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.ncoxs.myblog.constant.HttpHeaderConst;
+import com.ncoxs.myblog.constant.HttpHeaderKey;
 import com.ncoxs.myblog.model.pojo.User;
 import com.ncoxs.myblog.testutil.EncryptionMockMvcBuilder;
+import com.ncoxs.myblog.util.model.FormFormatter;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.util.FastByteArrayOutputStream;
+
+import java.nio.charset.StandardCharsets;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 
 import static com.ncoxs.myblog.util.general.MapUtil.kv;
 import static com.ncoxs.myblog.util.general.MapUtil.mp;
@@ -77,5 +85,30 @@ public class AppTestControllerTest {
                         .expectStatusOk()
                         .print()
                         .buildMap());
+    }
+
+    /**
+     * 测试解压功能。
+     */
+    @Test
+    public void testDecompress() throws Exception {
+        // 压缩信息
+        byte[] data = FormFormatter.format(mp(kv("message", "加密信息"), kv("code", 42), kv("name", "野兽先辈"),
+                kv("age", 24))).getBytes(StandardCharsets.UTF_8);
+        System.out.println(data.length);
+        FastByteArrayOutputStream byteOut = new FastByteArrayOutputStream();
+        ZipOutputStream zipOutputStream = new ZipOutputStream(byteOut);
+        zipOutputStream.putNextEntry(new ZipEntry("test"));
+        zipOutputStream.write(data);
+        zipOutputStream.close();
+        // 发送请求
+        System.out.println(new EncryptionMockMvcBuilder(mockMvc, objectMapper)
+                .post("/test/app/decompress")
+                .header(HttpHeaderKey.COMPRESS_MODE, HttpHeaderConst.COMPRESS_MODE_ZIP)
+                .byteParams(byteOut.toByteArray(), "application/x-www-form-urlencoded")
+                .sendRequest()
+                .expectStatusOk()
+                .print()
+                .buildMap());
     }
 }

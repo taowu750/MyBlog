@@ -18,6 +18,7 @@ import org.springframework.test.web.servlet.*;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 import org.springframework.test.web.servlet.result.MockMvcResultHandlers;
+import org.springframework.test.web.servlet.result.MockMvcResultMatchers;
 import org.yaml.snakeyaml.Yaml;
 
 import javax.servlet.http.Cookie;
@@ -31,7 +32,6 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
@@ -181,6 +181,16 @@ public class EncryptionMockMvcBuilder {
     }
 
 
+    public EncryptionMockMvcBuilder header(String key, Object value) {
+        if (requestBuilder == null) {
+            throw new IllegalStateException("method not setting");
+        }
+
+        requestBuilder.header(key, value);
+
+        return this;
+    }
+
     /**
      * 设置 Json 请求体。
      */
@@ -258,6 +268,24 @@ public class EncryptionMockMvcBuilder {
         }
 
         return paramsMap;
+    }
+
+    public EncryptionMockMvcBuilder byteParams(byte[] params, String contentType) throws GeneralSecurityException {
+        if (requestBuilder == null) {
+            throw new IllegalStateException("method not setting");
+        }
+        if (this.params != null) {
+            throw new IllegalStateException("params has setting");
+        }
+
+        this.params = params;
+        if (enable) {
+            params = AESUtil.encrypt(aesKey, params);
+        }
+        requestBuilder.header(HttpHeaders.CONTENT_TYPE, contentType)
+                .content(params);
+
+        return this;
     }
 
     /**
@@ -354,9 +382,9 @@ public class EncryptionMockMvcBuilder {
             throw new IllegalStateException("request not send");
         }
         resultActions.andExpect(status().isOk())
-                .andExpect(header().exists(HttpHeaderKey.ENCRYPTION_MODE));
+                .andExpect(MockMvcResultMatchers.header().exists(HttpHeaderKey.ENCRYPTION_MODE));
         if (enable) {
-            resultActions.andExpect(header().exists(HttpHeaderKey.REQUEST_ENCRYPTED_AES_KEY));
+            resultActions.andExpect(MockMvcResultMatchers.header().exists(HttpHeaderKey.REQUEST_ENCRYPTED_AES_KEY));
         }
 
         return this;

@@ -2,6 +2,7 @@ package com.ncoxs.myblog.handler.filter;
 
 import com.ncoxs.myblog.util.general.IOUtil;
 import com.ncoxs.myblog.util.model.FormParser;
+import org.springframework.util.StringUtils;
 
 import javax.servlet.ReadListener;
 import javax.servlet.ServletInputStream;
@@ -37,7 +38,8 @@ public class CustomServletRequest extends HttpServletRequestWrapper {
         Objects.requireNonNull(requestBody);
         this.requestBody = requestBody;
         // 如果数据类型是 application/x-www-form-urlencoded，就需要设置 Form 解析器解析参数
-        if (getContentType().toLowerCase().startsWith("application/x-www-form-urlencoded")) {
+        if (StringUtils.hasText(getContentType())
+                && getContentType().toLowerCase().startsWith("application/x-www-form-urlencoded")) {
             setFormParser(new FormParser(new String(requestBody, StandardCharsets.US_ASCII), getCharacterEncoding()));
         }
     }

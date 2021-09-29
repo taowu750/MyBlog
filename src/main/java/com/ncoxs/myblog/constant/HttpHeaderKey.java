@@ -37,4 +37,9 @@ public interface HttpHeaderKey {
      * 注意，参数需要符合 application/x-www-form-urlencoded 格式，并且必须是 UTF-8 编码。
      */
     String ENCRYPTED_PARAMS = "_Encrypted-Params";
+
+    /**
+     * 上传体积较大的数据（例如包含图片的博客），一般会先压缩。这个请求头指定客户端使用了哪种压缩方法压缩数据，
+     */
+    String COMPRESS_MODE = "_Compress-Mode";
 }
