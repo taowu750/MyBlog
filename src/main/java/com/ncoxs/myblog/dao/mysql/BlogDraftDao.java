@@ -8,9 +8,9 @@ public interface BlogDraftDao {
 
     BlogDraft selectById(Integer id);
 
-    int insert(BlogDraft blogDraft);
+    int insert(BlogDraft record);
 
-    int updateByIdSelective(BlogDraft record);
+    int updateById(BlogDraft record);
 
     int deleteById(Integer id);
 }

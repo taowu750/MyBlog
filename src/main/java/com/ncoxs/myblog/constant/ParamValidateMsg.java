@@ -36,4 +36,6 @@ public interface ParamValidateMsg {
             ParamValidateRule.BLOG_WORD_COUNT_MAX + " 字之间";
 
     String VERIFICATION_CODE_BLANK = "verificationCode.blank:验证码不能为空";
+
+    String UPLOAD_IMAGE_TARGET_TYPE_INVALID = "uploadImage.targetType.invalid:上传图片 targetType 不正确";
 }

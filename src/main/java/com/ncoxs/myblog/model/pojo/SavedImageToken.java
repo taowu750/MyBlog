@@ -6,15 +6,12 @@ import java.io.Serializable;
 import java.util.Date;
 
 /**
- * upload_img
+ * saved_image_token
  * @author 
  */
 @Data
-public class UploadImage implements Serializable {
-
+public class SavedImageToken implements Serializable {
     private Integer id;
-
-    private Integer userId;
 
     /**
      * 标识一组图片的 token
@@ -22,14 +19,14 @@ public class UploadImage implements Serializable {
     private String token;
 
     /**
-     * 图片在服务器上的相对路径
+     * 图片所属的对象类别：1 博客，2 博客草稿，3 专栏简介，4 评论，5 用户(头像、空间背景等)
      */
-    private String filepath;
+    private Integer targetType;
 
     /**
-     * 图片上传时的名称
+     * 图片对应的对象 id
      */
-    private String originFileName;
+    private Integer targetId;
 
     private Date createTime;
 

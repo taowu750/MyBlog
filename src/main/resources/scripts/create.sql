@@ -112,15 +112,15 @@ create table if not exists `blog`
 create table if not exists `blog_draft`
 (
     `id`               int primary key auto_increment,
-    `user_id`          int          not null,
-    `title`            varchar(50)  not null default '',
-    `markdown_body`    text         not null,
-    `cover_path`       varchar(150) not null default '' comment '封面图片路径',
-    `is_allow_reprint` bool         not null default false comment '是否允许转载',
-    `expire`           timestamp    not null,
+    `user_id`          int         not null,
+    `title`            varchar(50) not null default '',
+    `markdown_body`    text,
+    `cover_path`       varchar(60) not null default '' comment '封面图片路径',
+    `is_allow_reprint` bool        not null default false comment '是否允许转载',
+    `expire`           timestamp   not null,
 
-    `create_time`      timestamp    not null default current_timestamp,
-    `modify_time`      timestamp    not null default current_timestamp on update current_timestamp,
+    `create_time`      timestamp   not null default current_timestamp,
+    `modify_time`      timestamp   not null default current_timestamp on update current_timestamp,
 
     key (user_id)
 );
@@ -129,15 +129,29 @@ create table if not exists `blog_draft`
 create table if not exists `upload_image`
 (
     `id`               int primary key auto_increment,
-    `token`            varchar(36)  not null comment '一组图片的唯一标识',
-    `target_type`      int          not null comment '图片所属的对象类别：1 博客，2 博客草稿，3 专栏简介，4 评论，5 用户(头像、空间背景等)',
-    `target_id`        int          not null default 0 comment '图片对应的对象 id，如果图片上传时对象还不存在则默认为 0',
-    `file_path`        varchar(40)  not null comment '图片在服务器上相对路径',
+    `user_id`          int          not null,
+    `token`            varchar(36)  not null comment '标识一组图片的 token',
+    `filepath`         varchar(60)  not null comment '图片在服务器上相对路径',
     `origin_file_name` varchar(150) not null comment '图片上传时的名称',
 
     `create_time`      timestamp    not null default current_timestamp,
 
+    key(user_id),
     key (token)
+);
+
+# 当图片所属的对象（博客等包含图片的文档）被上传时，记录图片 token 和图片所属的对象映射关系的表
+create table if not exists `saved_image_token`
+(
+    `id`          int primary key auto_increment,
+    `token`       varchar(36) not null comment '标识一组图片的 token',
+    `target_type` int         not null comment '图片所属的对象类别：1 博客，2 博客草稿，3 专栏简介，4 评论，5 用户(头像、空间背景等)',
+    `target_id`   int         not null comment '图片对应的对象 id',
+
+    `create_time` timestamp   not null default current_timestamp,
+
+    key(`token`),
+    key (`target_id`, `target_type`)
 );
 
 # 标签
