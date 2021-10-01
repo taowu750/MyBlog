@@ -6,6 +6,8 @@ import org.apache.ibatis.annotations.Mapper;
 @Mapper
 public interface BlogDraftDao {
 
+    boolean isMatchIdAndUserId(int id, int userId);
+
     BlogDraft selectById(Integer id);
 
     int insert(BlogDraft record);

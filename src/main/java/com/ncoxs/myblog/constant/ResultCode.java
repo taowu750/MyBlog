@@ -55,6 +55,11 @@ public enum ResultCode {
     FILE_UPLOAD_IMAGE_ERROR(500, "上传图片为空或格式错误"),
     FILE_SAVE_IMAGE_ERROR(501, "保存图片出错"),
     /*
+    600-699：数据异常错误码
+     */
+    DATA_EXPIRED(600, "请求数据已过期"),
+    DATA_ACCESS_DENIED(601, "没有请求数据的访问权限"),
+    /*
     1000-1099: 服务器内部错误码
      */
     SERVER_UNKNOWN_ERROR(1000, "服务器发生了未知的异常"),

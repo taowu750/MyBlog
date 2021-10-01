@@ -38,4 +38,5 @@ public interface ParamValidateMsg {
     String VERIFICATION_CODE_BLANK = "verificationCode.blank:验证码不能为空";
 
     String UPLOAD_IMAGE_TARGET_TYPE_INVALID = "uploadImage.targetType.invalid:上传图片 targetType 不正确";
+    String UPLOAD_IMAGE_TOKEN_BLANK = "uploadImage.token.blank:图片 token 不能为空";
 }

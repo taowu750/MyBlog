@@ -67,11 +67,6 @@ myapp:
   image:
     origin-filename-max-length: 150
 
-  blog:
-    draft:
-      # 博客草稿过期时间，单位天
-      expire-days: 14
-
   mail:
     # 是否启用发送邮件功能
     enable: false

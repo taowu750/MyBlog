@@ -117,7 +117,6 @@ create table if not exists `blog_draft`
     `markdown_body`    text,
     `cover_path`       varchar(60) not null default '' comment '封面图片路径',
     `is_allow_reprint` bool        not null default false comment '是否允许转载',
-    `expire`           timestamp   not null,
 
     `create_time`      timestamp   not null default current_timestamp,
     `modify_time`      timestamp   not null default current_timestamp on update current_timestamp,

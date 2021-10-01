@@ -20,6 +20,12 @@
         where token=#{token}
     </select>
 
+    <select id="selectTokenByTarget" resultType="java.lang.String">
+        select token
+        from saved_image_token
+        where target_id=#{targetId} and target_type=#{targetType}
+    </select>
+
     <insert id="insert" keyColumn="id" keyProperty="id" parameterType="com.ncoxs.myblog.model.pojo.SavedImageToken"
             useGeneratedKeys="true">
         insert into saved_image_token (token, target_type, target_id)

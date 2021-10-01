@@ -34,7 +34,7 @@ spring:
     default-encoding: UTF-8
   servlet:
     multipart:
-      max-request-size: 162MB
+      max-request-size: 9MB
       max-file-size: 8MB
 
 mybatis:

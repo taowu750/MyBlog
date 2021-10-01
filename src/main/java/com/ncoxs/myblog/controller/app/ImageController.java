@@ -3,10 +3,10 @@ package com.ncoxs.myblog.controller.app;
 import com.ncoxs.myblog.constant.ParamValidateMsg;
 import com.ncoxs.myblog.constant.ResultCode;
 import com.ncoxs.myblog.constant.UploadImageTargetType;
+import com.ncoxs.myblog.handler.validate.UserLoginToken;
+import com.ncoxs.myblog.handler.validate.UserValidate;
 import com.ncoxs.myblog.model.dto.GenericResult;
-import com.ncoxs.myblog.model.pojo.User;
 import com.ncoxs.myblog.service.app.ImageService;
-import com.ncoxs.myblog.service.user.UserService;
 import lombok.extern.slf4j.Slf4j;
 import org.hibernate.validator.constraints.Range;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -24,20 +24,13 @@ import java.io.IOException;
 @Slf4j
 public class ImageController {
 
-    private UserService userService;
-
     private ImageService imageService;
-
-
-    @Autowired
-    public void setUserService(UserService userService) {
-        this.userService = userService;
-    }
 
     @Autowired
     public void setImageService(ImageService imageService) {
         this.imageService = imageService;
     }
+
 
     /**
      * 上传图片，成功返回图片 URL。
@@ -48,19 +41,15 @@ public class ImageController {
      * @param targetType     图片所属对象的类型
      */
     @PostMapping("/upload")
-    public GenericResult<String> uploadImage(String userLoginToken, MultipartFile imageFile,
+    @UserValidate
+    public GenericResult<String> uploadImage(@UserLoginToken String userLoginToken, MultipartFile imageFile,
                                              String imageToken,
                                              @Range(min = UploadImageTargetType.BLOG,
                                                      max = UploadImageTargetType.USER_PROFILE_PICTURE,
                                                      message = ParamValidateMsg.UPLOAD_IMAGE_TARGET_TYPE_INVALID)
                                                      int targetType) {
-        User user = userService.accessByToken(userLoginToken);
-        if (user == null) {
-            return GenericResult.error(ResultCode.USER_NOT_LOGGED_IN);
-        }
-
         try {
-            String url = imageService.saveImage(user, imageFile, imageToken, targetType);
+            String url = imageService.saveImage(userLoginToken, imageFile, imageToken, targetType);
             if (url == null) {
                 return GenericResult.error(ResultCode.FILE_UPLOAD_IMAGE_ERROR);
             } else {

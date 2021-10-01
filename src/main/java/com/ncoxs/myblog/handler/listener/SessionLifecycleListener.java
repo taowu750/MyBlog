@@ -41,6 +41,6 @@ public class SessionLifecycleListener implements HttpSessionListener {
             throw new ImpossibleError(e);
         }
         // 删除用户上传的图片数据
-        imageService.deleteImages(session);
+        imageService.deleteSessionImages(session);
     }
 }

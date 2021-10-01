@@ -8,6 +8,8 @@ public interface SavedImageTokenDao {
 
     SavedImageToken selectByToken(String token);
 
+    String selectTokenByTarget(int targetType, int targetId);
+
     boolean insert(SavedImageToken record);
 
     int deleteByToken(String token);

@@ -1,6 +1,7 @@
 package com.ncoxs.myblog.model.pojo;
 
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.io.Serializable;
 import java.util.Date;
@@ -10,6 +11,7 @@ import java.util.Date;
  * @author 
  */
 @Data
+@NoArgsConstructor
 public class BlogDraft implements Serializable {
     private Integer id;
 
@@ -29,11 +31,18 @@ public class BlogDraft implements Serializable {
      */
     private Boolean isAllowReprint;
 
-    private Date expire;
-
     private Date createTime;
 
     private Date modifyTime;
 
     private static final long serialVersionUID = 1L;
+
+
+    public BlogDraft(Integer userId, String title, String markdownBody, String coverPath, Boolean isAllowReprint) {
+        this.userId = userId;
+        this.title = title;
+        this.markdownBody = markdownBody;
+        this.coverPath = coverPath;
+        this.isAllowReprint = isAllowReprint;
+    }
 }

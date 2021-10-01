@@ -9,14 +9,12 @@
         <result column="markdown_body" jdbcType="VARCHAR" property="markdownBody"/>
         <result column="cover_path" jdbcType="VARCHAR" property="coverPath"/>
         <result column="is_allow_reprint" jdbcType="BOOLEAN" property="isAllowReprint"/>
-        <result column="expire" jdbcType="TIMESTAMP" property="expire"/>
         <result column="create_time" jdbcType="TIMESTAMP" property="createTime"/>
         <result column="modify_time" jdbcType="TIMESTAMP" property="modifyTime"/>
     </resultMap>
 
     <sql id="Base_Column_List">
-        id, user_id, title, markdown_body, cover_path, is_allow_reprint, expire, create_time,
-    modify_time
+        id, user_id, title, markdown_body, cover_path, is_allow_reprint, create_time, modify_time
     </sql>
 
     <select id="selectById" parameterType="java.lang.Integer" resultMap="BaseResultMap">
@@ -26,13 +24,18 @@
         where id = #{id,jdbcType=INTEGER}
     </select>
 
+    <select id="isMatchIdAndUserId" resultType="java.lang.Boolean">
+        select count(*)
+        from blog_draft
+        where id=#{id} and user_id=#{userId}
+    </select>
+
     <insert id="insert" keyColumn="id" keyProperty="id" parameterType="com.ncoxs.myblog.model.pojo.BlogDraft"
             useGeneratedKeys="true">
         insert into blog_draft
         <trim prefix="(" suffix=")" suffixOverrides=",">
             user_id,
             is_allow_reprint,
-            `expire`,
             <if test="title != null">
                 title,
             </if>
@@ -52,7 +55,6 @@
         <trim prefix="values (" suffix=")" suffixOverrides=",">
             #{userId,jdbcType=INTEGER},
             #{isAllowReprint,jdbcType=BOOLEAN},
-            #{expire,jdbcType=TIMESTAMP},
             <if test="title != null">
                 #{title,jdbcType=VARCHAR},
             </if>
@@ -74,9 +76,6 @@
     <update id="updateById" parameterType="com.ncoxs.myblog.model.pojo.BlogDraft">
         update blog_draft
         <set>
-            <if test="userId != null">
-                user_id = #{userId,jdbcType=INTEGER},
-            </if>
             <if test="title != null">
                 title = #{title,jdbcType=VARCHAR},
             </if>
@@ -88,9 +87,6 @@
             </if>
             <if test="isAllowReprint != null">
                 is_allow_reprint = #{isAllowReprint,jdbcType=BOOLEAN},
-            </if>
-            <if test="expire != null">
-                `expire` = #{expire,jdbcType=TIMESTAMP},
             </if>
             <if test="createTime != null">
                 create_time = #{createTime,jdbcType=TIMESTAMP},
