@@ -1,6 +1,9 @@
 package com.ncoxs.myblog.util.general;
 
 import java.lang.reflect.Field;
+import java.util.Collection;
+import java.util.Date;
+import java.util.Map;
 
 public class ReflectUtil {
 
@@ -10,6 +13,11 @@ public class ReflectUtil {
 
     public static boolean isPrimitive(Field field) {
         return isPrimitive(field.getType());
+    }
+
+    public static boolean isBasicType(Class<?> clazz) {
+        return isPrimitive(clazz) || clazz == String.class || clazz == Date.class || Collection.class.isAssignableFrom(clazz)
+                || Map.class.isAssignableFrom(clazz);
     }
 
     public static boolean isPrimitive(Class<?> clazz) {
