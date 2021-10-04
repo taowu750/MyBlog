@@ -2,8 +2,7 @@ package com.ncoxs.myblog.util.general;
 
 import org.junit.jupiter.api.Test;
 
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * 测试 {@link FileUtil}
@@ -28,7 +27,13 @@ public class FileUtilTest {
 
     @Test
     public void testRandomFileName() {
-        System.out.println(FileUtil.randomFileName(".png"));
-        System.out.println(FileUtil.randomFileName("jpeg"));
+        System.out.println(FileUtil.randomFilename(".png"));
+        System.out.println(FileUtil.randomFilename("jpeg"));
+    }
+
+    @Test
+    public void testTruncateFilename() {
+        assertEquals("wu.png", FileUtil.truncateFilename("wutao.png", 6));
+        assertEquals("wutao", FileUtil.truncateFilename("wutaoyy", 5));
     }
 }

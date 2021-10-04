@@ -3,7 +3,7 @@
 <mapper namespace="com.ncoxs.myblog.dao.mysql.UploadImageDao">
     <resultMap id="BaseResultMap" type="com.ncoxs.myblog.model.pojo.UploadImage">
         <id column="id" jdbcType="INTEGER" property="id"/>
-        <result column="user_id" jdbcType="Integer" property="userId"/>
+        <result column="user_id" jdbcType="INTEGER" property="userId"/>
         <result column="token" jdbcType="VARCHAR" property="token"/>
         <result column="filepath" jdbcType="VARCHAR" property="filepath"/>
         <result column="origin_file_name" jdbcType="VARCHAR" property="originFileName"/>

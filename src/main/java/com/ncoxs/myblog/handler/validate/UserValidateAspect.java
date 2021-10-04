@@ -38,13 +38,11 @@ public class UserValidateAspect {
     private static final class UserLoginTokenAccess {
         private final int argIndex;
         private final Field argField;
-        private final UserValidate userValidate;
         private final AtomicBoolean lock;
 
-        public UserLoginTokenAccess(int argIndex, Field argField, UserValidate userValidate) {
+        public UserLoginTokenAccess(int argIndex, Field argField) {
             this.argIndex = argIndex;
             this.argField = argField;
-            this.userValidate = userValidate;
             lock = new AtomicBoolean(false);
         }
 
@@ -65,10 +63,6 @@ public class UserValidateAspect {
                 }
             }
         }
-
-        public UserValidate getUserValidate() {
-            return userValidate;
-        }
     }
 
 
@@ -84,12 +78,10 @@ public class UserValidateAspect {
         MethodSignature methodSignature = (MethodSignature) joinPoint.getSignature();
         Method method = methodSignature.getMethod();
         String userLoginToken = null;
-        UserValidate userValidate = null;
         if (cache.containsKey(method)) {
             UserLoginTokenAccess access = cache.get(method);
             // 之前已经解析过，这次可以直接拿
             userLoginToken = access.getUserLoginToken(joinPoint);
-            userValidate = access.getUserValidate();
         } else {
             // 解析用户登录 token 在哪里
             int argIndex = -1;
@@ -97,9 +89,9 @@ public class UserValidateAspect {
             Parameter[] parameters = method.getParameters();
             for (int i = 0; i < parameters.length; i++) {
                 Parameter parameter = parameters[i];
-                if ((userValidate = parameter.getAnnotation(UserValidate.class)) != null) {
+                if (parameter.getAnnotation(UserLoginToken.class) != null) {
                     if (parameter.getType() != String.class) {
-                        throw new IllegalStateException("@UserValidate 必须用在字符串属性上");
+                        throw new IllegalStateException("@UserLoginToken 必须用在字符串属性上");
                     }
                     userLoginToken = (String) joinPoint.getArgs()[i];
                     argIndex = i;
@@ -107,9 +99,9 @@ public class UserValidateAspect {
                     Class<?> clazz = parameter.getType();
                     Field[] fields = clazz.getFields();
                     for (Field field : fields) {
-                        if ((userValidate = field.getAnnotation(UserValidate.class)) != null) {
+                        if (field.getAnnotation(UserLoginToken.class) != null) {
                             if (field.getType() != String.class) {
-                                throw new IllegalStateException("@UserValidate 必须用在字符串属性上");
+                                throw new IllegalStateException("@UserLoginToken 必须用在字符串属性上");
                             }
                             field.setAccessible(true);
                             userLoginToken = (String) field.get(joinPoint.getArgs()[i]);
@@ -124,7 +116,7 @@ public class UserValidateAspect {
 
             // 缓存解析结果
             if (userLoginToken != null) {
-                cache.put(method, new UserLoginTokenAccess(argIndex, argField, userValidate));
+                cache.put(method, new UserLoginTokenAccess(argIndex, argField));
             }
         }
         if (userLoginToken == null) {
@@ -136,7 +128,7 @@ public class UserValidateAspect {
         if (user == null) {
             return GenericResult.error(ResultCode.USER_NOT_LOGGED_IN);
         }
-        //noinspection ConstantConditions
+        UserValidate userValidate = method.getAnnotation(UserValidate.class);
         int[] allowStatus = userValidate.allowedStatus();
         boolean success = false;
         for (int status : allowStatus) {

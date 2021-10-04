@@ -6,7 +6,6 @@ import com.ncoxs.myblog.dao.mysql.UploadImageDao;
 import com.ncoxs.myblog.model.pojo.SavedImageToken;
 import com.ncoxs.myblog.model.pojo.UploadImage;
 import com.ncoxs.myblog.model.pojo.User;
-import com.ncoxs.myblog.service.markdown.MarkdownService;
 import com.ncoxs.myblog.service.user.UserService;
 import com.ncoxs.myblog.util.general.FileUtil;
 import com.ncoxs.myblog.util.general.ResourceUtil;
@@ -105,14 +104,14 @@ public class ImageService {
         String extension = originalFilename.substring(originalFilename.lastIndexOf("."));
         String type = UploadImageTargetType.toStr(targetType);
         String dir = FileUtil.dateHourDirName();
-        String fileName = FileUtil.randomFileName(extension);
+        String fileName = FileUtil.randomFilename(extension);
 
         // 插入图片上传记录
         UploadImage uploadImage = new UploadImage();
         uploadImage.setUserId(user.getId());
         uploadImage.setToken(imageToken);
         uploadImage.setFilepath(type + "/" + dir + "/" + fileName);
-        uploadImage.setOriginFileName(FileUtil.truncatefilename(originalFilename, originFilenameMaxLength));
+        uploadImage.setOriginFileName(FileUtil.truncateFilename(originalFilename, originFilenameMaxLength));
         uploadImageDao.insert(uploadImage);
 
         // 将图片写入文件

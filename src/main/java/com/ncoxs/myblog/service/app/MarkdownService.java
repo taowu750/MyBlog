@@ -1,4 +1,4 @@
-package com.ncoxs.myblog.service.markdown;
+package com.ncoxs.myblog.service.app;
 
 import org.springframework.beans.factory.InitializingBean;
 import org.springframework.beans.factory.annotation.Value;
@@ -23,7 +23,7 @@ public class MarkdownService implements InitializingBean {
 
     @Override
     public void afterPropertiesSet() throws Exception {
-        mdImagePattern = Pattern.compile("!\\[.+?\\]\\(" + webSiteUrl + "img/(.+?)\\)");
+        mdImagePattern = Pattern.compile("!\\[.+?\\]\\((.+?)\\)");
     }
 
 
@@ -35,7 +35,9 @@ public class MarkdownService implements InitializingBean {
         Matcher matcher = mdImagePattern.matcher(markdown);
         while (matcher.find()) {
             String imageFilepath = matcher.group(1);
-            usedImages.add(imageFilepath);
+            if (imageFilepath.startsWith(webSiteUrl)) {
+                usedImages.add(imageFilepath.substring(webSiteUrl.length() + 4));
+            }
         }
 
         return usedImages;

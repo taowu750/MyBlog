@@ -25,15 +25,15 @@ public class FileUtil {
         return year + String.format("%02d", mouth) + String.format("%02d", day) + String.format("%02d", hour);
     }
 
-    public static String randomFileName() {
+    public static String randomFilename() {
         return System.currentTimeMillis() + "" + ThreadLocalRandom.current().nextInt(1000, 1000000);
     }
 
-    public static String randomFileName(String extension) {
-        return randomFileName() + "." + (extension.startsWith(".") ? extension.substring(1) : extension);
+    public static String randomFilename(String extension) {
+        return randomFilename() + "." + (extension.startsWith(".") ? extension.substring(1) : extension);
     }
 
-    public static String randomFileName(String extension, Object ...appends) {
+    public static String randomFilename(String extension, Object ...appends) {
         StringBuilder sb = new StringBuilder().append(System.currentTimeMillis());
         for (Object append : appends) {
             sb.append(append);
@@ -44,7 +44,7 @@ public class FileUtil {
         return sb.toString();
     }
 
-    public static String truncatefilename(String fileName, int maxLength) {
+    public static String truncateFilename(String fileName, int maxLength) {
         if (fileName.length() <= maxLength) {
             return fileName;
         } else {
