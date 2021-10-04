@@ -4,20 +4,25 @@ import com.ncoxs.myblog.constant.UploadImageTargetType;
 import com.ncoxs.myblog.controller.blog.BlogUploadController;
 import com.ncoxs.myblog.dao.mysql.BlogDao;
 import com.ncoxs.myblog.dao.mysql.BlogDraftDao;
+import com.ncoxs.myblog.dao.mysql.SavedImageTokenDao;
 import com.ncoxs.myblog.dao.mysql.UserLogDao;
+import com.ncoxs.myblog.model.dto.ImageHolderParams;
 import com.ncoxs.myblog.model.pojo.BlogDraft;
 import com.ncoxs.myblog.model.pojo.User;
 import com.ncoxs.myblog.service.app.ImageService;
 import com.ncoxs.myblog.service.user.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 
-// TODO: 需要限制用户的草稿数量
 @Service
 public class BlogUploadService {
+
+    @Value("${myapp.blog.draft.default-max-upper-limit}")
+    private int maxBlogDraftUpperLimit;
 
     private UserService userService;
 
@@ -54,53 +59,67 @@ public class BlogUploadService {
         this.blogDraftDao = blogDraftDao;
     }
 
+    private SavedImageTokenDao savedImageTokenDao;
 
-    public static final int BLOG_DRAFT_NOT_BELONG = -1;
+    @Autowired
+    public void setSavedImageTokenDao(SavedImageTokenDao savedImageTokenDao) {
+        this.savedImageTokenDao = savedImageTokenDao;
+    }
+
+
+    public static final int IMAGE_TOKEN_MISMATCH = -1;
+    public static final int BLOG_DRAFT_NOT_BELONG = -2;
+    public static final int BLOG_DRAFT_COUNT_FULL = -3;
 
     @Transactional(isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
-    public Integer saveBlogDraft(BlogUploadController.BlogDraftParams params) {
+    public Integer saveBlogDraft(ImageHolderParams<BlogUploadController.BlogDraftParams> params) {
         User user = userService.accessByToken(params.getUserLoginToken());
+        BlogUploadController.BlogDraftParams blogDraftParams = params.getImageHolder();
         // 参数不能都是空
-        if (params.title == null && params.markdownBody == null && params.coverPath == null
-                && params.isAllowReprint == null) {
+        if (blogDraftParams.title == null && blogDraftParams.markdownBody == null && blogDraftParams.coverPath == null
+                && blogDraftParams.isAllowReprint == null) {
             return null;
         }
 
         // 首次上传博客草稿
-        if (params.id == null) {
-            // 插入博客草稿数据
-            BlogDraft blogDraft = new BlogDraft(user.getId(), params.title, params.markdownBody, params.coverPath,
-                    params.isAllowReprint);
-            blogDraftDao.insert(blogDraft);
-
-            // 保存图片 token 和博客草稿的映射关系
-            imageService.saveImageTokenWithTarget(params.imageToken, UploadImageTargetType.BLOG_DRAFT, blogDraft.getId());
-
-            // 删除没有用到的图片
-            if (blogDraft.getMarkdownBody() != null) {
-                imageService.deleteSessionDiscardedImage(params.imageToken, blogDraft.getMarkdownBody());
+        if (blogDraftParams.id == null) {
+            // 如果用户保存的博客草稿已达最大上限
+            if (blogDraftDao.selectCountByUserId(user.getId()) >= maxBlogDraftUpperLimit) {
+                return BLOG_DRAFT_COUNT_FULL;
             }
 
+            // 插入博客草稿数据
+            BlogDraft blogDraft = new BlogDraft(user.getId(), blogDraftParams.title, blogDraftParams.markdownBody,
+                    blogDraftParams.coverPath, blogDraftParams.isAllowReprint);
+            blogDraftDao.insert(blogDraft);
+
+            // 保存图片 token 和博客草稿的映射关系，并删除没有用到的图片
+            imageService.saveImageTokenWithTarget(params.getImageToken(), UploadImageTargetType.BLOG_DRAFT, blogDraft.getId(),
+                    blogDraft.getMarkdownBody());
+
             return blogDraft.getId();
-        } else if (blogDraftDao.isMatchIdAndUserId(params.id, user.getId())) {  // 修改博客草稿
-            // 先将博客草稿中的图片数据加载到 session 中来
-            imageService.loadImagesToSession(UploadImageTargetType.BLOG_DRAFT, params.id);
+        } else if (blogDraftDao.isMatchIdAndUserId(blogDraftParams.id, user.getId())) {  // 修改博客草稿
+            // 如果上传所带的图片 token 和此博客草稿所对应的图片 token 不一样，则上传出错，删除这些上传的图片
+            String originImageToken = savedImageTokenDao.selectTokenByTarget(UploadImageTargetType.BLOG_DRAFT, blogDraftParams.id);
+            if (!params.getImageToken().equals(originImageToken)) {
+                imageService.deleteSessionImage(params.getImageToken());
+
+                return IMAGE_TOKEN_MISMATCH;
+            }
 
             // 更新博客草稿数据
             BlogDraft blogDraft = new BlogDraft();
-            blogDraft.setId(params.id);
-            blogDraft.setTitle(params.title);
-            blogDraft.setMarkdownBody(params.markdownBody);
-            blogDraft.setCoverPath(params.coverPath);
-            blogDraft.setIsAllowReprint(params.isAllowReprint);
+            blogDraft.setId(blogDraftParams.id);
+            blogDraft.setTitle(blogDraftParams.title);
+            blogDraft.setMarkdownBody(blogDraftParams.markdownBody);
+            blogDraft.setCoverPath(blogDraftParams.coverPath);
+            blogDraft.setIsAllowReprint(blogDraftParams.isAllowReprint);
             blogDraftDao.updateById(blogDraft);
 
-            // 删除没有用到的图片
-            if (blogDraft.getMarkdownBody() != null) {
-                imageService.deleteSessionDiscardedImage(params.imageToken, blogDraft.getMarkdownBody());
-            }
+            // 将博客草稿中的图片数据加载到 session 中来，并删除其中没有用到的图像
+            imageService.loadAndDeleteSessionImages(UploadImageTargetType.BLOG_DRAFT, blogDraftParams.id, blogDraft.getMarkdownBody());
 
-            return params.id;
+            return blogDraftParams.id;
         } else {  // 此博客草稿不属于该用户
             return BLOG_DRAFT_NOT_BELONG;
         }

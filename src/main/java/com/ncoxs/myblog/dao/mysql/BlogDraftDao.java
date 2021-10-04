@@ -10,6 +10,8 @@ public interface BlogDraftDao {
 
     BlogDraft selectById(Integer id);
 
+    int selectCountByUserId(int userId);
+
     int insert(BlogDraft record);
 
     int updateById(BlogDraft record);

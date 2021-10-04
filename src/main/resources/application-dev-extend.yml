@@ -77,3 +77,8 @@ myapp:
     plain:
       # 普通验证码过期时间，单位分钟
       expireMinutes: 5
+
+  blog:
+    draft:
+      # 用户默认所能拥有的最大博客草稿上限
+      default-max-upper-limit: 10

@@ -36,6 +36,7 @@ import java.util.*;
  *    当用户主动关闭网页，放弃编辑时，或 session 被动销毁，则需要将这些图片和数据库记录删除
  * 3. 当上传编辑对象时，带上图片 token，然后从 session 读取数据，并删除不存在于编辑对象的图片和数据库记录。
  *    session 中的图片 token 数据随后也被清理。最后记录图片 token 和编辑对象 id 的对应关系。
+ * 4. 当更新编辑对象时，需要先将其数据库中保存的图片数据加载到 session 中。
  *
  * 当系统启动时，需要删除那些没有 targetId 的图片文件和数据库记录
  */
@@ -119,44 +120,53 @@ public class ImageService {
         imgFile.transferTo(filePath.toFile());
 
         // 将图片数据记录在 session 中
-        loadImagesToSession(SpringUtil.currentSession(), imageToken, Collections.singletonList(uploadImage));
+        loadImagesToSession(imageToken, Collections.singletonList(uploadImage));
 
         return webSiteUrl + "img/" + uploadImage.getFilepath();
     }
 
     /**
-     * 当用户上传博客、评论等可能包含图片的对象时，保存图片 token 和这些对象的关系。
+     * 当用户上传博客、评论等可能包含图片的对象时，保存图片 token 和这些对象的关系，并且删除没有用到的图片。
      */
-    public boolean saveImageTokenWithTarget(String imageToken, int targetType, int targetId) {
+    public void saveImageTokenWithTarget(String imageToken, int targetType, int targetId, String markdown) {
         HttpSession session = SpringUtil.currentSession();
         //noinspection unchecked
         Set<String> tokens = (Set<String>) session.getAttribute(SESSION_KEY_UPLOAD_IMAGE_TOKEN);
         if (tokens == null || !tokens.contains(imageToken)) {
-            return false;
+            return;
         }
 
+        // 插入新纪录，已存在则不会插入
         SavedImageToken savedImageToken = new SavedImageToken();
         savedImageToken.setToken(imageToken);
         savedImageToken.setTargetId(targetType);
         savedImageToken.setTargetType(targetId);
+        savedImageTokenDao.insert(savedImageToken);
 
-        return savedImageTokenDao.insert(savedImageToken);
+        // 删除没有用到的图片
+        deleteSessionDiscardedImage(imageToken, markdown);
     }
 
     /**
      * 当需要修改博客、博客草稿等可能包含图片的对象时，需要先把已保存的图片数据加载到 session 中，
-     * 方便之后的操作。
+     * 然后删除其中没有用到的图像。注意，博客等对象必须之前已经提交了。
      */
-    public void loadImagesToSession(int targetType, int targetId) {
+    public void loadAndDeleteSessionImages(int targetType, int targetId, String markdown) {
         String imageToken = savedImageTokenDao.selectTokenByTarget(targetType, targetId);
-        HttpSession session = SpringUtil.currentSession();
-        if (session.getAttribute(SESSION_KEY_UPLOAD_IMAGE_TOKEN + imageToken) == null) {
-            List<UploadImage> uploadImages = uploadImageDao.selectByToken(imageToken);
-            loadImagesToSession(session, imageToken, uploadImages);
+        if (imageToken == null) {
+            return;
+        }
+
+        List<UploadImage> savedImages = uploadImageDao.selectByToken(imageToken);
+        if (savedImages != null && !savedImages.isEmpty()) {
+            loadImagesToSession(imageToken, savedImages);
+            deleteSessionDiscardedImage(imageToken, markdown);
         }
     }
 
-    private void loadImagesToSession(HttpSession session, String imageToken, List<UploadImage> uploadImages) {
+    private void loadImagesToSession(String imageToken, List<UploadImage> images) {
+        HttpSession session = SpringUtil.currentSession();
+
         //noinspection unchecked
         Set<String> tokens = (Set<String>) session.getAttribute(SESSION_KEY_UPLOAD_IMAGE_TOKEN);
         if (tokens == null) {
@@ -170,7 +180,8 @@ public class ImageService {
             fp2id = new HashMap<>();
             session.setAttribute(SESSION_KEY_UPLOAD_IMAGE_TOKEN + imageToken, fp2id);
         }
-        for (UploadImage uploadImage : uploadImages) {
+
+        for (UploadImage uploadImage : images) {
             fp2id.put(uploadImage.getFilepath(), uploadImage.getId());
         }
     }
@@ -199,16 +210,24 @@ public class ImageService {
      * @param markdown 可能包含有图片的 markdown 文本
      */
     public void deleteSessionDiscardedImage(String token, String markdown) {
-        Set<String> usedImages = markdownService.parseUsedImages(markdown);
-        HttpSession session = SpringUtil.currentSession();
-        //noinspection unchecked
-        Map<String, Integer> fp2id = (Map<String, Integer>) session.getAttribute(SESSION_KEY_UPLOAD_IMAGE_TOKEN + token);
-        if (fp2id == null) {
+        if (markdown == null) {
             return;
         }
 
+        HttpSession session = SpringUtil.currentSession();
+        //noinspection unchecked
+        Map<String, Integer> fp2id = (Map<String, Integer>) session.getAttribute(SESSION_KEY_UPLOAD_IMAGE_TOKEN + token);
+        if (fp2id == null || fp2id.isEmpty()) {
+            return;
+        }
+
+        Set<String> usedImages = markdownService.parseUsedImages(markdown);
         fp2id.keySet().removeIf(usedImages::contains);
         deleteSessionImage(session, token);
+
+        //noinspection unchecked
+        Set<String> tokens = (Set<String>) session.getAttribute(SESSION_KEY_UPLOAD_IMAGE_TOKEN);
+        tokens.remove(token);
     }
 
     /**
@@ -238,12 +257,5 @@ public class ImageService {
             uploadImageDao.deleteById(imageId);
         }
         session.removeAttribute(SESSION_KEY_UPLOAD_IMAGE_TOKEN + token);
-    }
-
-    /**
-     * 删除某个对象所包含的图片。
-     */
-    public void deleteImage(int targetType, int targetId) {
-
     }
 }

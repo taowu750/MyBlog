@@ -30,6 +30,12 @@
         where id=#{id} and user_id=#{userId}
     </select>
 
+    <select id="selectCountByUserId" resultType="java.lang.Integer">
+        select count(*)
+        from blog_draft
+        where user_id=#{userId}
+    </select>
+
     <insert id="insert" keyColumn="id" keyProperty="id" parameterType="com.ncoxs.myblog.model.pojo.BlogDraft"
             useGeneratedKeys="true">
         insert into blog_draft
