@@ -12,6 +12,7 @@ import com.ncoxs.myblog.util.model.FormFormatter;
 import com.ncoxs.myblog.util.model.Tuple2;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpSession;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.FastByteArrayOutputStream;
 
 import java.nio.charset.StandardCharsets;
@@ -100,7 +101,7 @@ public class AppTestControllerTest extends BaseTester {
         System.out.println(new EncryptionMockMvcBuilder(mockMvc, objectMapper)
                 .post("/test/app/decompress")
                 .header(HttpHeaderKey.COMPRESS_MODE, HttpHeaderConst.COMPRESS_MODE_ZIP)
-                .byteParams(byteOut.toByteArray(), "application/x-www-form-urlencoded")
+                .byteParams(byteOut.toByteArray(), EncryptionMockMvcBuilder.CONTENT_TYPE_FORM)
                 .sendRequest()
                 .expectStatusOk()
                 .print()
@@ -111,6 +112,7 @@ public class AppTestControllerTest extends BaseTester {
      * 测试用户验证功能。
      */
     @Test
+    @Transactional
     public void testUserValidate() throws Exception {
         // 未登录
         GenericResult<Map<String, Object>> result = new EncryptionMockMvcBuilder(mockMvc, objectMapper)

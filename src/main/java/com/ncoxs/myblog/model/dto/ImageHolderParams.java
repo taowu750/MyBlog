@@ -1,8 +1,7 @@
 package com.ncoxs.myblog.model.dto;
 
 import com.ncoxs.myblog.constant.ParamValidateMsg;
-import lombok.Data;
-import lombok.EqualsAndHashCode;
+import lombok.*;
 
 import javax.validation.constraints.NotBlank;
 
@@ -11,6 +10,8 @@ import javax.validation.constraints.NotBlank;
  */
 @EqualsAndHashCode(callSuper = true)
 @Data
+@NoArgsConstructor
+@AllArgsConstructor
 public class ImageHolderParams<T> extends UserAccessParams {
 
     private T imageHolder;

@@ -1,6 +1,5 @@
-package com.ncoxs.myblog.controller.app;
+package com.ncoxs.myblog.service.app;
 
-import com.ncoxs.myblog.service.app.MarkdownService;
 import com.ncoxs.myblog.testutil.BaseTester;
 import com.ncoxs.myblog.util.general.ResourceUtil;
 import lombok.extern.slf4j.Slf4j;

@@ -1,4 +1,4 @@
-package com.ncoxs.myblog.service;
+package com.ncoxs.myblog.service.app;
 
 import com.ncoxs.myblog.constant.EmailTemplate;
 import com.ncoxs.myblog.service.app.MailService;

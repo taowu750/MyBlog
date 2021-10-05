@@ -64,7 +64,6 @@ public class EncryptionMockMvcBuilder {
         MvcResult mvcResult = mockMvc.perform(MockMvcRequestBuilders.get("/app/encryption/rsa-public-key")
                 .accept(MediaType.APPLICATION_JSON_UTF8_VALUE))
                 .andExpect(status().isOk())
-                .andDo(MockMvcResultHandlers.print())
                 .andReturn();
         GenericResult<Map<String, Object>> result = objectMapper.readValue(mvcResult.getResponse().getContentAsString(),
                 new TypeReference<GenericResult<Map<String, Object>>>() {
@@ -269,6 +268,10 @@ public class EncryptionMockMvcBuilder {
 
         return paramsMap;
     }
+
+    public static final String CONTENT_TYPE_FORM = "application/x-www-form-urlencoded";
+    public static final String CONTENT_TYPE_MULTIPART = "multipart/form-data; boundary=";
+    public static final String CONTENT_TYPE_JSON = "application/json";
 
     public EncryptionMockMvcBuilder byteParams(byte[] params, String contentType) throws GeneralSecurityException {
         if (requestBuilder == null) {

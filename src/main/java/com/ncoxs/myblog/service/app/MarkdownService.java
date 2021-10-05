@@ -22,8 +22,8 @@ public class MarkdownService implements InitializingBean {
 
 
     @Override
-    public void afterPropertiesSet() throws Exception {
-        mdImagePattern = Pattern.compile("!\\[.+?\\]\\((.+?)\\)");
+    public void afterPropertiesSet() {
+        mdImagePattern = Pattern.compile("!\\[.+?\\]\\(" + webSiteUrl + "img/(.+?)\\)");
     }
 
 
@@ -35,9 +35,7 @@ public class MarkdownService implements InitializingBean {
         Matcher matcher = mdImagePattern.matcher(markdown);
         while (matcher.find()) {
             String imageFilepath = matcher.group(1);
-            if (imageFilepath.startsWith(webSiteUrl)) {
-                usedImages.add(imageFilepath.substring(webSiteUrl.length() + 4));
-            }
+            usedImages.add(imageFilepath);
         }
 
         return usedImages;
