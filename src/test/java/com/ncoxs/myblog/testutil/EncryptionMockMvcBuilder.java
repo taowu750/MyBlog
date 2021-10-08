@@ -1,30 +1,30 @@
 package com.ncoxs.myblog.testutil;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ncoxs.myblog.constant.HttpHeaderConst;
 import com.ncoxs.myblog.constant.HttpHeaderKey;
 import com.ncoxs.myblog.model.dto.GenericResult;
-import com.ncoxs.myblog.util.general.AESUtil;
-import com.ncoxs.myblog.util.general.MapUtil;
-import com.ncoxs.myblog.util.general.RSAUtil;
-import com.ncoxs.myblog.util.general.ResourceUtil;
+import com.ncoxs.myblog.util.general.*;
 import com.ncoxs.myblog.util.model.FormFormatter;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpSession;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.*;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
+import org.springframework.test.web.servlet.request.MockMultipartHttpServletRequestBuilder;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 import org.springframework.test.web.servlet.result.MockMvcResultHandlers;
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers;
 import org.yaml.snakeyaml.Yaml;
 
 import javax.servlet.http.Cookie;
+import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.security.GeneralSecurityException;
 import java.util.Base64;
 import java.util.HashMap;
@@ -41,6 +41,9 @@ public class EncryptionMockMvcBuilder {
 
     private static final Pattern URL_VARIABLE_PATTERN = Pattern.compile("\\{.*?\\}");
 
+    private static final String DEFAULT_BOUNDARY = "EncryptionMockMvcBuilderBoundary";
+
+
     private MockHttpServletRequestBuilder requestBuilder;
 
     private boolean enable;
@@ -53,7 +56,9 @@ public class EncryptionMockMvcBuilder {
 
     private String url;
     private String method;
+    private String compressMode;
     private Object params;
+    private String boundary;
 
     private ResultActions resultActions;
 
@@ -155,6 +160,24 @@ public class EncryptionMockMvcBuilder {
         return this;
     }
 
+    public EncryptionMockMvcBuilder multipart(String url, String boundary, String... pathVariables) throws GeneralSecurityException {
+        if (method != null) {
+            throw new IllegalStateException("method has setting");
+        }
+
+        method = "post";
+        this.boundary = boundary;
+        urlSetting(url, pathVariables);
+        requestBuilder = MockMvcRequestBuilders.multipart(this.url);
+        publicSetting();
+
+        return this;
+    }
+
+    public EncryptionMockMvcBuilder multipart(String url, String... pathVariables) throws GeneralSecurityException {
+        return multipart(url, DEFAULT_BOUNDARY, pathVariables);
+    }
+
     private void urlSetting(String url, String... pathVariables) {
         this.url = url;
         Matcher matcher = URL_VARIABLE_PATTERN.matcher(url);
@@ -180,6 +203,28 @@ public class EncryptionMockMvcBuilder {
     }
 
 
+    /**
+     * 如果参数需要先压缩，需要设置压缩的格式。
+     * 注意，此方法需要在设置请求体数据之前使用，否则会出错。
+     */
+    public EncryptionMockMvcBuilder compressMode(String compressMode) {
+        if (requestBuilder == null) {
+            throw new IllegalStateException("method not setting");
+        }
+        if (params != null) {
+            throw new IllegalArgumentException("params already setting");
+        }
+        if (!HttpHeaderConst.isCompressMode(compressMode)) {
+            throw new IllegalArgumentException("compressMode illegal");
+        }
+
+        this.compressMode = compressMode;
+        requestBuilder.header(HttpHeaderKey.COMPRESS_MODE, compressMode);
+
+        return this;
+    }
+
+
     public EncryptionMockMvcBuilder header(String key, Object value) {
         if (requestBuilder == null) {
             throw new IllegalStateException("method not setting");
@@ -194,9 +239,12 @@ public class EncryptionMockMvcBuilder {
      * 设置 Json 请求体。
      */
     public EncryptionMockMvcBuilder jsonParams(Object params)
-            throws GeneralSecurityException, JsonProcessingException, IllegalAccessException {
+            throws GeneralSecurityException, IOException {
         if (requestBuilder == null) {
             throw new IllegalStateException("method not setting");
+        }
+        if (requestBuilder instanceof MockMultipartHttpServletRequestBuilder) {
+            throw new IllegalStateException("json can't apply in multipart");
         }
         if (method.equals("get")) {
             throw new IllegalStateException("method can't be get");
@@ -206,12 +254,26 @@ public class EncryptionMockMvcBuilder {
         }
 
         this.params = params;
-        requestBuilder.header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_UTF8_VALUE);
-        byte[] encryptedParams = objectMapper.writeValueAsBytes(params);
-        if (enable) {
-            encryptedParams = AESUtil.encrypt(aesKey, encryptedParams);
+        // 序列化
+        byte[] content = objectMapper.writeValueAsBytes(params);
+        // 压缩数据
+        if (compressMode != null) {
+            requestBuilder.header(HttpHeaderKey.COMPRESS_MODE, compressMode);
+            content = CompressUtil.compress(content, compressMode);
         }
-        requestBuilder.content(encryptedParams);
+        // 加密数据
+        if (enable) {
+            content = AESUtil.encrypt(aesKey, content);
+        }
+
+        // 设置字符编码和请求头 Content-Type
+        if (compressMode != null || enable) {
+            requestBuilder.header(HttpHeaderKey.CONTENT_CHARSET, "utf-8");
+            requestBuilder.header(HttpHeaders.CONTENT_TYPE, HttpHeaderConst.CONTENT_TYPE_PREPROCESS_JSON);
+        }
+
+        // 设置请求体
+        requestBuilder.content(content);
 
         return this;
     }
@@ -219,7 +281,7 @@ public class EncryptionMockMvcBuilder {
     /**
      * 设置 form 格式请求体/请求参数，参数 Map。
      */
-    public EncryptionMockMvcBuilder formParams(Map<String, Object> params) throws GeneralSecurityException {
+    public EncryptionMockMvcBuilder formParams(Map<String, Object> params) throws GeneralSecurityException, IOException {
         if (requestBuilder == null) {
             throw new IllegalStateException("method not setting");
         }
@@ -228,18 +290,60 @@ public class EncryptionMockMvcBuilder {
         }
 
         this.params = params;
-        if (enable) {
-            byte[] encryptedParams = AESUtil.encrypt(aesKey, FormFormatter.format(params).getBytes(StandardCharsets.US_ASCII));
+        // 一旦需要压缩或加密，则不能使用 MockMultipartHttpServletRequestBuilder 的文件功能
+        if (compressMode != null || enable) {
+            // 设置字符编码
+            requestBuilder.header(HttpHeaderKey.CONTENT_CHARSET, "utf-8");
+
+            byte[] content;
+            if ((requestBuilder instanceof MockMultipartHttpServletRequestBuilder)) {
+                // 设置请求头 Content-Type
+                requestBuilder.header(HttpHeaders.CONTENT_TYPE, HttpHeaderConst.CONTENT_TYPE_PREPROCESS_MULTIPART);
+                // 序列化
+                content = FormFormatter.multipart(params, boundary);
+            } else {
+                // 设置请求头 Content-Type
+                requestBuilder.header(HttpHeaders.CONTENT_TYPE, HttpHeaderConst.CONTENT_TYPE_PREPROCESS_FORM);
+                // 序列化
+                content = FormFormatter.format(params).getBytes(StandardCharsets.US_ASCII);
+            }
+            // 压缩
+            if (compressMode != null) {
+                content = CompressUtil.compress(content, compressMode);
+            }
+            // 加密
+            if (enable) {
+                content = AESUtil.encrypt(aesKey, content);
+            }
+            // 设置数据
             if (method.equals("get")) {
-                requestBuilder.header(HttpHeaderKey.ENCRYPTED_PARAMS, Base64.getEncoder().encodeToString(encryptedParams));
+                requestBuilder.header(HttpHeaderKey.ENCRYPTED_PARAMS, Base64.getEncoder().encodeToString(content));
             } else {
                 requestBuilder.header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_FORM_URLENCODED)
-                        .content(encryptedParams);
+                        .content(content);
             }
         } else {
-            params.forEach((k, v) -> requestBuilder.param(k, String.valueOf(v)));
-            if (!method.equals("get")) {
-                requestBuilder.header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_FORM_URLENCODED);
+            // 使用 MockMultipartHttpServletRequestBuilder 创建 MultipartRequest
+            if ((requestBuilder instanceof MockMultipartHttpServletRequestBuilder)) {
+                MockMultipartHttpServletRequestBuilder multipartBuilder = (MockMultipartHttpServletRequestBuilder) requestBuilder;
+                params.forEach((k, v) -> {
+                    if (v instanceof File) {
+                        File file = (File) v;
+                        try {
+                            multipartBuilder.file(new MockMultipartFile(k, file.getName(), Files.probeContentType(file.toPath()),
+                                    Files.readAllBytes(file.toPath())));
+                        } catch (IOException e) {
+                            throw new RuntimeException(e);
+                        }
+                    } else {
+                        multipartBuilder.param(k, String.valueOf(v));
+                    }
+                });
+            } else {
+                params.forEach((k, v) -> requestBuilder.param(k, String.valueOf(v)));
+                if (!method.equals("get")) {
+                    requestBuilder.header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_FORM_URLENCODED);
+                }
             }
         }
 
@@ -250,7 +354,7 @@ public class EncryptionMockMvcBuilder {
     /**
      * 设置 form 格式请求体/请求参数，参数对象。
      */
-    public EncryptionMockMvcBuilder formParam(Object params) throws GeneralSecurityException, IllegalAccessException {
+    public EncryptionMockMvcBuilder formParams(Object params) throws GeneralSecurityException, IllegalAccessException, IOException {
         return formParams(obj2map(params));
     }
 
@@ -267,28 +371,6 @@ public class EncryptionMockMvcBuilder {
         }
 
         return paramsMap;
-    }
-
-    public static final String CONTENT_TYPE_FORM = "application/x-www-form-urlencoded";
-    public static final String CONTENT_TYPE_MULTIPART = "multipart/form-data; boundary=";
-    public static final String CONTENT_TYPE_JSON = "application/json";
-
-    public EncryptionMockMvcBuilder byteParams(byte[] params, String contentType) throws GeneralSecurityException {
-        if (requestBuilder == null) {
-            throw new IllegalStateException("method not setting");
-        }
-        if (this.params != null) {
-            throw new IllegalStateException("params has setting");
-        }
-
-        this.params = params;
-        if (enable) {
-            params = AESUtil.encrypt(aesKey, params);
-        }
-        requestBuilder.header(HttpHeaders.CONTENT_TYPE, contentType)
-                .content(params);
-
-        return this;
     }
 
     /**

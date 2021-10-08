@@ -21,6 +21,19 @@ public interface HttpHeaderConst {
     }
 
     /**
+     * Content-Type：被加密或压缩的 application/json 数据
+     */
+    String CONTENT_TYPE_PREPROCESS_JSON = "application/x-preprocess-json";
+    /**
+     * Content-Type：被加密或压缩的 application/x-www-form-urlencoded 数据
+     */
+    String CONTENT_TYPE_PREPROCESS_FORM = "application/x-preprocess-form-urlencoded";
+    /**
+     * Content-Type：被加密或压缩的 multipart/form-data 数据
+     */
+    String CONTENT_TYPE_PREPROCESS_MULTIPART = "application/x-preprocess-form-multipart";
+
+    /**
      * 压缩模式：zip
      */
     String COMPRESS_MODE_ZIP = "zip";

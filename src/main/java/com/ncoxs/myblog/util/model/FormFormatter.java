@@ -85,18 +85,14 @@ public class FormFormatter {
                 }
                 out.write("\r\n".getBytes(StandardCharsets.UTF_8));
             } else {
-                out.write(("Content-Disposition: form-data; name=\"" + name + "\"\r\n\r\n").getBytes(StandardCharsets.UTF_8));
+                out.write(("Content-Disposition: form-data; name=\"" + name + "\"\r\n").getBytes(StandardCharsets.UTF_8));
+                out.write("Content-Type: text/plain; charset=UTF-8\r\n\r\n".getBytes(StandardCharsets.UTF_8));
                 out.write((value.toString() + "\r\n").getBytes(StandardCharsets.UTF_8));
             }
         }
-        out.write(("--" + boundary + "--\r\n").getBytes(StandardCharsets.UTF_8));
+        out.write(("--" + boundary + "--").getBytes(StandardCharsets.UTF_8));
+        out.close();
 
         return out.toByteArray();
-    }
-
-    public static final String BOUNDARY = "MyBlogMultipartFormBoundary";
-
-    public static byte[] multipart(Map<String, Object> data) throws IOException {
-        return multipart(data, BOUNDARY);
     }
 }

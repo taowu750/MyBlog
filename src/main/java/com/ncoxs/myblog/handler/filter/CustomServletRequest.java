@@ -1,15 +1,21 @@
 package com.ncoxs.myblog.handler.filter;
 
+import com.ncoxs.myblog.constant.HttpHeaderKey;
 import com.ncoxs.myblog.util.general.IOUtil;
 import com.ncoxs.myblog.util.model.FormParser;
+import org.apache.commons.fileupload.FileUploadException;
+import org.springframework.http.HttpHeaders;
 import org.springframework.util.StringUtils;
 
 import javax.servlet.ReadListener;
+import javax.servlet.ServletException;
 import javax.servlet.ServletInputStream;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletRequestWrapper;
+import javax.servlet.http.Part;
 import java.io.*;
 import java.nio.charset.StandardCharsets;
+import java.util.Collection;
 import java.util.Enumeration;
 import java.util.Map;
 import java.util.Objects;
@@ -21,9 +27,104 @@ public class CustomServletRequest extends HttpServletRequestWrapper {
 
     private byte[] requestBody;
     private FormParser formParser;
+    private String contentType;
+    private String charset;
 
     public CustomServletRequest(HttpServletRequest request) {
         super(request);
+    }
+
+    /**
+     * 设置 {@link FormParser}，使用它获取参数和文件。
+     */
+    public void setFormParser(FormParser formParser) {
+        Objects.requireNonNull(formParser);
+
+        this.formParser = formParser;
+    }
+
+    @Override
+    public String getContentType() {
+        if (contentType == null) {
+            return super.getContentType();
+        } else {
+            return contentType;
+        }
+    }
+
+    @Override
+    public String getHeader(String name) {
+        if (contentType == null || !HttpHeaders.CONTENT_TYPE.equals(name)) {
+            return super.getHeader(name);
+        } else {
+            return contentType;
+        }
+    }
+
+    @Override
+    public Enumeration<String> getHeaders(String name) {
+        if (contentType == null || !HttpHeaders.CONTENT_TYPE.equals(name)) {
+            return super.getHeaders(name);
+        } else {
+            return new Enumeration<String>() {
+                private String ct = contentType;
+
+                @Override
+                public boolean hasMoreElements() {
+                    return ct != null;
+                }
+
+                @Override
+                public String nextElement() {
+                    String result = ct;
+                    ct = null;
+
+                    return result;
+                }
+            };
+        }
+    }
+
+    @Override
+    public String getCharacterEncoding() {
+        if (charset == null) {
+            return super.getCharacterEncoding();
+        } else {
+            return charset;
+        }
+    }
+
+    /**
+     * 当经过解密和解压缩后，对请求体数据和请求头进行解析
+     */
+    public void parseRequest() throws UnsupportedEncodingException, FileUploadException {
+        // 解析是否有 CONTENT_CHARSET 请求头
+        String charsetEncoding = getHeader(HttpHeaderKey.CONTENT_CHARSET);
+        if (charsetEncoding != null) {
+            charset = charsetEncoding;
+        }
+        charsetEncoding = charsetEncoding != null ? charsetEncoding : "utf-8";
+
+        if (StringUtils.hasText(getContentType())) {
+            // 如果数据类型是被加密或压缩的 form，就需要设置 Form 解析器解析参数
+            if (getContentType().startsWith("application/x-preprocess-form-")) {
+                // 将自定义的 contentType 变为标准的 contentType
+                if (getContentType().endsWith("urlencoded")) {
+                    contentType = "application/x-www-form-urlencoded";
+                } else {
+                    contentType = "multipart/form-data";
+                }
+
+                // 使用 FormParser 解析 urlencoded 和 multipart 两种类型的 form 数据
+                if (getContentType().endsWith("urlencoded")) {
+                    setFormParser(new FormParser(new String(requestBody, StandardCharsets.US_ASCII), charsetEncoding));
+                } else {
+                    setFormParser(new FormParser(this, charsetEncoding));
+                }
+            } else if (getContentType().equals("application/x-preprocess-json")) {
+                contentType = "application/json";
+            }
+        }
     }
 
     public byte[] getRequestBody() throws IOException {
@@ -37,11 +138,6 @@ public class CustomServletRequest extends HttpServletRequestWrapper {
     public void setRequestBody(byte[] requestBody) {
         Objects.requireNonNull(requestBody);
         this.requestBody = requestBody;
-        // 如果数据类型是 application/x-www-form-urlencoded，就需要设置 Form 解析器解析参数
-        if (StringUtils.hasText(getContentType())
-                && getContentType().toLowerCase().startsWith("application/x-www-form-urlencoded")) {
-            setFormParser(new FormParser(new String(requestBody, StandardCharsets.US_ASCII), getCharacterEncoding()));
-        }
     }
 
     @Override
@@ -56,19 +152,6 @@ public class CustomServletRequest extends HttpServletRequestWrapper {
     @Override
     public BufferedReader getReader() throws IOException {
         return new BufferedReader(new InputStreamReader(getInputStream(), getCharacterEncoding()));
-    }
-
-    /**
-     * 设置 {@link FormParser}，一般是为了设置 GET 请求中的加密参数。
-     */
-    public void setFormParser(FormParser formParser) {
-        Objects.requireNonNull(formParser);
-
-        this.formParser = formParser;
-//        // 将原来的参数都添加到 formParser 中
-//        for (Map.Entry<String, String[]> kv : getParameterMap().entrySet()) {
-//            this.formParser.putParameter(kv.getKey(), kv.getValue());
-//        }
     }
 
     @Override
@@ -104,6 +187,24 @@ public class CustomServletRequest extends HttpServletRequestWrapper {
             return super.getParameterValues(name);
         } else {
             return formParser.getParameterValues(name);
+        }
+    }
+
+    @Override
+    public Collection<Part> getParts() throws IOException, ServletException {
+        if (formParser == null) {
+            return super.getParts();
+        } else {
+            return formParser.getParts();
+        }
+    }
+
+    @Override
+    public Part getPart(String name) throws IOException, ServletException {
+        if (formParser == null) {
+            return super.getPart(name);
+        } else {
+            return formParser.getPart(name);
         }
     }
 

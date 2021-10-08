@@ -8,7 +8,6 @@ import com.ncoxs.myblog.testutil.BaseTester;
 import com.ncoxs.myblog.testutil.EncryptionMockMvcBuilder;
 import com.ncoxs.myblog.util.general.ResourceUtil;
 import com.ncoxs.myblog.util.general.UUIDUtil;
-import com.ncoxs.myblog.util.model.FormFormatter;
 import com.ncoxs.myblog.util.model.Tuple2;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.Test;
@@ -30,11 +29,10 @@ public class ImageControllerTest extends BaseTester {
 
         String imageToken = UUIDUtil.generate();
         byte[] data = new EncryptionMockMvcBuilder(mockMvc, objectMapper)
-                .post("/app/image/upload")
-                .byteParams(FormFormatter.multipart(mp(kv("userLoginToken", tuple.t1.getToken()),
+                .multipart("/app/image/upload")
+                .formParams(mp(kv("userLoginToken", tuple.t1.getToken()),
                         kv("imageToken", imageToken), kv("targetType", UploadImageTargetType.BLOG_DRAFT),
-                        kv("imageFile", Paths.get(ResourceUtil.classpath(), "img", "test.gif").toFile()))),
-                        EncryptionMockMvcBuilder.CONTENT_TYPE_MULTIPART + FormFormatter.BOUNDARY)
+                        kv("imageFile", Paths.get(ResourceUtil.classpath(), "img", "test.gif").toFile())))
                 .session(tuple.t2)
                 .sendRequest()
                 .print()

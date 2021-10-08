@@ -42,4 +42,9 @@ public interface HttpHeaderKey {
      * 上传体积较大的数据（例如包含图片的博客），一般会先压缩。这个请求头指定客户端使用了哪种压缩方法压缩数据，
      */
     String COMPRESS_MODE = "_Compress-Mode";
+
+    /**
+     * 请求体的字符编码，用在需要加密或压缩请求体数据时
+     */
+    String CONTENT_CHARSET = "_Content-Charset";
 }

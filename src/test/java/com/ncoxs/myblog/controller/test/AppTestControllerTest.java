@@ -1,24 +1,18 @@
 package com.ncoxs.myblog.controller.test;
 
 import com.ncoxs.myblog.constant.HttpHeaderConst;
-import com.ncoxs.myblog.constant.HttpHeaderKey;
 import com.ncoxs.myblog.constant.ResultCode;
 import com.ncoxs.myblog.model.dto.GenericResult;
 import com.ncoxs.myblog.model.dto.UserLoginResp;
 import com.ncoxs.myblog.model.pojo.User;
 import com.ncoxs.myblog.testutil.BaseTester;
 import com.ncoxs.myblog.testutil.EncryptionMockMvcBuilder;
-import com.ncoxs.myblog.util.model.FormFormatter;
 import com.ncoxs.myblog.util.model.Tuple2;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpSession;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.util.FastByteArrayOutputStream;
 
-import java.nio.charset.StandardCharsets;
 import java.util.Map;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipOutputStream;
 
 import static com.ncoxs.myblog.util.general.MapUtil.kv;
 import static com.ncoxs.myblog.util.general.MapUtil.mp;
@@ -88,20 +82,12 @@ public class AppTestControllerTest extends BaseTester {
      */
     @Test
     public void testDecompress() throws Exception {
-        // 压缩信息
-        byte[] data = FormFormatter.format(mp(kv("message", "加密信息"), kv("code", 42), kv("name", "野兽先辈"),
-                kv("age", 24))).getBytes(StandardCharsets.UTF_8);
-        System.out.println(data.length);
-        FastByteArrayOutputStream byteOut = new FastByteArrayOutputStream();
-        ZipOutputStream zipOutputStream = new ZipOutputStream(byteOut);
-        zipOutputStream.putNextEntry(new ZipEntry("test"));
-        zipOutputStream.write(data);
-        zipOutputStream.close();
         // 发送请求
         System.out.println(new EncryptionMockMvcBuilder(mockMvc, objectMapper)
                 .post("/test/app/decompress")
-                .header(HttpHeaderKey.COMPRESS_MODE, HttpHeaderConst.COMPRESS_MODE_ZIP)
-                .byteParams(byteOut.toByteArray(), EncryptionMockMvcBuilder.CONTENT_TYPE_FORM)
+                .compressMode(HttpHeaderConst.COMPRESS_MODE_ZIP)
+                .formParams(mp(kv("message", "加密信息"), kv("code", 42), kv("name", "野兽先辈"),
+                        kv("age", 24)))
                 .sendRequest()
                 .expectStatusOk()
                 .print()
