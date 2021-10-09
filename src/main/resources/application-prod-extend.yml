@@ -38,6 +38,5 @@ myapp:
     # 不使用加解密功能的 url 前缀
     ignore-url-prefixes:
       - "/app/encryption"
-      - "/user/account-activate"
-      - "/password/forget"
-      - "/blog/editor-md-img/upload"
+      - "/user/account/activate/"
+      - "/user/password/forget"

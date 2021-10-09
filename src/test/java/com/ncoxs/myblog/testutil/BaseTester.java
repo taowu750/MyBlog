@@ -122,14 +122,16 @@ public class BaseTester {
     }
 
     private Tuple2<VerificationCode, MockHttpSession> getVerificationCode(String type) throws Exception {
+        EncryptionMockMvcBuilder builder = new EncryptionMockMvcBuilder(mockMvc, objectMapper);
         // 获取验证码
-        MvcResult mvcResult = new EncryptionMockMvcBuilder(mockMvc, objectMapper)
+        MvcResult mvcResult = builder
                 .get("/app/verification-code/generate/plain")
                 .formParams(mp("type", type))
                 .sendRequest()
                 .expectStatusOk()
                 .build();
-        GenericResult<VerificationCode> verificationCode = objectMapper.readValue(mvcResult.getResponse().getContentAsString(),
+        GenericResult<VerificationCode> verificationCode = objectMapper.readValue(
+                EncryptionMockMvcBuilder.decryptData(builder, mvcResult),
                 new TypeReference<GenericResult<VerificationCode>>() {
                 });
         HttpSession session = mvcResult.getRequest().getSession();

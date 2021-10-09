@@ -47,4 +47,9 @@ public interface HttpHeaderKey {
      * 请求体的字符编码，用在需要加密或压缩请求体数据时
      */
     String CONTENT_CHARSET = "_Content-Charset";
+
+    /**
+     * 当请求数据是 {@link HttpHeaderConst#CONTENT_TYPE_PREPROCESS_MULTIPART} 格式，其所使用的分隔串
+     */
+    String MULTIPART_BOUNDARY = "_Boundary";
 }

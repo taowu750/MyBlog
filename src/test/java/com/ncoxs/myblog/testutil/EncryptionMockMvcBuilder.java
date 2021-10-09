@@ -7,7 +7,6 @@ import com.ncoxs.myblog.constant.HttpHeaderKey;
 import com.ncoxs.myblog.model.dto.GenericResult;
 import com.ncoxs.myblog.util.general.*;
 import com.ncoxs.myblog.util.model.FormFormatter;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpSession;
 import org.springframework.mock.web.MockMultipartFile;
@@ -211,6 +210,10 @@ public class EncryptionMockMvcBuilder {
         if (requestBuilder == null) {
             throw new IllegalStateException("method not setting");
         }
+        // get 请求不进行压缩
+        if (method.equals("get")) {
+            throw new IllegalStateException("method not be get");
+        }
         if (params != null) {
             throw new IllegalArgumentException("params already setting");
         }
@@ -269,7 +272,9 @@ public class EncryptionMockMvcBuilder {
         // 设置字符编码和请求头 Content-Type
         if (compressMode != null || enable) {
             requestBuilder.header(HttpHeaderKey.CONTENT_CHARSET, "utf-8");
-            requestBuilder.header(HttpHeaders.CONTENT_TYPE, HttpHeaderConst.CONTENT_TYPE_PREPROCESS_JSON);
+            requestBuilder.contentType(HttpHeaderConst.CONTENT_TYPE_PREPROCESS_JSON);
+        } else {
+            requestBuilder.contentType(MediaType.APPLICATION_JSON_UTF8_VALUE);
         }
 
         // 设置请求体
@@ -298,12 +303,14 @@ public class EncryptionMockMvcBuilder {
             byte[] content;
             if ((requestBuilder instanceof MockMultipartHttpServletRequestBuilder)) {
                 // 设置请求头 Content-Type
-                requestBuilder.header(HttpHeaders.CONTENT_TYPE, HttpHeaderConst.CONTENT_TYPE_PREPROCESS_MULTIPART);
+                requestBuilder.contentType(HttpHeaderConst.CONTENT_TYPE_PREPROCESS_MULTIPART)
+                        .header(HttpHeaderKey.MULTIPART_BOUNDARY, boundary);
                 // 序列化
                 content = FormFormatter.multipart(params, boundary);
             } else {
-                // 设置请求头 Content-Type
-                requestBuilder.header(HttpHeaders.CONTENT_TYPE, HttpHeaderConst.CONTENT_TYPE_PREPROCESS_FORM);
+                if (!method.equals("get")) {
+                    requestBuilder.contentType(HttpHeaderConst.CONTENT_TYPE_PREPROCESS_FORM);
+                }
                 // 序列化
                 content = FormFormatter.format(params).getBytes(StandardCharsets.US_ASCII);
             }
@@ -319,8 +326,7 @@ public class EncryptionMockMvcBuilder {
             if (method.equals("get")) {
                 requestBuilder.header(HttpHeaderKey.ENCRYPTED_PARAMS, Base64.getEncoder().encodeToString(content));
             } else {
-                requestBuilder.header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_FORM_URLENCODED)
-                        .content(content);
+                requestBuilder.content(content);
             }
         } else {
             // 使用 MockMultipartHttpServletRequestBuilder 创建 MultipartRequest
@@ -342,7 +348,7 @@ public class EncryptionMockMvcBuilder {
             } else {
                 params.forEach((k, v) -> requestBuilder.param(k, String.valueOf(v)));
                 if (!method.equals("get")) {
-                    requestBuilder.header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_FORM_URLENCODED);
+                    requestBuilder.contentType(MediaType.APPLICATION_FORM_URLENCODED);
                 }
             }
         }
@@ -468,9 +474,6 @@ public class EncryptionMockMvcBuilder {
         }
         resultActions.andExpect(status().isOk())
                 .andExpect(MockMvcResultMatchers.header().exists(HttpHeaderKey.ENCRYPTION_MODE));
-        if (enable) {
-            resultActions.andExpect(MockMvcResultMatchers.header().exists(HttpHeaderKey.REQUEST_ENCRYPTED_AES_KEY));
-        }
 
         return this;
     }

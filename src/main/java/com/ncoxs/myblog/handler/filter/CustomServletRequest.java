@@ -5,7 +5,12 @@ import com.ncoxs.myblog.util.general.IOUtil;
 import com.ncoxs.myblog.util.model.FormParser;
 import org.apache.commons.fileupload.FileUploadException;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
 import org.springframework.util.StringUtils;
+import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.multipart.MultipartHttpServletRequest;
 
 import javax.servlet.ReadListener;
 import javax.servlet.ServletException;
@@ -15,16 +20,14 @@ import javax.servlet.http.HttpServletRequestWrapper;
 import javax.servlet.http.Part;
 import java.io.*;
 import java.nio.charset.StandardCharsets;
-import java.util.Collection;
-import java.util.Enumeration;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
 
 /**
  * 自定义 Request，可以重复获取 {@link InputStream} 对象，还可以替换请求体内容。
  */
-public class CustomServletRequest extends HttpServletRequestWrapper {
+public class CustomServletRequest extends HttpServletRequestWrapper implements MultipartHttpServletRequest {
 
+    private HttpServletRequest request;
     private byte[] requestBody;
     private FormParser formParser;
     private String contentType;
@@ -32,6 +35,7 @@ public class CustomServletRequest extends HttpServletRequestWrapper {
 
     public CustomServletRequest(HttpServletRequest request) {
         super(request);
+        this.request = request;
     }
 
     /**
@@ -112,7 +116,11 @@ public class CustomServletRequest extends HttpServletRequestWrapper {
                 if (getContentType().endsWith("urlencoded")) {
                     contentType = "application/x-www-form-urlencoded";
                 } else {
-                    contentType = "multipart/form-data";
+                    if (!StringUtils.hasText(getHeader(HttpHeaderKey.MULTIPART_BOUNDARY))) {
+                        throw new FileUploadException("no " + HttpHeaderKey.MULTIPART_BOUNDARY + " header");
+                    }
+                    // 还需要拼接 boundary
+                    contentType = "multipart/form-data; boundary=" + getHeader(HttpHeaderKey.MULTIPART_BOUNDARY);
                 }
 
                 // 使用 FormParser 解析 urlencoded 和 multipart 两种类型的 form 数据
@@ -206,6 +214,116 @@ public class CustomServletRequest extends HttpServletRequestWrapper {
         } else {
             return formParser.getPart(name);
         }
+    }
+
+    @Override
+    public HttpMethod getRequestMethod() {
+        return HttpMethod.resolve(getMethod());
+    }
+
+    private HttpHeaders httpHeaders;
+
+    @Override
+    public HttpHeaders getRequestHeaders() {
+        HttpHeaders result = null;
+        if (request instanceof MultipartHttpServletRequest) {
+            result = ((MultipartHttpServletRequest) request).getRequestHeaders();
+        }
+        if (result == null) {
+            if (httpHeaders == null) {
+                MultiValueMap<String, String> headers = new LinkedMultiValueMap<>();
+                Enumeration<String> headerNames = getHeaderNames();
+                while (headerNames.hasMoreElements()) {
+                    String name = headerNames.nextElement();
+                    Enumeration<String> hs = getHeaders(name);
+                    while (hs.hasMoreElements()) {
+                        headers.add(name, hs.nextElement());
+                    }
+                }
+                httpHeaders = HttpHeaders.readOnlyHttpHeaders(headers);
+            }
+
+            result = httpHeaders;
+        }
+
+        return result;
+    }
+
+    @Override
+    public HttpHeaders getMultipartHeaders(String paramOrFileName) {
+        if (formParser != null) {
+            return formParser.getMultipartHeaders(paramOrFileName);
+        } else if (request instanceof MultipartHttpServletRequest) {
+            return ((MultipartHttpServletRequest) request).getMultipartHeaders(paramOrFileName);
+        }
+
+        return null;
+    }
+
+    @Override
+    public Iterator<String> getFileNames() {
+        if (formParser != null) {
+            return formParser.getFileNames();
+        } else if (request instanceof MultipartHttpServletRequest) {
+            return ((MultipartHttpServletRequest) request).getFileNames();
+        }
+
+        return null;
+    }
+
+    @Override
+    public MultipartFile getFile(String name) {
+        if (formParser != null) {
+            return formParser.getFile(name);
+        } else if (request instanceof MultipartHttpServletRequest) {
+            return ((MultipartHttpServletRequest) request).getFile(name);
+        }
+
+        return null;
+    }
+
+    @Override
+    public List<MultipartFile> getFiles(String name) {
+        if (formParser != null) {
+            return formParser.getFiles(name);
+        } else if (request instanceof MultipartHttpServletRequest) {
+            return ((MultipartHttpServletRequest) request).getFiles(name);
+        }
+
+        return null;
+    }
+
+    @Override
+    public Map<String, MultipartFile> getFileMap() {
+        if (formParser != null) {
+            return formParser.getFileMap();
+        } else if (request instanceof MultipartHttpServletRequest) {
+            return ((MultipartHttpServletRequest) request).getFileMap();
+        }
+
+        return null;
+    }
+
+    @Override
+    public MultiValueMap<String, MultipartFile> getMultiFileMap() {
+        if (formParser != null) {
+            return formParser.getMultiFileMap();
+        } else if (request instanceof MultipartHttpServletRequest) {
+            return ((MultipartHttpServletRequest) request).getMultiFileMap();
+        }
+
+        return null;
+    }
+
+    @Override
+    public String getMultipartContentType(String paramOrFileName) {
+        if (formParser != null) {
+            return formParser.getMultipartContentType(paramOrFileName);
+        } else if (request instanceof MultipartHttpServletRequest) {
+            return ((MultipartHttpServletRequest) request).getMultipartContentType(paramOrFileName);
+        }
+
+        return null;
     }
 
     private static class CustomServletInputStream extends ServletInputStream {
