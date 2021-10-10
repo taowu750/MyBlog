@@ -116,6 +116,8 @@ public class ImageService {
 
         // 将图片写入文件
         Path filePath = Paths.get(ResourceUtil.classpath("static"), "img", type, dir, fileName);
+        // 注意要先创建文件夹
+        Files.createDirectories(filePath.getParent());
         imgFile.transferTo(filePath.toFile());
 
         // 将图片数据记录在 session 中

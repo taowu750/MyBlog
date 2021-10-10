@@ -180,7 +180,7 @@ public class FormParser {
 
     public HttpHeaders getMultipartHeaders(String paramOrFileName) {
         if (multipartFiles == null) {
-            return null;
+            return HttpHeaders.EMPTY;
         }
 
         MultipartFile multipartFile = CollectionUtil.getFirst(multipartFiles.get(paramOrFileName));
@@ -192,7 +192,7 @@ public class FormParser {
 
             return result;
         } else {
-            return null;
+            return HttpHeaders.EMPTY;
         }
     }
 

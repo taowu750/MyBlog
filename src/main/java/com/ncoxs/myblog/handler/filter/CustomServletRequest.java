@@ -8,6 +8,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
+import org.springframework.util.MultiValueMapAdapter;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.multipart.MultipartHttpServletRequest;
@@ -268,7 +269,7 @@ public class CustomServletRequest extends HttpServletRequestWrapper implements M
             return ((MultipartHttpServletRequest) request).getFileNames();
         }
 
-        return null;
+        return Collections.emptyIterator();
     }
 
     @Override
@@ -290,7 +291,7 @@ public class CustomServletRequest extends HttpServletRequestWrapper implements M
             return ((MultipartHttpServletRequest) request).getFiles(name);
         }
 
-        return null;
+        return Collections.emptyList();
     }
 
     @Override
@@ -301,8 +302,10 @@ public class CustomServletRequest extends HttpServletRequestWrapper implements M
             return ((MultipartHttpServletRequest) request).getFileMap();
         }
 
-        return null;
+        return Collections.emptyMap();
     }
+
+    private static final MultiValueMap<String, MultipartFile> EMPTY_MULTI_VALUE_MAP = new MultiValueMapAdapter<>(Collections.emptyMap());
 
     @Override
     public MultiValueMap<String, MultipartFile> getMultiFileMap() {
@@ -312,7 +315,7 @@ public class CustomServletRequest extends HttpServletRequestWrapper implements M
             return ((MultipartHttpServletRequest) request).getMultiFileMap();
         }
 
-        return null;
+        return EMPTY_MULTI_VALUE_MAP;
     }
 
     @Override
