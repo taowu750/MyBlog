@@ -11,6 +11,8 @@ import com.ncoxs.myblog.model.dto.UserLoginResp;
 import com.ncoxs.myblog.model.pojo.User;
 import com.ncoxs.myblog.model.pojo.UserIdentity;
 import com.ncoxs.myblog.service.app.VerificationCodeService;
+import com.ncoxs.myblog.util.general.FileUtil;
+import com.ncoxs.myblog.util.general.ResourceUtil;
 import com.ncoxs.myblog.util.model.Tuple2;
 import com.ncoxs.myblog.util.model.Tuples;
 import org.junit.jupiter.api.AfterEach;
@@ -24,7 +26,8 @@ import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.web.servlet.ModelAndView;
 
 import javax.servlet.http.HttpSession;
-
+import java.io.File;
+import java.nio.file.Paths;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -32,6 +35,7 @@ import java.util.Set;
 import static com.ncoxs.myblog.util.general.MapUtil.kv;
 import static com.ncoxs.myblog.util.general.MapUtil.mp;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -57,9 +61,13 @@ public class BaseTester {
 
     @AfterEach
     public void clear() {
+        // 清理 Redis 数据
         Set<String> keys = redisTemplate.keys("*");
         //noinspection ConstantConditions
         redisTemplate.delete(keys);
+
+        // 清理上传的图片
+        FileUtil.empty(new File(ResourceUtil.classpath("static/img")));
     }
 
 
@@ -119,6 +127,28 @@ public class BaseTester {
         user.setPassword("12345");
 
         return prepareUser(user);
+    }
+
+    /**
+     * 上传图片。图片从 test/resources/img 下面读取。
+     */
+    protected String uploadImage(Tuple2<UserLoginResp, MockHttpSession> tuple, int targetType,
+                                 String imageToken, String testImageName) throws Exception {
+        byte[] data = new EncryptionMockMvcBuilder(mockMvc, objectMapper)
+                .multipart("/app/image/upload")
+                .formParams(mp(kv("userLoginToken", tuple.t1.getToken()),
+                        kv("imageToken", imageToken), kv("targetType", targetType),
+                        kv("imageFile", Paths.get(ResourceUtil.classpath(), "img", testImageName).toFile())))
+                .session(tuple.t2)
+                .sendRequest()
+                .expectStatusOk()
+                .buildByte();
+        GenericResult<String> result = objectMapper.readValue(data,
+                new TypeReference<GenericResult<String>>() {
+                });
+        assertNotNull(result.getData());
+
+        return result.getData();
     }
 
     private Tuple2<VerificationCode, MockHttpSession> getVerificationCode(String type) throws Exception {

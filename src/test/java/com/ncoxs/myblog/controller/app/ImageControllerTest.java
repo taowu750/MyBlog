@@ -17,7 +17,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.mock.web.MockHttpSession;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Enumeration;
@@ -45,7 +44,7 @@ public class ImageControllerTest extends BaseTester {
                 .multipart("/app/image/upload")
                 .formParams(mp(kv("userLoginToken", tuple.t1.getToken()),
                         kv("imageToken", imageToken), kv("targetType", UploadImageTargetType.BLOG_DRAFT),
-                        kv("imageFile", Paths.get(ResourceUtil.classpath(), "img", "test.gif").toFile())))
+                        kv("imageFile", Paths.get(ResourceUtil.classpath(), "img", "test1.gif").toFile())))
                 .session(tuple.t2)
                 .sendRequest()
                 .print()
@@ -63,7 +62,6 @@ public class ImageControllerTest extends BaseTester {
 
         Path path = Paths.get(ResourceUtil.classpath("static"), "img", uploadImage.getFilepath());
         assertTrue(path.toFile().isFile());
-        Files.delete(path);
 
         Enumeration<String> attributeNames = tuple.t2.getAttributeNames();
         while (attributeNames.hasMoreElements()) {

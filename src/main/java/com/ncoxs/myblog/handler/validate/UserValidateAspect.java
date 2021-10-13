@@ -17,6 +17,7 @@ import org.springframework.stereotype.Component;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
+import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -97,7 +98,7 @@ public class UserValidateAspect {
                     argIndex = i;
                 } else if (!ReflectUtil.isBasicType(parameter.getType())) {
                     Class<?> clazz = parameter.getType();
-                    Field[] fields = clazz.getFields();
+                    List<Field> fields = ReflectUtil.getFields(clazz);
                     for (Field field : fields) {
                         if (field.getAnnotation(UserLoginToken.class) != null) {
                             if (field.getType() != String.class) {

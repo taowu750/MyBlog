@@ -29,9 +29,7 @@
     <insert id="insert" keyColumn="id" keyProperty="id" parameterType="com.ncoxs.myblog.model.pojo.SavedImageToken"
             useGeneratedKeys="true">
         insert into saved_image_token (token, target_type, target_id)
-        # 防止重复插入
-        select #{token,jdbcType=VARCHAR}, #{targetType,jdbcType=INTEGER}, #{targetId,jdbcType=INTEGER}
-        from dual where not exists(select token from saved_image_token where token=#{token})
+        values (#{token,jdbcType=VARCHAR}, #{targetType,jdbcType=INTEGER}, #{targetId,jdbcType=INTEGER})
     </insert>
 
     <delete id="deleteByToken" parameterType="java.lang.String">

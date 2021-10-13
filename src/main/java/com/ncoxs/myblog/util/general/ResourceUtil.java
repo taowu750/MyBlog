@@ -4,6 +4,7 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -16,7 +17,12 @@ public class ResourceUtil {
     }
 
     public static String classpath(String subPath) {
-        return ResourceUtil.class.getClassLoader().getResource(subPath).getPath();
+        URL resource = ResourceUtil.class.getClassLoader().getResource(subPath);
+        if (resource != null) {
+            return resource.getPath();
+        } else {
+            throw new IllegalArgumentException("subPath not exists");
+        }
     }
 
     public static InputStream load(String classpath) {

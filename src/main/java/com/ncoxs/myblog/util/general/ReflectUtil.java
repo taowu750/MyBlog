@@ -1,9 +1,7 @@
 package com.ncoxs.myblog.util.general;
 
 import java.lang.reflect.Field;
-import java.util.Collection;
-import java.util.Date;
-import java.util.Map;
+import java.util.*;
 
 public class ReflectUtil {
 
@@ -31,5 +29,18 @@ public class ReflectUtil {
         }
 
         return false;
+    }
+
+    /**
+     * 获取 clazz 所有的字段，包括公有、私有和继承的字段。
+     */
+    public static List<Field> getFields(Class<?> clazz) {
+        List<Field> result = new ArrayList<>(Arrays.asList(clazz.getDeclaredFields()));
+        while (clazz.getSuperclass() != null) {
+            clazz = clazz.getSuperclass();
+            result.addAll(Arrays.asList(clazz.getDeclaredFields()));
+        }
+
+        return result;
     }
 }

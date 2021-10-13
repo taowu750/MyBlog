@@ -127,8 +127,9 @@ public class ImageService {
     }
 
     /**
-     * 当用户上传博客、评论等可能包含图片的对象时，保存图片 token 和这些对象的关系，并且删除没有用到的图片。
+     * 当用户上传新博客、评论等可能包含图片的对象时，保存图片 token 和这些对象的关系，并且删除没有用到的图片。
      */
+    @Transactional(isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
     public void saveImageTokenWithTarget(String imageToken, int targetType, int targetId, String markdown) {
         HttpSession session = SpringUtil.currentSession();
         //noinspection unchecked
@@ -137,11 +138,11 @@ public class ImageService {
             return;
         }
 
-        // 插入新纪录，已存在则不会插入
+        // 插入新纪录
         SavedImageToken savedImageToken = new SavedImageToken();
         savedImageToken.setToken(imageToken);
-        savedImageToken.setTargetId(targetType);
-        savedImageToken.setTargetType(targetId);
+        savedImageToken.setTargetId(targetId);
+        savedImageToken.setTargetType(targetType);
         savedImageTokenDao.insert(savedImageToken);
 
         // 删除没有用到的图片
@@ -152,6 +153,7 @@ public class ImageService {
      * 当需要修改博客、博客草稿等可能包含图片的对象时，需要先把已保存的图片数据加载到 session 中，
      * 然后删除其中没有用到的图像。注意，博客等对象必须之前已经提交了。
      */
+    @Transactional(isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
     public void loadAndDeleteSessionImages(int targetType, int targetId, String markdown) {
         String imageToken = savedImageTokenDao.selectTokenByTarget(targetType, targetId);
         if (imageToken == null) {
@@ -190,6 +192,7 @@ public class ImageService {
     /**
      * 当用户主动关闭网页、退出登录、或 session 被动销毁时，需要删除已上传的图片。
      */
+    @Transactional(isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
     public void deleteSessionImages(HttpSession session) {
         //noinspection unchecked
         Set<String> tokens = (Set<String>) session.getAttribute(SESSION_KEY_UPLOAD_IMAGE_TOKEN);
@@ -248,14 +251,14 @@ public class ImageService {
             String filepath = en.getKey();
             int imageId = en.getValue();
 
+            uploadImageDao.deleteById(imageId);
+
             Path realPath = Paths.get(ResourceUtil.classpath("static"), "img", filepath);
             try {
                 Files.delete(realPath);
             } catch (IOException e) {
                 log.error("删除图片失败：" + realPath, e);
             }
-
-            uploadImageDao.deleteById(imageId);
         }
         session.removeAttribute(SESSION_KEY_UPLOAD_IMAGE_TOKEN + token);
     }

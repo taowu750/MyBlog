@@ -39,7 +39,7 @@ public class ParamTestControllerTest extends BaseTester {
         GenericResult<Map<String, Object>> result = new EncryptionMockMvcBuilder(mockMvc, objectMapper)
                 .multipart("/test/param/file")
                 .formParams(mp(kv("message", "文件上传"), kv("code", 42),
-                        kv("image", Paths.get(ResourceUtil.classpath(), "img", "test.gif").toFile())))
+                        kv("image", Paths.get(ResourceUtil.classpath(), "img", "test1.gif").toFile())))
                 .sendRequest()
                 .print()
                 .expectStatusOk()

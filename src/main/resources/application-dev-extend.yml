@@ -48,7 +48,7 @@ myapp:
 
   encryption:
     # 是否开启请求体/响应体加密模式
-    enable: true
+    enable: false
     # 服务器 RSA 秘钥过期时间间隔，单位毫秒。30 天
     rsa-key-expire: 2592000000
     # 服务器 RSA 秘钥的存储位置

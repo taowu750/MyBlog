@@ -1,5 +1,6 @@
 package com.ncoxs.myblog.util.general;
 
+import java.io.File;
 import java.util.Calendar;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.regex.Pattern;
@@ -54,6 +55,32 @@ public class FileUtil {
                 return fileName.substring(0, maxLength - extension.length()) + extension;
             } else {
                 return fileName.substring(0, maxLength);
+            }
+        }
+    }
+
+    /**
+     * 删除 file。如果 file 是目录，会删除这个目录下的所有文件
+     */
+    @SuppressWarnings("ResultOfMethodCallIgnored")
+    public static void delete(File file) {
+        if (file.isDirectory()) {
+            //noinspection ConstantConditions
+            for (File f : file.listFiles()) {
+                delete(f);
+            }
+        }
+        file.delete();
+    }
+
+    /**
+     * 当 dir 是目录时，清空它里面的所有内容，否则忽略。
+     */
+    public static void empty(File dir) {
+        if (dir.isDirectory()) {
+            //noinspection ConstantConditions
+            for (File file : dir.listFiles()) {
+                delete(file);
             }
         }
     }

@@ -1,11 +1,14 @@
 package com.ncoxs.myblog.controller.blog;
 
+import com.ncoxs.myblog.constant.ParamValidateMsg;
+import com.ncoxs.myblog.constant.ParamValidateRule;
 import com.ncoxs.myblog.constant.ResultCode;
 import com.ncoxs.myblog.handler.validate.UserValidate;
 import com.ncoxs.myblog.model.dto.GenericResult;
 import com.ncoxs.myblog.model.dto.ImageHolderParams;
 import com.ncoxs.myblog.service.blog.BlogUploadService;
 import lombok.Data;
+import org.hibernate.validator.constraints.Length;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -34,8 +37,10 @@ public class BlogUploadController {
 
         public Integer id;
 
+        @Length(message = ParamValidateMsg.BLOG_TITLE_LEN)
         public String title;
 
+        @Length(max = ParamValidateRule.BLOG_CONTENT_MAX_LEN, message = ParamValidateMsg.BLOG_CONTENT_LEN)
         public String markdownBody;
 
         public String coverPath;
