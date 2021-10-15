@@ -1,6 +1,7 @@
 package com.ncoxs.myblog.model.pojo;
 
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.io.Serializable;
 import java.util.Date;
@@ -10,6 +11,7 @@ import java.util.Date;
  * @author 
  */
 @Data
+@NoArgsConstructor
 public class SavedImageToken implements Serializable {
     private Integer id;
 
@@ -31,4 +33,10 @@ public class SavedImageToken implements Serializable {
     private Date createTime;
 
     private static final long serialVersionUID = 1L;
+
+    public SavedImageToken(String token, Integer targetType, Integer targetId) {
+        this.token = token;
+        this.targetType = targetType;
+        this.targetId = targetId;
+    }
 }

@@ -67,7 +67,7 @@ public class BaseTester {
         redisTemplate.delete(keys);
 
         // 清理上传的图片
-        FileUtil.empty(new File(ResourceUtil.classpath("static/img")));
+        FileUtil.emptyDir(new File(ResourceUtil.classpath("static/img")));
     }
 
 

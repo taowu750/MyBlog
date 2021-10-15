@@ -76,7 +76,7 @@ public class FileUtil {
     /**
      * 当 dir 是目录时，清空它里面的所有内容，否则忽略。
      */
-    public static void empty(File dir) {
+    public static void emptyDir(File dir) {
         if (dir.isDirectory()) {
             //noinspection ConstantConditions
             for (File file : dir.listFiles()) {

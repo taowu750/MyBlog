@@ -22,6 +22,11 @@ public class UploadImage implements Serializable {
     private String token;
 
     /**
+     * 图片的类型，参见 {@link com.ncoxs.myblog.constant.UploadImageTargetType}
+     */
+    private Integer targetType;
+
+    /**
      * 图片在服务器上的相对路径
      */
     private String filepath;

@@ -5,13 +5,14 @@
         <id column="id" jdbcType="INTEGER" property="id"/>
         <result column="user_id" jdbcType="INTEGER" property="userId"/>
         <result column="token" jdbcType="VARCHAR" property="token"/>
+        <result column="target_type" jdbcType="INTEGER" property="targetType"/>
         <result column="filepath" jdbcType="VARCHAR" property="filepath"/>
         <result column="origin_file_name" jdbcType="VARCHAR" property="originFileName"/>
         <result column="create_time" jdbcType="TIMESTAMP" property="createTime"/>
     </resultMap>
 
     <sql id="Base_Column_List">
-        id, user_id, token, filepath, origin_file_name, create_time
+        id, user_id, token, target_type, filepath, origin_file_name, create_time
     </sql>
 
     <select id="selectByToken" resultMap="BaseResultMap">
@@ -21,14 +22,26 @@
         where token=#{token}
     </select>
 
+    <select id="selectSingle" resultType="com.ncoxs.myblog.model.pojo.UploadImage">
+        select
+        <include refid="Base_Column_List"/>
+        from upload_image
+        where token=#{token} and target_type=#{targetType}
+    </select>
+
     <insert id="insert" keyColumn="id" keyProperty="id" parameterType="com.ncoxs.myblog.model.pojo.UploadImage"
             useGeneratedKeys="true">
-        insert into upload_image (user_id, token, filepath, origin_file_name)
-        values (#{userId}, #{token}, #{filepath}, #{originFileName,jdbcType=VARCHAR})
+        insert into upload_image (user_id, token, target_type, filepath, origin_file_name)
+        values (#{userId}, #{token}, #{targetType}, #{filepath}, #{originFileName,jdbcType=VARCHAR})
     </insert>
 
     <delete id="deleteById">
         delete from upload_image
         where id=#{id}
+    </delete>
+
+    <delete id="deleteByToken">
+        delete from upload_image
+        where token=#{token}
     </delete>
 </mapper>

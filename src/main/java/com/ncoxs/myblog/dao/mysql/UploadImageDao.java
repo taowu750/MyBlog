@@ -10,7 +10,11 @@ public interface UploadImageDao {
 
     List<UploadImage> selectByToken(String token);
 
+    UploadImage selectSingle(String token, int targetType);
+
     int insert(UploadImage record);
 
     boolean deleteById(int id);
+
+    int deleteByToken(String token);
 }

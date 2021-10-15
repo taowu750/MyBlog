@@ -21,7 +21,7 @@ public class ResourceUtil {
         if (resource != null) {
             return resource.getPath();
         } else {
-            throw new IllegalArgumentException("subPath not exists");
+            throw new IllegalArgumentException("subPath not exists: " + subPath);
         }
     }
 

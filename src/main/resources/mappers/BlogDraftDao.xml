@@ -41,7 +41,9 @@
         insert into blog_draft
         <trim prefix="(" suffix=")" suffixOverrides=",">
             user_id,
-            is_allow_reprint,
+            <if test="isAllowReprint != null">
+                is_allow_reprint,
+            </if>
             <if test="title != null">
                 title,
             </if>
@@ -60,7 +62,9 @@
         </trim>
         <trim prefix="values (" suffix=")" suffixOverrides=",">
             #{userId,jdbcType=INTEGER},
-            #{isAllowReprint,jdbcType=BOOLEAN},
+            <if test="isAllowReprint != null">
+                #{isAllowReprint,jdbcType=BOOLEAN},
+            </if>
             <if test="title != null">
                 #{title,jdbcType=VARCHAR},
             </if>

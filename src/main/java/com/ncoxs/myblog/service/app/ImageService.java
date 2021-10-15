@@ -38,6 +38,15 @@ import java.util.*;
  * 4. 当更新编辑对象时，需要先将其数据库中保存的图片数据加载到 session 中。
  *
  * 当系统启动时，需要删除那些没有 targetId 的图片文件和数据库记录
+ *
+ *
+ * 让封面图片单独成为一种类型。封面图片的 token 和博客的图片 token 是不一样的。
+ * 每个博客最多有一个封面 token。
+ *
+ * 每次上传新的封面时，就删除旧的封面，保证只有一个封面。用户主动删除封面图片的请求应该作为一个接口。
+ *
+ * 当保存或修改博客时，需要传递封面图片的 token，根据这个 token 设置博客的封面路径。
+ * 编辑博客时，还需要返回它的封面图片的 token 和 url（如果有的话）。
  */
 @Service
 @Slf4j
@@ -103,19 +112,30 @@ public class ImageService {
         //noinspection ConstantConditions
         String extension = originalFilename.substring(originalFilename.lastIndexOf("."));
         String type = UploadImageTargetType.toStr(targetType);
-        String dir = FileUtil.dateHourDirName();
+        String dateDir = FileUtil.dateHourDirName();
         String fileName = FileUtil.randomFilename(extension);
+
+        // 如果上传的是封面，则删除旧的封面
+        if (UploadImageTargetType.isCover(targetType)) {
+            UploadImage uploadImage = uploadImageDao.selectSingle(imageToken, targetType);
+            if (uploadImage != null) {
+                String coverPath = uploadImage.getFilepath();
+                uploadImageDao.deleteById(uploadImage.getId());
+                Files.delete(Paths.get(ResourceUtil.classpath("static"), "img", coverPath));
+            }
+        }
 
         // 插入图片上传记录
         UploadImage uploadImage = new UploadImage();
         uploadImage.setUserId(user.getId());
         uploadImage.setToken(imageToken);
-        uploadImage.setFilepath(type + "/" + dir + "/" + fileName);
+        uploadImage.setTargetType(targetType);
+        uploadImage.setFilepath(type + "/" + user.getId() + "/" + dateDir + "/" + fileName);
         uploadImage.setOriginFileName(FileUtil.truncateFilename(originalFilename, originFilenameMaxLength));
         uploadImageDao.insert(uploadImage);
 
         // 将图片写入文件
-        Path filePath = Paths.get(ResourceUtil.classpath("static"), "img", type, dir, fileName);
+        Path filePath = Paths.get(ResourceUtil.classpath("static"), "img", uploadImage.getFilepath());
         // 注意要先创建文件夹
         Files.createDirectories(filePath.getParent());
         imgFile.transferTo(filePath.toFile());
@@ -131,6 +151,10 @@ public class ImageService {
      */
     @Transactional(isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
     public void saveImageTokenWithTarget(String imageToken, int targetType, int targetId, String markdown) {
+        if (imageToken == null) {
+            return;
+        }
+
         HttpSession session = SpringUtil.currentSession();
         //noinspection unchecked
         Set<String> tokens = (Set<String>) session.getAttribute(SESSION_KEY_UPLOAD_IMAGE_TOKEN);
@@ -139,14 +163,27 @@ public class ImageService {
         }
 
         // 插入新纪录
-        SavedImageToken savedImageToken = new SavedImageToken();
-        savedImageToken.setToken(imageToken);
-        savedImageToken.setTargetId(targetId);
-        savedImageToken.setTargetType(targetType);
-        savedImageTokenDao.insert(savedImageToken);
+        savedImageTokenDao.insert(new SavedImageToken(imageToken, targetType, targetId));
 
         // 删除没有用到的图片
         deleteSessionDiscardedImage(imageToken, markdown);
+    }
+
+    /**
+     * 保存博客封面、专栏封面这样单独一张的图片记录。
+     */
+    public void saveSingleImageToken(String imageToken, int targetType, int targetId) {
+        HttpSession session = SpringUtil.currentSession();
+        //noinspection unchecked
+        Set<String> tokens = (Set<String>) session.getAttribute(SESSION_KEY_UPLOAD_IMAGE_TOKEN);
+        if (tokens == null || !tokens.contains(imageToken)) {
+            return;
+        }
+
+        savedImageTokenDao.insert(new SavedImageToken(imageToken, targetType, targetId));
+        
+        tokens.remove(imageToken);
+        session.removeAttribute(SESSION_KEY_UPLOAD_IMAGE_TOKEN + imageToken);
     }
 
     /**
@@ -155,6 +192,9 @@ public class ImageService {
      */
     @Transactional(isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
     public void loadAndDeleteSessionImages(int targetType, int targetId, String markdown) {
+        if (markdown == null) {
+            return;
+        }
         String imageToken = savedImageTokenDao.selectTokenByTarget(targetType, targetId);
         if (imageToken == null) {
             return;
@@ -180,7 +220,7 @@ public class ImageService {
         //noinspection unchecked
         Map<String, Integer> fp2id = (Map<String, Integer>) session.getAttribute(SESSION_KEY_UPLOAD_IMAGE_TOKEN + imageToken);
         if (fp2id == null) {
-            fp2id = new HashMap<>();
+            fp2id = new HashMap<>(4);
             session.setAttribute(SESSION_KEY_UPLOAD_IMAGE_TOKEN + imageToken, fp2id);
         }
 
