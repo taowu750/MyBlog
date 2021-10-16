@@ -34,6 +34,12 @@
         where id = #{id,jdbcType=INTEGER}
     </select>
 
+    <select id="isMatchIdAndUserId" resultType="java.lang.Boolean">
+        select count(*)
+        from blog
+        where id=#{id} and user_id=#{user_id}
+    </select>
+
     <insert id="insert" keyColumn="id" keyProperty="id" parameterType="com.ncoxs.myblog.model.pojo.Blog"
             useGeneratedKeys="true">
         insert into blog

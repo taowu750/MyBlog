@@ -21,6 +21,7 @@ public enum ResultCode {
     PARAMS_EXPIRED(105, "参数已过期"),
     PARAMS_VERIFICATION_CODE_ERROR(106, "验证码错误"),
     PARAMS_ALL_BLANK(106, "参数都为空"),
+    PARAMS_IMAGE_TOKEN_MISMATCH(107, "上传的图片 token 和持有图片的对象所对应图片 token 不一致"),
     /*
     200-299: 用户错误状态码
      */
@@ -59,8 +60,8 @@ public enum ResultCode {
      */
     DATA_EXPIRED(600, "请求数据已过期"),
     DATA_ACCESS_DENIED(601, "没有请求数据的访问权限"),
-    DATA_IMAGE_TOKEN_MISMATCH(602, "上传的图片 token 和持有图片的对象所对应图片 token 不一致"),
-    DATA_COUNT_OUT_RANGE(603, "数据量超过限制"),
+    DATA_COUNT_OUT_RANGE(602, "数据量超过限制"),
+    DATA_NOT_COMPLETE(603, "数据缺失"),
     /*
     1000-1099: 服务器内部错误码
      */

@@ -85,6 +85,16 @@ public class MarkdownService implements InitializingBean {
     public interface SaveMarkdownCallback {
 
         /**
+         * 当 {@link MarkdownObject#getMarkdownBody()} 存在时，所能具有的最小长度
+         */
+        int minMarkdownLength();
+
+        /**
+         * 当 {@link MarkdownObject#getMarkdownBody()} 存在时，所能具有的最大长度
+         */
+        int maxMarkdownLength();
+
+        /**
          * 检测参数是否有问题，没有问题就返回 0，有的话返回负数错误码。除了 {@link #MARKDOWN_NOT_BELONG}
          * 和 {@link #IMAGE_TOKEN_MISMATCH} 外，其余可以自定义。
          */
@@ -105,14 +115,21 @@ public class MarkdownService implements InitializingBean {
         /**
          * 当用户修改文档时被调用
          */
-        default void onUpdate(User user, MarkdownObject params, int imageTokenType, Integer coverTokenType, UploadImage cover) {
-        }
+        void onUpdate(User user, MarkdownObject params, int imageTokenType, Integer coverTokenType, UploadImage cover);
     }
 
-    // TODO: 增加一个注解，用来对 markdown 长度进行限制
-
+    /**
+     * 文档的图像 token 和参数的图像 token 不匹配
+     */
     public static final int IMAGE_TOKEN_MISMATCH = -1;
+    /**
+     * 文档不属于当前用户
+     */
     public static final int MARKDOWN_NOT_BELONG = -2;
+    /**
+     * 文档内容长度大于或小于给定范围
+     */
+    public static final int MARKDOWN_MAX_LENGTH_EXCEEDED = -3;
 
     /**
      * 一个保存/修改 markdown 文档（如博客、评论等）的公共方法，包含了一些公共逻辑，通过 {@link SaveMarkdownCallback}
@@ -124,6 +141,13 @@ public class MarkdownService implements InitializingBean {
     @Transactional(isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
     public Integer saveMarkdown(MarkdownObject params, int imageTokenType, Integer coverTokenType,
                                 SaveMarkdownCallback saveMarkdownCallback) {
+        // 检测文档长度是否在范围内
+        if (params.getMarkdownBody() != null
+                && (params.getMarkdownBody().length() > saveMarkdownCallback.maxMarkdownLength()
+                || params.getMarkdownBody().length() < saveMarkdownCallback.minMarkdownLength())) {
+            return MARKDOWN_MAX_LENGTH_EXCEEDED;
+        }
+
         User user = userService.accessByToken(params.getUserLoginToken());
         // 检测参数
         int errCode;

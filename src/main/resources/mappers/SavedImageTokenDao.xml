@@ -13,6 +13,12 @@
         id, token, target_type, target_id, create_time
     </sql>
 
+    <update id="updateTargetTypeByToken">
+        update saved_image_token
+        set target_type=#{newTargetType}
+        where token=#{token}
+    </update>
+
     <select id="selectByToken" parameterType="java.lang.String" resultMap="BaseResultMap">
         select
         <include refid="Base_Column_List"/>

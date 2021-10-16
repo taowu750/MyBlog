@@ -20,7 +20,9 @@ public interface ParamValidateRule {
     String IP_REGEX = "^(((\\d)|([1-9]\\d)|((1\\d\\d)(2[0-4]\\d)(25[0-5])))\\.){3}" +
             "((\\d)|([1-9]\\d)|((1\\d\\d)(2[0-4]\\d)(25[0-5])))$";
 
+    int BLOG_TITLE_MIN_LEN = 1;
     int BLOG_TITLE_MAX_LEN = 50;
+    int BLOG_CONTENT_MIN_LEN = 10;
     int BLOG_CONTENT_MAX_LEN = 30000;
     int BLOG_WORD_COUNT_MIN = 20;
     int BLOG_WORD_COUNT_MAX = 15000;

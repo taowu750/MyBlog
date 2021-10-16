@@ -1,13 +1,8 @@
 package com.ncoxs.myblog.model.pojo;
 
-import com.ncoxs.myblog.constant.ParamValidateMsg;
-import com.ncoxs.myblog.constant.ParamValidateRule;
 import lombok.Data;
-import org.hibernate.validator.constraints.Length;
-import org.hibernate.validator.constraints.Range;
+import lombok.NoArgsConstructor;
 
-import javax.validation.constraints.NotBlank;
-import javax.validation.constraints.NotNull;
 import java.io.Serializable;
 import java.util.Date;
 
@@ -16,32 +11,23 @@ import java.util.Date;
  * @author 
  */
 @Data
+@NoArgsConstructor
 public class Blog implements Serializable {
     private Integer id;
 
     private Integer userId;
 
-    @NotBlank(message = ParamValidateMsg.BLOG_TITLE_BLANK)
-    @Length(message = ParamValidateMsg.BLOG_TITLE_LEN)
     private String title;
 
-    @NotBlank(message = ParamValidateMsg.BLOG_CONTENT_BLANK)
-    @Length(max = ParamValidateRule.BLOG_CONTENT_MAX_LEN, message = ParamValidateMsg.BLOG_CONTENT_LEN)
     private String htmlBody;
 
-    @NotBlank(message = ParamValidateMsg.BLOG_CONTENT_BLANK)
-    @Length(max = ParamValidateRule.BLOG_CONTENT_MAX_LEN, message = ParamValidateMsg.BLOG_CONTENT_LEN)
     private String markdownBody;
 
     /**
      * 封面图片路径
      */
-    @NotBlank(message = ParamValidateMsg.BLOG_CONTENT_BLANK)
     private String coverPath;
 
-    @NotNull
-    @Range(min = ParamValidateRule.BLOG_WORD_COUNT_MIN, max = ParamValidateRule.BLOG_WORD_COUNT_MAX,
-            message = ParamValidateMsg.BLOG_WORD_COUNT_RANGE)
     private Integer wordCount;
 
     private Integer readingCount;
@@ -62,7 +48,6 @@ public class Blog implements Serializable {
     /**
      * 是否允许转载
      */
-    @NotNull
     private Boolean isAllowReprint;
 
     private Date createTime;
@@ -73,4 +58,27 @@ public class Blog implements Serializable {
     private Date modifyTime;
 
     private static final long serialVersionUID = 1L;
+
+
+    public Blog(Integer userId, String title, String htmlBody, String markdownBody, String coverPath, Integer wordCount, Integer status, Boolean isAllowReprint) {
+        this.userId = userId;
+        this.title = title;
+        this.htmlBody = htmlBody;
+        this.markdownBody = markdownBody;
+        this.coverPath = coverPath;
+        this.wordCount = wordCount;
+        this.status = status;
+        this.isAllowReprint = isAllowReprint;
+    }
+
+    public Blog(Integer id, Integer userId, String title, String htmlBody, String markdownBody, String coverPath, Integer wordCount, Boolean isAllowReprint) {
+        this.id = id;
+        this.userId = userId;
+        this.title = title;
+        this.htmlBody = htmlBody;
+        this.markdownBody = markdownBody;
+        this.coverPath = coverPath;
+        this.wordCount = wordCount;
+        this.isAllowReprint = isAllowReprint;
+    }
 }

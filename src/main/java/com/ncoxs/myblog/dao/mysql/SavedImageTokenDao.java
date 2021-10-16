@@ -12,5 +12,7 @@ public interface SavedImageTokenDao {
 
     boolean insert(SavedImageToken record);
 
+    boolean updateTargetTypeByToken(String token, int newTargetType);
+
     int deleteByToken(String token);
 }
