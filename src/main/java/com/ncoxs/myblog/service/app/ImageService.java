@@ -55,6 +55,9 @@ public class ImageService {
     @Value("${myapp.website.url}")
     private String webSiteUrl;
 
+    @Value("${myapp.website.image-dir}")
+    private String imageDir;
+
     @Value("${myapp.image.origin-filename-max-length}")
     private int originFilenameMaxLength;
 
@@ -121,7 +124,7 @@ public class ImageService {
             if (uploadImage != null) {
                 String coverPath = uploadImage.getFilepath();
                 uploadImageDao.deleteById(uploadImage.getId());
-                Files.delete(Paths.get(ResourceUtil.classpath("static"), "img", coverPath));
+                Files.delete(Paths.get(ResourceUtil.classpath("static"), imageDir, coverPath));
             }
         }
 
@@ -135,7 +138,7 @@ public class ImageService {
         uploadImageDao.insert(uploadImage);
 
         // 将图片写入文件
-        Path filePath = Paths.get(ResourceUtil.classpath("static"), "img", uploadImage.getFilepath());
+        Path filePath = Paths.get(ResourceUtil.classpath("static"), imageDir, uploadImage.getFilepath());
         // 注意要先创建文件夹
         Files.createDirectories(filePath.getParent());
         imgFile.transferTo(filePath.toFile());
@@ -143,7 +146,7 @@ public class ImageService {
         // 将图片数据记录在 session 中
         loadImagesToSession(imageToken, Collections.singletonList(uploadImage));
 
-        return webSiteUrl + "img/" + uploadImage.getFilepath();
+        return webSiteUrl + imageDir +  "/" + uploadImage.getFilepath();
     }
 
     /**
@@ -293,7 +296,7 @@ public class ImageService {
 
             uploadImageDao.deleteById(imageId);
 
-            Path realPath = Paths.get(ResourceUtil.classpath("static"), "img", filepath);
+            Path realPath = Paths.get(ResourceUtil.classpath("static"), imageDir, filepath);
             try {
                 Files.delete(realPath);
             } catch (IOException e) {

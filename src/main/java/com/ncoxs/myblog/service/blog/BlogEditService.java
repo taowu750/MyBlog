@@ -3,10 +3,13 @@ package com.ncoxs.myblog.service.blog;
 import com.ncoxs.myblog.constant.ParamValidateRule;
 import com.ncoxs.myblog.constant.UploadImageTargetType;
 import com.ncoxs.myblog.constant.blog.BlogStatus;
-import com.ncoxs.myblog.controller.blog.BlogUploadController;
+import com.ncoxs.myblog.controller.blog.BlogEditController;
 import com.ncoxs.myblog.dao.mysql.*;
 import com.ncoxs.myblog.model.dto.MarkdownObject;
-import com.ncoxs.myblog.model.pojo.*;
+import com.ncoxs.myblog.model.pojo.Blog;
+import com.ncoxs.myblog.model.pojo.BlogDraft;
+import com.ncoxs.myblog.model.pojo.UploadImage;
+import com.ncoxs.myblog.model.pojo.User;
 import com.ncoxs.myblog.service.app.MarkdownService;
 import com.ncoxs.myblog.service.user.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -17,10 +20,17 @@ import org.springframework.transaction.annotation.Transactional;
 
 
 @Service
-public class BlogUploadService {
+public class BlogEditService {
 
     @Value("${myapp.blog.draft.default-max-upper-limit}")
     private int maxBlogDraftUpperLimit;
+
+    @Value("${myapp.website.url}")
+    private String webSiteUrl;
+
+    @Value("${myapp.website.image-dir}")
+    private String imageDir;
+
 
     private UserService userService;
 
@@ -81,7 +91,7 @@ public class BlogUploadService {
      */
     public static final int BLOG_DRAFT_COUNT_FULL = -11;
 
-    public int saveBlogDraft(BlogUploadController.BlogDraftParams params) {
+    public int saveBlogDraft(BlogEditController.BlogDraftParams params) {
         return markdownService.saveMarkdown(params, UploadImageTargetType.BLOG_DRAFT, UploadImageTargetType.BLOG_DRAFT_COVER,
                 new MarkdownService.SaveMarkdownCallback() {
 
@@ -97,7 +107,7 @@ public class BlogUploadService {
 
                     @Override
                     public int checkParams(User user, MarkdownObject params, int imageTokenType, Integer coverTokenType) {
-                        BlogUploadController.BlogDraftParams blogDraftParams = (BlogUploadController.BlogDraftParams) params;
+                        BlogEditController.BlogDraftParams blogDraftParams = (BlogEditController.BlogDraftParams) params;
                         // 参数不能都是空
                         if (blogDraftParams.title == null && blogDraftParams.getMarkdownBody() == null
                                 && blogDraftParams.getCoverToken() == null && blogDraftParams.isAllowReprint == null) {
@@ -113,12 +123,12 @@ public class BlogUploadService {
 
                     @Override
                     public boolean checkUserAndMarkdownId(User user, int markdownId) {
-                        return blogDraftDao.isMatchIdAndUserId(user.getId(), markdownId);
+                        return blogDraftDao.isMatchIdAndUserId(markdownId, user.getId());
                     }
 
                     @Override
                     public int onSave(User user, MarkdownObject params, int imageTokenType, Integer coverTokenType, UploadImage cover) {
-                        BlogUploadController.BlogDraftParams blogDraftParams = (BlogUploadController.BlogDraftParams) params;
+                        BlogEditController.BlogDraftParams blogDraftParams = (BlogEditController.BlogDraftParams) params;
                         // 插入博客草稿数据
                         BlogDraft blogDraft = new BlogDraft(user.getId(), blogDraftParams.title, blogDraftParams.getMarkdownBody(),
                                 cover != null ? cover.getFilepath() : null, blogDraftParams.isAllowReprint);
@@ -129,7 +139,7 @@ public class BlogUploadService {
 
                     @Override
                     public void onUpdate(User user, MarkdownObject params, int imageTokenType, Integer coverTokenType, UploadImage cover) {
-                        BlogUploadController.BlogDraftParams blogDraftParams = (BlogUploadController.BlogDraftParams) params;
+                        BlogEditController.BlogDraftParams blogDraftParams = (BlogEditController.BlogDraftParams) params;
                         // 更新博客草稿数据
                         BlogDraft blogDraft = new BlogDraft(blogDraftParams.getId(), user.getId(), blogDraftParams.title,
                                 blogDraftParams.getMarkdownBody(), cover != null ? cover.getFilepath() : null, blogDraftParams.isAllowReprint);
@@ -144,7 +154,7 @@ public class BlogUploadService {
      */
     public static final int BLOG_PARAM_BLANK = -20;
 
-    public int publishBlog(BlogUploadController.BlogParams blogParams) {
+    public int publishBlog(BlogEditController.BlogParams blogParams) {
         return markdownService.saveMarkdown(blogParams, UploadImageTargetType.BLOG, UploadImageTargetType.BLOG_COVER,
                 new MarkdownService.SaveMarkdownCallback() {
                     @Override
@@ -176,7 +186,7 @@ public class BlogUploadService {
 
                     @Override
                     public boolean checkUserAndMarkdownId(User user, int markdownId) {
-                        return blogDao.isMatchIdAndUserId(user.getId(), markdownId);
+                        return blogDao.isMatchIdAndUserId(markdownId, user.getId());
                     }
 
                     @Override
@@ -209,7 +219,7 @@ public class BlogUploadService {
      * 将博客草稿发表为博客，博客草稿必须内容完整。
      */
     @Transactional(isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
-    public int publishBlog(BlogUploadController.PublishDraftParams params) {
+    public int publishBlog(BlogEditController.PublishDraftParams params) {
         User user = userService.accessByToken(params.getUserLoginToken());
         // 检测博客草稿是否属于这个用户
         if (!blogDraftDao.isMatchIdAndUserId(params.blogDraftId, user.getId())) {
@@ -244,5 +254,51 @@ public class BlogUploadService {
         blogDraftDao.deleteById(params.blogDraftId);
 
         return blog.getId();
+    }
+
+    public BlogEditController.EditResp getDraftData(BlogEditController.EditParams params) {
+        User user = userService.accessByToken(params.getUserLoginToken());
+        if (!blogDraftDao.isMatchIdAndUserId(params.id, user.getId())) {
+            return null;
+        }
+
+        BlogDraft blogDraft = blogDraftDao.selectById(params.id);
+        String imageToken = savedImageTokenDao.selectTokenByTarget(UploadImageTargetType.BLOG_DRAFT, params.id);
+        String coverToken = savedImageTokenDao.selectTokenByTarget(UploadImageTargetType.BLOG_DRAFT_COVER, params.id);
+
+        BlogEditController.EditResp result = new BlogEditController.EditResp();
+        result.setTitle(blogDraft.getTitle());
+        result.setMarkdownBody(blogDraft.getMarkdownBody());
+        result.setIsAllowReprint(blogDraft.getIsAllowReprint());
+        result.setCreateTime(blogDraft.getCreateTime());
+        result.setModifyTime(blogDraft.getModifyTime());
+        result.setImageToken(imageToken);
+        result.setCoverToken(coverToken);
+        result.setCoverUrl(blogDraft.getCoverPath() != null ? webSiteUrl + imageDir + "/" + blogDraft.getCoverPath() : null);
+
+        return result;
+    }
+
+    public BlogEditController.EditResp getBlogData(BlogEditController.EditParams params) {
+        User user = userService.accessByToken(params.getUserLoginToken());
+        if (!blogDao.isMatchIdAndUserId(params.id, user.getId())) {
+            return null;
+        }
+
+        Blog blog = blogDao.selectById(params.id);
+        String imageToken = savedImageTokenDao.selectTokenByTarget(UploadImageTargetType.BLOG, params.id);
+        String coverToken = savedImageTokenDao.selectTokenByTarget(UploadImageTargetType.BLOG_COVER, params.id);
+
+        BlogEditController.EditResp result = new BlogEditController.EditResp();
+        result.setTitle(blog.getTitle());
+        result.setMarkdownBody(blog.getMarkdownBody());
+        result.setIsAllowReprint(blog.getIsAllowReprint());
+        result.setCreateTime(blog.getCreateTime());
+        result.setModifyTime(blog.getModifyTime());
+        result.setImageToken(imageToken);
+        result.setCoverToken(coverToken);
+        result.setCoverUrl(blog.getCoverPath() != null ? webSiteUrl + imageDir + "/" + blog.getCoverPath() : null);
+
+        return result;
     }
 }

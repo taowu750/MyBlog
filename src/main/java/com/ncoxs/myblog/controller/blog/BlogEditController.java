@@ -6,10 +6,11 @@ import com.ncoxs.myblog.constant.ResultCode;
 import com.ncoxs.myblog.handler.encryption.Encryption;
 import com.ncoxs.myblog.handler.validate.UserValidate;
 import com.ncoxs.myblog.model.dto.GenericResult;
+import com.ncoxs.myblog.model.dto.MarkdownEditObject;
 import com.ncoxs.myblog.model.dto.MarkdownObject;
 import com.ncoxs.myblog.model.dto.UserAccessParams;
 import com.ncoxs.myblog.service.app.MarkdownService;
-import com.ncoxs.myblog.service.blog.BlogUploadService;
+import com.ncoxs.myblog.service.blog.BlogEditService;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import org.hibernate.validator.constraints.Length;
@@ -24,18 +25,18 @@ import org.springframework.web.bind.annotation.RestController;
 import javax.validation.constraints.NotBlank;
 
 /**
- * 博客上传控制器
+ * 博客编辑控制器
  */
 @RestController
 @RequestMapping("/blog")
 @Validated
-public class BlogUploadController {
+public class BlogEditController {
 
-    private BlogUploadService blogUploadService;
+    private BlogEditService blogEditService;
 
     @Autowired
-    public void setBlogUploadService(BlogUploadService blogUploadService) {
-        this.blogUploadService = blogUploadService;
+    public void setBlogUploadService(BlogEditService blogEditService) {
+        this.blogEditService = blogEditService;
     }
 
 
@@ -58,10 +59,10 @@ public class BlogUploadController {
     @Encryption
     @UserValidate
     public GenericResult<Integer> uploadBlogDraft(@RequestBody BlogDraftParams params) {
-        int blogDraftId = blogUploadService.saveBlogDraft(params);
-        if (blogDraftId == BlogUploadService.PARAMS_ALL_BLANK) {
+        int blogDraftId = blogEditService.saveBlogDraft(params);
+        if (blogDraftId == BlogEditService.PARAMS_ALL_BLANK) {
             return GenericResult.error(ResultCode.PARAMS_ALL_BLANK);
-        } else if (blogDraftId == BlogUploadService.BLOG_DRAFT_COUNT_FULL) {
+        } else if (blogDraftId == BlogEditService.BLOG_DRAFT_COUNT_FULL) {
             return GenericResult.error(ResultCode.DATA_COUNT_OUT_RANGE);
         }  else if (blogDraftId == MarkdownService.IMAGE_TOKEN_MISMATCH) {
             return GenericResult.error(ResultCode.PARAMS_IMAGE_TOKEN_MISMATCH);
@@ -100,14 +101,14 @@ public class BlogUploadController {
      * 当发布新的博客时，除 id、imageToken、coverToken 外的参数都不能为空；
      * 当修改博客时，id 必须存在，并且不能所有参数都为空。
      */
-    @PostMapping("/publish/self")
+    @PostMapping("/publish")
     @Encryption
     @UserValidate
     public GenericResult<Integer> publishBlog(@RequestBody BlogParams params) {
-        int blogId = blogUploadService.publishBlog(params);
-        if (blogId == BlogUploadService.PARAMS_ALL_BLANK) {
+        int blogId = blogEditService.publishBlog(params);
+        if (blogId == BlogEditService.PARAMS_ALL_BLANK) {
             return GenericResult.error(ResultCode.PARAMS_ALL_BLANK);
-        } else if (blogId == BlogUploadService.BLOG_PARAM_BLANK) {
+        } else if (blogId == BlogEditService.BLOG_PARAM_BLANK) {
             return GenericResult.error(ResultCode.PARAM_NOT_COMPLETE);
         } else if (blogId == MarkdownService.IMAGE_TOKEN_MISMATCH) {
             return GenericResult.error(ResultCode.PARAMS_IMAGE_TOKEN_MISMATCH);
@@ -141,17 +142,50 @@ public class BlogUploadController {
      *
      * 注意，当修改了博客草稿并且想要发表成博客时，应该先调用保存博客草稿接口再调用此接口。
      */
-    @PostMapping("/publish/draft")
+    @PostMapping("/draft/publish")
     @Encryption
     @UserValidate
     public GenericResult<Integer> publishBlog(@RequestBody PublishDraftParams params) {
-        int blogId = blogUploadService.publishBlog(params);
+        int blogId = blogEditService.publishBlog(params);
         if (blogId == MarkdownService.MARKDOWN_NOT_BELONG) {
             return GenericResult.error(ResultCode.DATA_ACCESS_DENIED);
-        } else if (blogId == BlogUploadService.BLOG_DRAFT_NOT_COMPLETE) {
+        } else if (blogId == BlogEditService.BLOG_DRAFT_NOT_COMPLETE) {
             return GenericResult.error(ResultCode.DATA_NOT_COMPLETE);
         } else {
             return GenericResult.success(blogId);
         }
+    }
+
+    @EqualsAndHashCode(callSuper = true)
+    @Data
+    public static class EditParams extends UserAccessParams {
+
+        public int id;
+    }
+
+    @EqualsAndHashCode(callSuper = true)
+    @Data
+    public static class EditResp extends MarkdownEditObject {
+        public Boolean isAllowReprint;
+    }
+
+    /**
+     * 为了编辑博客草稿，获取它的内容。
+     */
+    @PostMapping("/draft/get-for-edit")
+    @Encryption
+    @UserValidate
+    public GenericResult<EditResp> getDraftForEdit(@RequestBody EditParams params) {
+        return GenericResult.ofNullable(blogEditService.getDraftData(params), ResultCode.DATA_ACCESS_DENIED);
+    }
+
+    /**
+     * 为了编辑博客，获取它的内容。
+     */
+    @PostMapping("/get-for-edit")
+    @Encryption
+    @UserValidate
+    public GenericResult<EditResp> getBlogForEdit(@RequestBody EditParams params) {
+        return GenericResult.ofNullable(blogEditService.getBlogData(params), ResultCode.DATA_ACCESS_DENIED);
     }
 }

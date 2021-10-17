@@ -27,7 +27,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-public class BlogUploadControllerTest extends BaseTester {
+public class BlogEditControllerTest extends BaseTester {
 
     @Autowired
     BlogDraftDao blogDraftDao;
@@ -62,7 +62,7 @@ public class BlogUploadControllerTest extends BaseTester {
         blogBody = blogBody.replace("url-placeholder2", imageUrl2);
 
         // 上传新的博客草稿
-        BlogUploadController.BlogDraftParams params = new BlogUploadController.BlogDraftParams();
+        BlogEditController.BlogDraftParams params = new BlogEditController.BlogDraftParams();
         params.title = "标题1";
         params.setMarkdownBody(blogBody);
         params.isAllowReprint = true;
@@ -124,7 +124,7 @@ public class BlogUploadControllerTest extends BaseTester {
         blogBody = blogBody.replace("url-placeholder2", imageUrl3);
 
         // 修改博客草稿
-        params = new BlogUploadController.BlogDraftParams();
+        params = new BlogEditController.BlogDraftParams();
         // 修改博客草稿，上传 id
         params.setId(blogDraftId);
         params.title = "标题2";
@@ -180,7 +180,7 @@ public class BlogUploadControllerTest extends BaseTester {
 
         // 上传新的博客草稿
         String blogBody = ResourceUtil.loadString("markdown/test-blog-new.md");
-        BlogUploadController.BlogDraftParams params = new BlogUploadController.BlogDraftParams();
+        BlogEditController.BlogDraftParams params = new BlogEditController.BlogDraftParams();
         params.title = "标题1";
         params.setMarkdownBody(blogBody);
         params.isAllowReprint = true;
@@ -212,7 +212,7 @@ public class BlogUploadControllerTest extends BaseTester {
         // 上传图片 test2.jpeg 作为新的博客封面
         String coverUrl2 = uploadImage(tuple, UploadImageTargetType.BLOG_DRAFT_COVER, coverToken, "test2.jpeg");
         // 修改博客封面
-        params = new BlogUploadController.BlogDraftParams();
+        params = new BlogEditController.BlogDraftParams();
         params.setId(result2.getData());
         // 删除原来的封面，其实这里的赋值有没有都可以
         params.setCoverToken(coverToken);
@@ -264,7 +264,7 @@ public class BlogUploadControllerTest extends BaseTester {
         htmlBody = htmlBody.replace("url-placeholder2", imageUrl2);
 
         // 上传新的博客
-        BlogUploadController.BlogParams params = new BlogUploadController.BlogParams();
+        BlogEditController.BlogParams params = new BlogEditController.BlogParams();
         params.title = "标题1";
         params.htmlBody = htmlBody;
         params.wordCount = 1000;
@@ -274,7 +274,7 @@ public class BlogUploadControllerTest extends BaseTester {
         params.setUserLoginToken(tuple.t1.getToken());
 
         byte[] data = new EncryptionMockMvcBuilder(mockMvc, objectMapper)
-                .post("/blog/publish/self")
+                .post("/blog/publish")
                 .jsonParams(params)
                 .session(tuple.t2)
                 .sendRequest()
@@ -334,7 +334,7 @@ public class BlogUploadControllerTest extends BaseTester {
         htmlBody = htmlBody.replace("url-placeholder2", imageUrl3);
 
         // 修改博客
-        params = new BlogUploadController.BlogParams();
+        params = new BlogEditController.BlogParams();
         // 修改博客，上传 id
         params.setId(blogId);
         params.title = "标题2";
@@ -346,7 +346,7 @@ public class BlogUploadControllerTest extends BaseTester {
         params.setUserLoginToken(tuple.t1.getToken());
 
         data = new EncryptionMockMvcBuilder(mockMvc, objectMapper)
-                .post("/blog/publish/self")
+                .post("/blog/publish")
                 .jsonParams(params)
                 .session(tuple.t2)
                 .sendRequest()
@@ -399,7 +399,7 @@ public class BlogUploadControllerTest extends BaseTester {
         blogBody = blogBody.replace("url-placeholder2", imageUrl2);
 
         // 上传新的博客草稿
-        BlogUploadController.BlogDraftParams params = new BlogUploadController.BlogDraftParams();
+        BlogEditController.BlogDraftParams params = new BlogEditController.BlogDraftParams();
         params.title = "标题1";
         params.setMarkdownBody(blogBody);
         params.isAllowReprint = true;
@@ -441,14 +441,14 @@ public class BlogUploadControllerTest extends BaseTester {
         htmlBody = htmlBody.replace("url-placeholder1", imageUrl1);
         htmlBody = htmlBody.replace("url-placeholder2", imageUrl2);
 
-        BlogUploadController.PublishDraftParams publishDraftParams = new BlogUploadController.PublishDraftParams();
+        BlogEditController.PublishDraftParams publishDraftParams = new BlogEditController.PublishDraftParams();
         publishDraftParams.blogDraftId = blogDraftId;
         publishDraftParams.htmlBody = htmlBody;
         publishDraftParams.wordCount = 1000;
         publishDraftParams.setUserLoginToken(tuple.t1.getToken());
 
         data = new EncryptionMockMvcBuilder(mockMvc, objectMapper)
-                .post("/blog/publish/draft")
+                .post("/blog/draft/publish")
                 .jsonParams(publishDraftParams)
                 .session(tuple.t2)
                 .sendRequest()

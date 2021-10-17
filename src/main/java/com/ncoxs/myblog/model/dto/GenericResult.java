@@ -60,4 +60,12 @@ public class GenericResult<T> implements Serializable {
             return error(code);
         }
     }
+
+    public static <T> GenericResult<T> ofNullable(T data, ResultCode errorCode) {
+        if (data != null) {
+            return success(data);
+        } else {
+            return error(errorCode);
+        }
+    }
 }

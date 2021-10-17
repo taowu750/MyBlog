@@ -2,6 +2,8 @@ myapp:
   website:
     # 网站 URL
     url: http://localhost:8080/my-blog/
+    # 图片相对目录
+    image-dir: img
 
   user:
     activate:

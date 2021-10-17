@@ -60,7 +60,11 @@ public class Blog implements Serializable {
     private static final long serialVersionUID = 1L;
 
 
-    public Blog(Integer userId, String title, String htmlBody, String markdownBody, String coverPath, Integer wordCount, Integer status, Boolean isAllowReprint) {
+    /**
+     * 新建博客的构造器
+     */
+    public Blog(Integer userId, String title, String htmlBody, String markdownBody, String coverPath, Integer wordCount,
+                Integer status, Boolean isAllowReprint) {
         this.userId = userId;
         this.title = title;
         this.htmlBody = htmlBody;
@@ -71,7 +75,11 @@ public class Blog implements Serializable {
         this.isAllowReprint = isAllowReprint;
     }
 
-    public Blog(Integer id, Integer userId, String title, String htmlBody, String markdownBody, String coverPath, Integer wordCount, Boolean isAllowReprint) {
+    /**
+     * 修改博客的构造器
+     */
+    public Blog(Integer id, Integer userId, String title, String htmlBody, String markdownBody, String coverPath,
+                Integer wordCount, Boolean isAllowReprint) {
         this.id = id;
         this.userId = userId;
         this.title = title;
@@ -80,5 +88,7 @@ public class Blog implements Serializable {
         this.coverPath = coverPath;
         this.wordCount = wordCount;
         this.isAllowReprint = isAllowReprint;
+        // 修改时间设置
+        modifyTime = new Date();
     }
 }
