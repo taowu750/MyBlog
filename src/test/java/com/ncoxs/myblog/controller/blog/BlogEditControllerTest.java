@@ -25,6 +25,8 @@ import java.io.File;
 import java.util.Enumeration;
 import java.util.List;
 
+import static com.ncoxs.myblog.util.general.MapUtil.kv;
+import static com.ncoxs.myblog.util.general.MapUtil.mp;
 import static org.junit.jupiter.api.Assertions.*;
 
 public class BlogEditControllerTest extends BaseTester {
@@ -476,5 +478,84 @@ public class BlogEditControllerTest extends BaseTester {
         assertEquals(params.getMarkdownBody(), blog.getMarkdownBody());
         assertEquals(publishDraftParams.wordCount, blog.getWordCount());
         assertEquals(publishDraftParams.getHtmlBody(), blog.getHtmlBody());
+    }
+
+    /**
+     * 测试获取编辑数据的接口。
+     */
+    @Test
+    @Transactional
+    public void testGetEditData() throws Exception {
+        Tuple2<UserLoginResp, MockHttpSession> tuple = prepareUser();
+
+        // 上传图片 test1.gif
+        String imageToken = UUIDUtil.generate();
+        String imageUrl1 = uploadImage(tuple, UploadImageTargetType.BLOG_DRAFT, imageToken, "test1.gif");
+        // 上传图片 test2.jpeg
+        String imageUrl2 = uploadImage(tuple, UploadImageTargetType.BLOG_DRAFT, imageToken, "test2.jpeg");
+
+        // 上传图片 test3.jpeg 作为博客封面
+        String coverToken = UUIDUtil.generate();
+        String coverUrl = uploadImage(tuple, UploadImageTargetType.BLOG_DRAFT_COVER, coverToken, "test3.jpeg");
+
+        // 读取博客草稿正文并替换图片 url
+        String blogBody = ResourceUtil.loadString("markdown/test-blog-new.md");
+        blogBody = blogBody.replace("url-placeholder1", imageUrl1);
+        blogBody = blogBody.replace("url-placeholder2", imageUrl2);
+
+        // 上传新的博客草稿
+        BlogEditController.BlogDraftParams params = new BlogEditController.BlogDraftParams();
+        params.title = "标题1";
+        params.setMarkdownBody(blogBody);
+        params.isAllowReprint = true;
+        params.setImageToken(imageToken);
+        params.setCoverToken(coverToken);
+        params.setUserLoginToken(tuple.t1.getToken());
+
+        byte[] data = new EncryptionMockMvcBuilder(mockMvc, objectMapper)
+                .post("/blog/draft/upload")
+                .jsonParams(params)
+                .session(tuple.t2)
+                .sendRequest()
+                .expectStatusOk()
+                .print()
+                .buildByte();
+        GenericResult<Integer> result2 = objectMapper.readValue(data,
+                new TypeReference<GenericResult<Integer>>() {
+                });
+        assertNotNull(result2.getData());
+
+        // assert 博客草稿上传
+        BlogDraft blogDraft = blogDraftDao.selectById(result2.getData());
+        assertNotNull(blogDraft);
+        assertEquals(blogBody, blogDraft.getMarkdownBody());
+        assertEquals(params.title, blogDraft.getTitle());
+        assertEquals(params.isAllowReprint, blogDraft.getIsAllowReprint());
+
+
+        // 获取博客草稿内容
+        data = new EncryptionMockMvcBuilder(mockMvc, objectMapper)
+                .post("/blog/draft/get-for-edit")
+                .jsonParams(mp(kv("id", blogDraft.getId()), kv("userLoginToken", tuple.t1.getToken())))
+                .session(tuple.t2)
+                .sendRequest()
+                .expectStatusOk()
+                .print()
+                .buildByte();
+        GenericResult<BlogEditController.EditResp> result3 = objectMapper.readValue(data,
+                new TypeReference<GenericResult<BlogEditController.EditResp>>() {
+                });
+
+        // assert 获取博客草稿内容
+        BlogEditController.EditResp editResp = result3.getData();
+        assertNotNull(editResp);
+        assertEquals(blogDraft.getTitle(), editResp.getTitle());
+        assertEquals(blogDraft.getMarkdownBody(), editResp.getMarkdownBody());
+        assertEquals(blogDraft.getIsAllowReprint(), editResp.getIsAllowReprint());
+        assertEquals(blogDraft.getCreateTime(), editResp.getCreateTime());
+        assertEquals(blogDraft.getModifyTime(), editResp.getModifyTime());
+        assertEquals(imageToken, editResp.getImageToken());
+        assertEquals(coverToken, editResp.getCoverToken());
+        assertEquals(coverUrl, editResp.getCoverUrl());
     }
 }
