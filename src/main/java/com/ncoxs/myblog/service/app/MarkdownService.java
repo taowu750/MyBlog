@@ -20,7 +20,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * 用来处理上传的原始 Markdown 文档，其中可能包含 base64 格式的图片。
+ * 用来处理上传的原始 Markdown 文档。
  */
 @Service
 public class MarkdownService implements InitializingBean {

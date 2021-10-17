@@ -23,7 +23,7 @@ public interface ParamValidateRule {
     int BLOG_TITLE_MIN_LEN = 1;
     int BLOG_TITLE_MAX_LEN = 50;
     int BLOG_CONTENT_MIN_LEN = 10;
-    int BLOG_CONTENT_MAX_LEN = 30000;
-    int BLOG_WORD_COUNT_MIN = 20;
-    int BLOG_WORD_COUNT_MAX = 15000;
+    int BLOG_CONTENT_MAX_LEN = 25000;
+    int BLOG_WORD_COUNT_MIN = 10;
+    int BLOG_WORD_COUNT_MAX = 10000;
 }

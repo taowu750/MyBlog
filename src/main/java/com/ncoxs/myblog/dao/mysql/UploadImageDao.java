@@ -14,6 +14,8 @@ public interface UploadImageDao {
 
     int insert(UploadImage record);
 
+    int updateTargetTypeByToken(String token, int newTargetType);
+
     boolean deleteById(int id);
 
     int deleteByToken(String token);

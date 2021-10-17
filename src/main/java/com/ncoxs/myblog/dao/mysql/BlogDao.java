@@ -8,7 +8,7 @@ public interface BlogDao {
 
     boolean isMatchIdAndUserId(int id, int userId);
 
-    Blog selectByPrimaryKey(Integer id);
+    Blog selectById(Integer id);
 
     int insert(Blog record);
 

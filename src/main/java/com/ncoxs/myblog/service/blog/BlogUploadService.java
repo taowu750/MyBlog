@@ -4,10 +4,7 @@ import com.ncoxs.myblog.constant.ParamValidateRule;
 import com.ncoxs.myblog.constant.UploadImageTargetType;
 import com.ncoxs.myblog.constant.blog.BlogStatus;
 import com.ncoxs.myblog.controller.blog.BlogUploadController;
-import com.ncoxs.myblog.dao.mysql.BlogDao;
-import com.ncoxs.myblog.dao.mysql.BlogDraftDao;
-import com.ncoxs.myblog.dao.mysql.SavedImageTokenDao;
-import com.ncoxs.myblog.dao.mysql.UserLogDao;
+import com.ncoxs.myblog.dao.mysql.*;
 import com.ncoxs.myblog.model.dto.MarkdownObject;
 import com.ncoxs.myblog.model.pojo.*;
 import com.ncoxs.myblog.service.app.MarkdownService;
@@ -67,13 +64,20 @@ public class BlogUploadService {
         this.savedImageTokenDao = savedImageTokenDao;
     }
 
+    private UploadImageDao uploadImageDao;
+
+    @Autowired
+    public void setUploadImageDao(UploadImageDao uploadImageDao) {
+        this.uploadImageDao = uploadImageDao;
+    }
+
 
     /**
-     * 参数都是空
+     * 错误码：参数都是 null
      */
     public static final int PARAMS_ALL_BLANK = -10;
     /**
-     * 用户所具有的博客草稿数量超过最大值
+     * 错误码：用户所具有的博客草稿数量超过最大值
      */
     public static final int BLOG_DRAFT_COUNT_FULL = -11;
 
@@ -136,7 +140,7 @@ public class BlogUploadService {
 
 
     /**
-     * 博客的一些关键参数是空
+     * 错误码：博客的一些关键参数是 null
      */
     public static final int BLOG_PARAM_BLANK = -20;
 
@@ -197,7 +201,7 @@ public class BlogUploadService {
     }
 
     /**
-     * 博客草稿的一些关键参数是空
+     * 错误码：博客草稿的一些关键参数是 null
      */
     public static final int BLOG_DRAFT_NOT_COMPLETE = -30;
 
@@ -227,11 +231,13 @@ public class BlogUploadService {
         // 将博客草稿的图片 token 和封面 token 变成博客的
         String imageToken = savedImageTokenDao.selectTokenByTarget(UploadImageTargetType.BLOG_DRAFT, params.blogDraftId);
         if (imageToken != null) {
-            savedImageTokenDao.updateTargetTypeByToken(imageToken, UploadImageTargetType.BLOG);
+            savedImageTokenDao.updateTargetByToken(imageToken, blog.getId(), UploadImageTargetType.BLOG);
+            uploadImageDao.updateTargetTypeByToken(imageToken, UploadImageTargetType.BLOG);
         }
         String coverToken = savedImageTokenDao.selectTokenByTarget(UploadImageTargetType.BLOG_DRAFT_COVER, params.blogDraftId);
         if (coverToken != null) {
-            savedImageTokenDao.updateTargetTypeByToken(coverToken, UploadImageTargetType.BLOG_COVER);
+            savedImageTokenDao.updateTargetByToken(coverToken, blog.getId(), UploadImageTargetType.BLOG_COVER);
+            uploadImageDao.updateTargetTypeByToken(imageToken, UploadImageTargetType.BLOG_COVER);
         }
 
         // 删除博客草稿

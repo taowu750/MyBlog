@@ -2,11 +2,13 @@ package com.ncoxs.myblog.controller.blog;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.ncoxs.myblog.constant.UploadImageTargetType;
+import com.ncoxs.myblog.dao.mysql.BlogDao;
 import com.ncoxs.myblog.dao.mysql.BlogDraftDao;
 import com.ncoxs.myblog.dao.mysql.SavedImageTokenDao;
 import com.ncoxs.myblog.dao.mysql.UploadImageDao;
 import com.ncoxs.myblog.model.dto.GenericResult;
 import com.ncoxs.myblog.model.dto.UserLoginResp;
+import com.ncoxs.myblog.model.pojo.Blog;
 import com.ncoxs.myblog.model.pojo.BlogDraft;
 import com.ncoxs.myblog.model.pojo.UploadImage;
 import com.ncoxs.myblog.testutil.BaseTester;
@@ -29,6 +31,9 @@ public class BlogUploadControllerTest extends BaseTester {
 
     @Autowired
     BlogDraftDao blogDraftDao;
+
+    @Autowired
+    BlogDao blogDao;
 
     @Autowired
     SavedImageTokenDao savedImageTokenDao;
@@ -161,6 +166,9 @@ public class BlogUploadControllerTest extends BaseTester {
         assertThrows(IllegalArgumentException.class, () -> ResourceUtil.classpath("static/img/" + deleteImagePath));
     }
 
+    /**
+     * 测试上传博客草稿封面。
+     */
     @Test
     @Transactional
     public void testUploadBlogDraftCover() throws Exception {
@@ -231,5 +239,242 @@ public class BlogUploadControllerTest extends BaseTester {
         assertTrue(new File(ResourceUtil.classpath("static/img/" + blogDraft.getCoverPath())).isFile());
         // 测试被删除的图片
         assertThrows(IllegalArgumentException.class, () -> ResourceUtil.classpath("static/img/" + deleteCoverPath1));
+    }
+
+    /**
+     * 测试发表/修改博客
+     */
+    @Test
+    @Transactional
+    public void testPublishBlog() throws Exception {
+        Tuple2<UserLoginResp, MockHttpSession> tuple = prepareUser();
+
+        // 上传图片 test1.gif
+        String imageToken = UUIDUtil.generate();
+        String imageUrl1 = uploadImage(tuple, UploadImageTargetType.BLOG, imageToken, "test1.gif");
+        // 上传图片 test2.jpeg
+        String imageUrl2 = uploadImage(tuple, UploadImageTargetType.BLOG, imageToken, "test2.jpeg");
+
+        // 读取博客正文并替换图片 url
+        String markdownBody = ResourceUtil.loadString("markdown/test-blog-new.md");
+        markdownBody = markdownBody.replace("url-placeholder1", imageUrl1);
+        markdownBody = markdownBody.replace("url-placeholder2", imageUrl2);
+        String htmlBody = ResourceUtil.loadString("markdown/test-blog-new.html");
+        htmlBody = htmlBody.replace("url-placeholder1", imageUrl1);
+        htmlBody = htmlBody.replace("url-placeholder2", imageUrl2);
+
+        // 上传新的博客
+        BlogUploadController.BlogParams params = new BlogUploadController.BlogParams();
+        params.title = "标题1";
+        params.htmlBody = htmlBody;
+        params.wordCount = 1000;
+        params.setMarkdownBody(markdownBody);
+        params.isAllowReprint = true;
+        params.setImageToken(imageToken);
+        params.setUserLoginToken(tuple.t1.getToken());
+
+        byte[] data = new EncryptionMockMvcBuilder(mockMvc, objectMapper)
+                .post("/blog/publish/self")
+                .jsonParams(params)
+                .session(tuple.t2)
+                .sendRequest()
+                .expectStatusOk()
+                .print()
+                .buildByte();
+        GenericResult<Integer> result2 = objectMapper.readValue(data,
+                new TypeReference<GenericResult<Integer>>() {
+                });
+        assertNotNull(result2.getData());
+        int blogId = result2.getData();
+
+        // assert 博客上传
+        Blog blog = blogDao.selectById(blogId);
+        assertNotNull(blog);
+        assertEquals(htmlBody, blog.getHtmlBody());
+        assertEquals(markdownBody, blog.getMarkdownBody());
+        assertEquals(params.wordCount, blog.getWordCount());
+        assertEquals(params.title, blog.getTitle());
+        assertEquals(params.isAllowReprint, blog.getIsAllowReprint());
+
+        String savedImageToken = savedImageTokenDao.selectTokenByTarget(UploadImageTargetType.BLOG, result2.getData());
+        assertEquals(savedImageToken, imageToken);
+
+        List<UploadImage> uploadImages = uploadImageDao.selectByToken(imageToken);
+        assertEquals(2, uploadImages.size());
+        assertTrue(imageUrl1.endsWith(uploadImages.get(0).getFilepath()));
+        assertTrue(imageUrl2.endsWith(uploadImages.get(1).getFilepath()));
+
+        assertTrue(new File(ResourceUtil.classpath("static/img/" + uploadImages.get(0).getFilepath())).isFile());
+        assertTrue(new File(ResourceUtil.classpath("static/img/" + uploadImages.get(1).getFilepath())).isFile());
+
+        // 这张图片在下面的修改博客中将被删除
+        String deleteImagePath = uploadImages.get(1).getFilepath();
+
+        int cnt = 0;
+        Enumeration<String> attributeNames = tuple.t2.getAttributeNames();
+        while (attributeNames.hasMoreElements()) {
+            attributeNames.nextElement();
+            cnt++;
+        }
+        // 上传博客后，session 里面的属性应该只剩下用户登录 token 的两个，以及图片 token set
+        assertEquals(3, cnt);
+
+
+        // 上传图片 test3.jpeg
+        String imageUrl3 = uploadImage(tuple, UploadImageTargetType.BLOG, imageToken, "test3.jpeg");
+
+        // 读取修改的博客正文
+        markdownBody = ResourceUtil.loadString("markdown/test-blog-update.md");
+        markdownBody = markdownBody.replace("url-placeholder1", imageUrl1);
+        // 修改博客中的一张图片
+        markdownBody = markdownBody.replace("url-placeholder2", imageUrl3);
+        htmlBody = ResourceUtil.loadString("markdown/test-blog-update.html");
+        htmlBody = htmlBody.replace("url-placeholder1", imageUrl1);
+        // 修改博客中的一张图片
+        htmlBody = htmlBody.replace("url-placeholder2", imageUrl3);
+
+        // 修改博客
+        params = new BlogUploadController.BlogParams();
+        // 修改博客，上传 id
+        params.setId(blogId);
+        params.title = "标题2";
+        params.htmlBody = htmlBody;
+        params.wordCount = 900;
+        params.setMarkdownBody(markdownBody);
+        params.isAllowReprint = false;
+        params.setImageToken(imageToken);
+        params.setUserLoginToken(tuple.t1.getToken());
+
+        data = new EncryptionMockMvcBuilder(mockMvc, objectMapper)
+                .post("/blog/publish/self")
+                .jsonParams(params)
+                .session(tuple.t2)
+                .sendRequest()
+                .expectStatusOk()
+                .print()
+                .buildByte();
+        result2 = objectMapper.readValue(data,
+                new TypeReference<GenericResult<Integer>>() {
+                });
+        assertNotNull(result2.getData());
+
+        // assert 博客的修改
+        blog = blogDao.selectById(result2.getData());
+        assertNotNull(blog);
+        assertEquals(markdownBody, blog.getMarkdownBody());
+        assertEquals(htmlBody, blog.getHtmlBody());
+        assertEquals(params.wordCount, blog.getWordCount());
+        assertEquals(params.title, blog.getTitle());
+        assertEquals(params.isAllowReprint, blog.getIsAllowReprint());
+
+        uploadImages = uploadImageDao.selectByToken(imageToken);
+        assertEquals(2, uploadImages.size());
+        assertTrue(imageUrl1.endsWith(uploadImages.get(0).getFilepath()));
+        // 修改的图片
+        assertTrue(imageUrl3.endsWith(uploadImages.get(1).getFilepath()));
+
+        assertTrue(new File(ResourceUtil.classpath("static/img/" + uploadImages.get(0).getFilepath())).isFile());
+        assertTrue(new File(ResourceUtil.classpath("static/img/" + uploadImages.get(1).getFilepath())).isFile());
+        // 测试被删除的图片
+        assertThrows(IllegalArgumentException.class, () -> ResourceUtil.classpath("static/img/" + deleteImagePath));
+    }
+
+    /**
+     * 测试将博客草稿发表为博客
+     */
+    @Test
+    @Transactional
+    public void testPublishBlogByDraft() throws Exception {
+        Tuple2<UserLoginResp, MockHttpSession> tuple = prepareUser();
+
+        // 上传图片 test1.gif
+        String imageToken = UUIDUtil.generate();
+        String imageUrl1 = uploadImage(tuple, UploadImageTargetType.BLOG_DRAFT, imageToken, "test1.gif");
+        // 上传图片 test2.jpeg
+        String imageUrl2 = uploadImage(tuple, UploadImageTargetType.BLOG_DRAFT, imageToken, "test2.jpeg");
+
+        // 读取博客草稿正文并替换图片 url
+        String blogBody = ResourceUtil.loadString("markdown/test-blog-new.md");
+        blogBody = blogBody.replace("url-placeholder1", imageUrl1);
+        blogBody = blogBody.replace("url-placeholder2", imageUrl2);
+
+        // 上传新的博客草稿
+        BlogUploadController.BlogDraftParams params = new BlogUploadController.BlogDraftParams();
+        params.title = "标题1";
+        params.setMarkdownBody(blogBody);
+        params.isAllowReprint = true;
+        params.setImageToken(imageToken);
+        params.setUserLoginToken(tuple.t1.getToken());
+
+        byte[] data = new EncryptionMockMvcBuilder(mockMvc, objectMapper)
+                .post("/blog/draft/upload")
+                .jsonParams(params)
+                .session(tuple.t2)
+                .sendRequest()
+                .expectStatusOk()
+                .print()
+                .buildByte();
+        GenericResult<Integer> result2 = objectMapper.readValue(data,
+                new TypeReference<GenericResult<Integer>>() {
+                });
+        assertNotNull(result2.getData());
+        int blogDraftId = result2.getData();
+
+        // assert 博客草稿上传
+        BlogDraft blogDraft = blogDraftDao.selectById(result2.getData());
+        assertNotNull(blogDraft);
+        assertEquals(blogBody, blogDraft.getMarkdownBody());
+        assertEquals(params.title, blogDraft.getTitle());
+        assertEquals(params.isAllowReprint, blogDraft.getIsAllowReprint());
+
+        String savedImageToken = savedImageTokenDao.selectTokenByTarget(UploadImageTargetType.BLOG_DRAFT, result2.getData());
+        assertEquals(savedImageToken, imageToken);
+
+        List<UploadImage> uploadImages = uploadImageDao.selectByToken(imageToken);
+        assertEquals(2, uploadImages.size());
+        assertTrue(imageUrl1.endsWith(uploadImages.get(0).getFilepath()));
+        assertTrue(imageUrl2.endsWith(uploadImages.get(1).getFilepath()));
+
+
+        // 将博客草稿发表为博客
+        String htmlBody = ResourceUtil.loadString("markdown/test-blog-new.html");
+        htmlBody = htmlBody.replace("url-placeholder1", imageUrl1);
+        htmlBody = htmlBody.replace("url-placeholder2", imageUrl2);
+
+        BlogUploadController.PublishDraftParams publishDraftParams = new BlogUploadController.PublishDraftParams();
+        publishDraftParams.blogDraftId = blogDraftId;
+        publishDraftParams.htmlBody = htmlBody;
+        publishDraftParams.wordCount = 1000;
+        publishDraftParams.setUserLoginToken(tuple.t1.getToken());
+
+        data = new EncryptionMockMvcBuilder(mockMvc, objectMapper)
+                .post("/blog/publish/draft")
+                .jsonParams(publishDraftParams)
+                .session(tuple.t2)
+                .sendRequest()
+                .expectStatusOk()
+                .print()
+                .buildByte();
+        result2 = objectMapper.readValue(data,
+                new TypeReference<GenericResult<Integer>>() {
+                });
+        assertNotNull(result2.getData());
+
+        // assert 博客发表
+        assertNull(blogDraftDao.selectById(blogDraftId));
+        assertNull(savedImageTokenDao.selectTokenByTarget(UploadImageTargetType.BLOG_DRAFT, blogDraftId));
+        assertNotNull(savedImageTokenDao.selectTokenByTarget(UploadImageTargetType.BLOG, result2.getData()));
+        uploadImages = uploadImageDao.selectByToken(imageToken);
+        assertEquals(2, uploadImages.size());
+        for (UploadImage uploadImage : uploadImages) {
+            assertEquals(UploadImageTargetType.BLOG, uploadImage.getTargetType());
+        }
+
+        Blog blog = blogDao.selectById(result2.getData());
+        assertNotNull(blog);
+        assertEquals(params.title, blog.getTitle());
+        assertEquals(params.getMarkdownBody(), blog.getMarkdownBody());
+        assertEquals(publishDraftParams.wordCount, blog.getWordCount());
+        assertEquals(publishDraftParams.getHtmlBody(), blog.getHtmlBody());
     }
 }

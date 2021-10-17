@@ -27,7 +27,7 @@
     create_time, modify_time
     </sql>
 
-    <select id="selectByPrimaryKey" parameterType="java.lang.Integer" resultMap="BaseResultMap">
+    <select id="selectById" parameterType="java.lang.Integer" resultMap="BaseResultMap">
         select
         <include refid="Base_Column_List"/>
         from blog
@@ -37,7 +37,7 @@
     <select id="isMatchIdAndUserId" resultType="java.lang.Boolean">
         select count(*)
         from blog
-        where id=#{id} and user_id=#{user_id}
+        where id=#{id} and user_id=#{userId}
     </select>
 
     <insert id="insert" keyColumn="id" keyProperty="id" parameterType="com.ncoxs.myblog.model.pojo.Blog"

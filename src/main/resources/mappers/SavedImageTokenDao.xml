@@ -13,9 +13,9 @@
         id, token, target_type, target_id, create_time
     </sql>
 
-    <update id="updateTargetTypeByToken">
+    <update id="updateTargetByToken">
         update saved_image_token
-        set target_type=#{newTargetType}
+        set target_id=#{newTargetId}, target_type=#{newTargetType}
         where token=#{token}
     </update>
 

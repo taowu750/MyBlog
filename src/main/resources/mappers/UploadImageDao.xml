@@ -15,6 +15,12 @@
         id, user_id, token, target_type, filepath, origin_file_name, create_time
     </sql>
 
+    <update id="updateTargetTypeByToken">
+        update upload_image
+        set target_type = #{newTargetType}
+        where token=#{token};
+    </update>
+
     <select id="selectByToken" resultMap="BaseResultMap">
         select
         <include refid="Base_Column_List"/>
