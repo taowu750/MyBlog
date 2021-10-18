@@ -20,6 +20,8 @@ public class UserBasicInfo implements Serializable {
 
     private Integer userId;
 
+    private String name;
+
     /**
      * 头像图片路径
      */

@@ -10,6 +10,7 @@ import com.ncoxs.myblog.model.pojo.Blog;
 import com.ncoxs.myblog.model.pojo.BlogDraft;
 import com.ncoxs.myblog.model.pojo.UploadImage;
 import com.ncoxs.myblog.model.pojo.User;
+import com.ncoxs.myblog.service.app.ImageService;
 import com.ncoxs.myblog.service.app.MarkdownService;
 import com.ncoxs.myblog.service.user.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,17 +20,12 @@ import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 
+// TODO: 增加用户日志记录
 @Service
 public class BlogEditService {
 
     @Value("${myapp.blog.draft.default-max-upper-limit}")
     private int maxBlogDraftUpperLimit;
-
-    @Value("${myapp.website.url}")
-    private String webSiteUrl;
-
-    @Value("${myapp.website.image-dir}")
-    private String imageDir;
 
 
     private UserService userService;
@@ -44,6 +40,13 @@ public class BlogEditService {
     @Autowired
     public void setMarkdownService(MarkdownService markdownService) {
         this.markdownService = markdownService;
+    }
+
+    private ImageService imageService;
+
+    @Autowired
+    public void setImageService(ImageService imageService) {
+        this.imageService = imageService;
     }
 
     private UserLogDao userLogDao;
@@ -274,7 +277,7 @@ public class BlogEditService {
         result.setModifyTime(blogDraft.getModifyTime());
         result.setImageToken(imageToken);
         result.setCoverToken(coverToken);
-        result.setCoverUrl(blogDraft.getCoverPath() != null ? webSiteUrl + imageDir + "/" + blogDraft.getCoverPath() : null);
+        result.setCoverUrl(blogDraft.getCoverPath() != null ? imageService.toImageUrl(blogDraft.getCoverPath()) : null);
 
         return result;
     }
@@ -297,7 +300,7 @@ public class BlogEditService {
         result.setModifyTime(blog.getModifyTime());
         result.setImageToken(imageToken);
         result.setCoverToken(coverToken);
-        result.setCoverUrl(blog.getCoverPath() != null ? webSiteUrl + imageDir + "/" + blog.getCoverPath() : null);
+        result.setCoverUrl(blog.getCoverPath() != null ? imageService.toImageUrl(blog.getCoverPath()) : null);
 
         return result;
     }

@@ -21,6 +21,19 @@
         <result column="modify_time" jdbcType="TIMESTAMP" property="modifyTime"/>
     </resultMap>
 
+    <resultMap id="ThumbnailResultMap" type="com.ncoxs.myblog.model.dto.BlogThumbnail">
+        <id column="id" jdbcType="INTEGER" property="blogId"/>
+        <result column="user_id" jdbcType="INTEGER" property="userId"/>
+        <result column="title" jdbcType="VARCHAR" property="title"/>
+        <result column="cover_path" jdbcType="VARCHAR" property="coverUrl"/>
+        <result column="abbr" jdbcType="VARCHAR" property="abbrMarkdown"/>
+        <result column="word_count" jdbcType="INTEGER" property="wordCount"/>
+        <result column="like_count" jdbcType="INTEGER" property="likeCount"/>
+        <result column="dislike_count" jdbcType="INTEGER" property="dislikeCount"/>
+        <result column="collect_count" jdbcType="INTEGER" property="collectCount"/>
+        <result column="comment_count" jdbcType="INTEGER" property="commentCount"/>
+    </resultMap>
+
     <sql id="Base_Column_List">
         id, user_id, title, html_body, markdown_body, cover_path, word_count, reading_count,
     like_count, dislike_count, collect_count, comment_count, `status`, is_allow_reprint, 
@@ -38,6 +51,19 @@
         select count(*)
         from blog
         where id=#{id} and user_id=#{userId}
+    </select>
+
+    <select id="selectThumbnail" resultMap="ThumbnailResultMap">
+        select id, user_id, title, cover_path, left(markdown_body, #{abbrLength}) as abbr,
+               word_count, reading_count, like_count, dislike_count, collect_count, comment_count
+        from blog
+        where id=#{id}
+    </select>
+
+    <select id="canExhibit" resultType="java.lang.Boolean">
+        select count(*)
+        from blog
+        where id=#{id} and status=${@com.ncoxs.myblog.constant.blog.BlogStatus@NORMAL}
     </select>
 
     <insert id="insert" keyColumn="id" keyProperty="id" parameterType="com.ncoxs.myblog.model.pojo.Blog"

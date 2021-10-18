@@ -4,6 +4,7 @@
 
     <resultMap id="BaseResultMap" type="com.ncoxs.myblog.model.pojo.UserBasicInfo">
         <id column="user_id" jdbcType="INTEGER" property="userId"/>
+        <result column="name" jdbcType="VARCHAR" property="name"/>
         <result column="profile_picture_path" jdbcType="VARCHAR" property="profilePicturePath"/>
         <result column="description" jdbcType="VARCHAR" property="description"/>
         <result column="sex" jdbcType="INTEGER" property="sex"/>
@@ -14,8 +15,13 @@
         <result column="modify_time" jdbcType="TIMESTAMP" property="modifyTime"/>
     </resultMap>
 
+    <resultMap id="UserAbbrExhibitInfoResultMap" type="com.ncoxs.myblog.model.dto.UserAbbrExhibitInfo">
+        <result column="name" jdbcType="VARCHAR" property="name"/>
+        <result column="profile_picture_path" jdbcType="VARCHAR" property="profilePicturePath"/>
+    </resultMap>
+
     <sql id="Base_Column_List">
-        user_id, profile_picture_path, `description`, sex, age, birthday, profession, create_time,
+        user_id, `name`, profile_picture_path, `description`, sex, age, birthday, profession, create_time,
         modify_time
     </sql>
 
@@ -25,10 +31,17 @@
         where user_id=#{userId}
     </select>
 
-    <insert id="insertSelective" parameterType="com.ncoxs.myblog.model.pojo.UserBasicInfo">
+    <select id="selectUserAbbrExhibitInfo" resultMap="UserAbbrExhibitInfoResultMap">
+        select `name`, profile_picture_path
+        from user_basic_info
+        where user_id=#{userId}
+    </select>
+
+    <insert id="insert" parameterType="com.ncoxs.myblog.model.pojo.UserBasicInfo">
         insert into user_basic_info
         <trim prefix="(" suffix=")" suffixOverrides=",">
             user_id,
+            `name`,
             <if test="profilePicturePath != null">
                 profile_picture_path,
             </if>
@@ -56,6 +69,7 @@
         </trim>
         <trim prefix="values (" suffix=")" suffixOverrides=",">
             #{userId,jdbcType=INTEGER},
+            #{name},
             <if test="profilePicturePath != null">
                 #{profilePicturePath},
             </if>
@@ -83,9 +97,12 @@
         </trim>
     </insert>
 
-    <update id="updateByUserIdSelective" parameterType="com.ncoxs.myblog.model.pojo.UserBasicInfo">
+    <update id="updateByUserId" parameterType="com.ncoxs.myblog.model.pojo.UserBasicInfo">
         update user_basic_info
         <set>
+            <if test="name != null">
+                `name`=#{name}
+            </if>
             <if test="profilePicturePath != null">
                 profile_picture_path = #{profilePicturePath},
             </if>

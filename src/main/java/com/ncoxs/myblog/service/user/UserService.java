@@ -293,7 +293,7 @@ public class UserService {
         userBasicInfo.setUserId(user.getId());
         userBasicInfo.setProfilePicturePath(defaultProfilePicturePath);
         userBasicInfo.setDescription(defaultDescription);
-        userBasicInfoDao.insertSelective(userBasicInfo);
+        userBasicInfoDao.insert(userBasicInfo);
 
         // 将已激活的用户缓存到 redis 中
         user.setStatus(UserStatus.NORMAL);
@@ -754,6 +754,11 @@ public class UserService {
         update.setId(user.getId());
         update.setName(params.newName);
         userDao.updateByIdSelective(update);
+
+        UserBasicInfo updateBasic = new UserBasicInfo();
+        updateBasic.setUserId(user.getId());
+        updateBasic.setName(params.newName);
+        userBasicInfoDao.updateByUserId(updateBasic);
 
         // 写入用户更新名称日志
         userLogDao.insert(new UserLog(user.getId(), UserLogType.MODIFY_NAME, objectMapper.writeValueAsString(

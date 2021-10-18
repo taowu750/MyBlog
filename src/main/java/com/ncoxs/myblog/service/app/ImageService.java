@@ -284,6 +284,13 @@ public class ImageService {
         deleteSessionImage(SpringUtil.currentSession(), token);
     }
 
+    /**
+     * 将图片路径转化成图片 url
+     */
+    public String toImageUrl(String imagePath) {
+        return webSiteUrl + imageDir + "/" + imagePath;
+    }
+
     private void deleteSessionImage(HttpSession session, String token) {
         //noinspection unchecked
         Map<String, Integer> fp2id = (Map<String, Integer>) session.getAttribute(SESSION_KEY_UPLOAD_IMAGE_TOKEN + token);

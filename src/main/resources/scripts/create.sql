@@ -56,6 +56,7 @@ create table if not exists `user_basic_info`
 (
     `user_id`              int primary key,
 
+    `name`                 varchar(255)  not null,
     `profile_picture_path` varchar(150)  not null comment '头像图片路径',
     `description`          varchar(3000) not null comment '用户自我介绍',
     `sex`                  int           not null default 0 comment '性别：1 男，2 女',
