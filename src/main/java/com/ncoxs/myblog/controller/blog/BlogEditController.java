@@ -1,5 +1,6 @@
 package com.ncoxs.myblog.controller.blog;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.ncoxs.myblog.constant.ParamValidateMsg;
 import com.ncoxs.myblog.constant.ParamValidateRule;
 import com.ncoxs.myblog.constant.ResultCode;
@@ -17,10 +18,7 @@ import org.hibernate.validator.constraints.Length;
 import org.hibernate.validator.constraints.Range;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.validation.annotation.Validated;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import javax.validation.constraints.NotBlank;
 
@@ -58,7 +56,7 @@ public class BlogEditController {
     @PostMapping("/draft/upload")
     @Encryption
     @UserValidate
-    public GenericResult<Integer> uploadBlogDraft(@RequestBody BlogDraftParams params) {
+    public GenericResult<Integer> uploadBlogDraft(@RequestBody BlogDraftParams params) throws JsonProcessingException {
         int blogDraftId = blogEditService.saveBlogDraft(params);
         if (blogDraftId == BlogEditService.PARAMS_ALL_BLANK) {
             return GenericResult.error(ResultCode.PARAMS_ALL_BLANK);
@@ -104,7 +102,7 @@ public class BlogEditController {
     @PostMapping("/publish")
     @Encryption
     @UserValidate
-    public GenericResult<Integer> publishBlog(@RequestBody BlogParams params) {
+    public GenericResult<Integer> publishBlog(@RequestBody BlogParams params) throws JsonProcessingException {
         int blogId = blogEditService.publishBlog(params);
         if (blogId == BlogEditService.PARAMS_ALL_BLANK) {
             return GenericResult.error(ResultCode.PARAMS_ALL_BLANK);
@@ -145,7 +143,7 @@ public class BlogEditController {
     @PostMapping("/draft/publish")
     @Encryption
     @UserValidate
-    public GenericResult<Integer> publishBlog(@RequestBody PublishDraftParams params) {
+    public GenericResult<Integer> publishBlog(@RequestBody PublishDraftParams params) throws JsonProcessingException {
         int blogId = blogEditService.publishBlog(params);
         if (blogId == MarkdownService.MARKDOWN_NOT_BELONG) {
             return GenericResult.error(ResultCode.DATA_ACCESS_DENIED);
@@ -187,5 +185,23 @@ public class BlogEditController {
     @UserValidate
     public GenericResult<EditResp> getBlogForEdit(@RequestBody EditParams params) {
         return GenericResult.ofNullable(blogEditService.getBlogData(params), ResultCode.DATA_ACCESS_DENIED);
+    }
+
+    /**
+     * 删除博客草稿
+     */
+    @DeleteMapping("/draft/delete")
+    @UserValidate
+    public GenericResult<?> deleteBlogDraft(@RequestBody EditParams params) throws JsonProcessingException {
+        return GenericResult.byCode(blogEditService.deleteBlogDraft(params.getUserLoginToken(), params.id));
+    }
+
+    /**
+     * 删除博客
+     */
+    @DeleteMapping("/delete")
+    @UserValidate
+    public GenericResult<?> deleteBlog(@RequestBody EditParams params) throws JsonProcessingException {
+        return GenericResult.byCode(blogEditService.deleteBlog(params.getUserLoginToken(), params.id));
     }
 }

@@ -1,15 +1,17 @@
 package com.ncoxs.myblog.service.blog;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ncoxs.myblog.constant.ParamValidateRule;
+import com.ncoxs.myblog.constant.ResultCode;
 import com.ncoxs.myblog.constant.UploadImageTargetType;
 import com.ncoxs.myblog.constant.blog.BlogStatus;
+import com.ncoxs.myblog.constant.user.UserLogType;
 import com.ncoxs.myblog.controller.blog.BlogEditController;
 import com.ncoxs.myblog.dao.mysql.*;
+import com.ncoxs.myblog.model.bo.UserEditMarkdownLog;
 import com.ncoxs.myblog.model.dto.MarkdownObject;
-import com.ncoxs.myblog.model.pojo.Blog;
-import com.ncoxs.myblog.model.pojo.BlogDraft;
-import com.ncoxs.myblog.model.pojo.UploadImage;
-import com.ncoxs.myblog.model.pojo.User;
+import com.ncoxs.myblog.model.pojo.*;
 import com.ncoxs.myblog.service.app.ImageService;
 import com.ncoxs.myblog.service.app.MarkdownService;
 import com.ncoxs.myblog.service.user.UserService;
@@ -49,13 +51,6 @@ public class BlogEditService {
         this.imageService = imageService;
     }
 
-    private UserLogDao userLogDao;
-
-    @Autowired
-    public void setUserLogDao(UserLogDao userLogDao) {
-        this.userLogDao = userLogDao;
-    }
-
     private BlogDao blogDao;
 
     @Autowired
@@ -84,6 +79,20 @@ public class BlogEditService {
         this.uploadImageDao = uploadImageDao;
     }
 
+    private UserLogDao userLogDao;
+
+    @Autowired
+    public void setUserLogDao(UserLogDao userLogDao) {
+        this.userLogDao = userLogDao;
+    }
+
+    private ObjectMapper objectMapper;
+
+    @Autowired
+    public void setObjectMapper(ObjectMapper objectMapper) {
+        this.objectMapper = objectMapper;
+    }
+
 
     /**
      * 错误码：参数都是 null
@@ -94,7 +103,7 @@ public class BlogEditService {
      */
     public static final int BLOG_DRAFT_COUNT_FULL = -11;
 
-    public int saveBlogDraft(BlogEditController.BlogDraftParams params) {
+    public int saveBlogDraft(BlogEditController.BlogDraftParams params) throws JsonProcessingException {
         return markdownService.saveMarkdown(params, UploadImageTargetType.BLOG_DRAFT, UploadImageTargetType.BLOG_DRAFT_COVER,
                 new MarkdownService.SaveMarkdownCallback() {
 
@@ -157,7 +166,7 @@ public class BlogEditService {
      */
     public static final int BLOG_PARAM_BLANK = -20;
 
-    public int publishBlog(BlogEditController.BlogParams blogParams) {
+    public int publishBlog(BlogEditController.BlogParams blogParams) throws JsonProcessingException {
         return markdownService.saveMarkdown(blogParams, UploadImageTargetType.BLOG, UploadImageTargetType.BLOG_COVER,
                 new MarkdownService.SaveMarkdownCallback() {
                     @Override
@@ -208,7 +217,7 @@ public class BlogEditService {
                         Blog blog = new Blog(params.getId(), user.getId(), blogParams.title, blogParams.htmlBody,
                                 params.getMarkdownBody(), cover != null ? cover.getFilepath() : null, blogParams.wordCount,
                                 blogParams.isAllowReprint);
-                        blogDao.updateByIdSelective(blog);
+                        blogDao.updateById(blog);
                     }
                 });
     }
@@ -219,10 +228,10 @@ public class BlogEditService {
     public static final int BLOG_DRAFT_NOT_COMPLETE = -30;
 
     /**
-     * 将博客草稿发表为博客，博客草稿必须内容完整。
+     * 将博客草稿发表为博客。博客草稿必须内容完整，并且博客草稿必须已经保存过。
      */
     @Transactional(isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
-    public int publishBlog(BlogEditController.PublishDraftParams params) {
+    public int publishBlog(BlogEditController.PublishDraftParams params) throws JsonProcessingException {
         User user = userService.accessByToken(params.getUserLoginToken());
         // 检测博客草稿是否属于这个用户
         if (!blogDraftDao.isMatchIdAndUserId(params.blogDraftId, user.getId())) {
@@ -255,6 +264,18 @@ public class BlogEditService {
 
         // 删除博客草稿
         blogDraftDao.deleteById(params.blogDraftId);
+
+        // 记录新增博客日志
+        UserLog userLog = new UserLog(user.getId(), UserLogType.EDIT_MARKDOWN, objectMapper.writeValueAsString(
+                new UserEditMarkdownLog(UploadImageTargetType.BLOG, blog.getId(), UserEditMarkdownLog.EDIT_TYPE_CREATE)));
+        userLogDao.insert(userLog);
+        // 记录删除博客草稿日志
+        userLog = new UserLog(user.getId(), UserLogType.EDIT_MARKDOWN, objectMapper.writeValueAsString(
+                new UserEditMarkdownLog(UploadImageTargetType.BLOG_DRAFT, params.blogDraftId, UserEditMarkdownLog.EDIT_TYPE_DELETE)));
+        userLogDao.insert(userLog);
+
+        // 删除没有用到的图片并从 session 中移除数据。这一步是预防措施
+        imageService.deleteSessionDiscardedImage(imageToken, blogDraft.getMarkdownBody());
 
         return blog.getId();
     }
@@ -303,5 +324,53 @@ public class BlogEditService {
         result.setCoverUrl(blog.getCoverPath() != null ? imageService.toImageUrl(blog.getCoverPath()) : null);
 
         return result;
+    }
+
+    /**
+     * 删除博客草稿。
+     */
+    @Transactional(isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
+    public ResultCode deleteBlogDraft(String userLoginToken, int blogDraftId) throws JsonProcessingException {
+        User user = userService.accessByToken(userLoginToken);
+        if (!blogDraftDao.isMatchIdAndUserId(blogDraftId, user.getId())) {
+            return ResultCode.DATA_ACCESS_DENIED;
+        }
+
+        // 删除草稿
+        blogDraftDao.deleteById(blogDraftId);
+
+        // 记录日志
+        UserLog userLog = new UserLog(user.getId(), UserLogType.EDIT_MARKDOWN, objectMapper.writeValueAsString(
+                new UserEditMarkdownLog(UploadImageTargetType.BLOG_DRAFT, blogDraftId, UserEditMarkdownLog.EDIT_TYPE_DELETE)));
+        userLogDao.insert(userLog);
+
+        // 删除图片
+        imageService.deleteImages(UploadImageTargetType.BLOG_DRAFT, blogDraftId, UploadImageTargetType.BLOG_DRAFT_COVER);
+
+        return ResultCode.SUCCESS;
+    }
+
+    /**
+     * 删除博客。
+     */
+    @Transactional(isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
+    public ResultCode deleteBlog(String userLoginToken, int blogId) throws JsonProcessingException {
+        User user = userService.accessByToken(userLoginToken);
+        if (!blogDao.isMatchIdAndUserId(blogId, user.getId())) {
+            return ResultCode.DATA_ACCESS_DENIED;
+        }
+
+        // 不实际删除博客，而是把它设为删除状态
+        Blog update = new Blog();
+        update.setId(blogId);
+        update.setStatus(BlogStatus.DELETED);
+        blogDao.updateById(update);
+
+        // 记录日志
+        UserLog userLog = new UserLog(user.getId(), UserLogType.EDIT_MARKDOWN, objectMapper.writeValueAsString(
+                new UserEditMarkdownLog(UploadImageTargetType.BLOG, blogId, UserEditMarkdownLog.EDIT_TYPE_DELETE)));
+        userLogDao.insert(userLog);
+
+        return ResultCode.SUCCESS;
     }
 }

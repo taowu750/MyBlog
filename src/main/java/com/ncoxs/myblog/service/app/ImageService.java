@@ -285,6 +285,46 @@ public class ImageService {
     }
 
     /**
+     * 删除指定对象的所有图片记录。
+     *
+     * @param targetType 对象类型，参见 {@link UploadImageTargetType}
+     * @param targetId 对象 id
+     * @param coverType 对象封面类型，参见 {@link UploadImageTargetType}。没有的话就传 null
+     */
+    @Transactional(isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
+    public void deleteImages(int targetType, int targetId, Integer coverType) {
+        // 删除文档中的图片
+        String imageToken = savedImageTokenDao.selectTokenByTarget(targetType, targetId);
+        if (imageToken != null) {
+            savedImageTokenDao.deleteByToken(imageToken);
+            List<UploadImage> uploadImages = uploadImageDao.selectByToken(imageToken);
+            for (UploadImage uploadImage : uploadImages) {
+                Path realPath = Paths.get(ResourceUtil.classpath("static"), imageDir, uploadImage.getFilepath());
+                try {
+                    Files.delete(realPath);
+                } catch (IOException e) {
+                    log.error("删除图片失败：" + realPath, e);
+                }
+            }
+            uploadImageDao.deleteByToken(imageToken);
+        }
+        // 删除封面图片
+        if (coverType != null) {
+            String coverToken = savedImageTokenDao.selectTokenByTarget(coverType, targetId);
+            savedImageTokenDao.deleteByToken(coverToken);
+            UploadImage cover = uploadImageDao.selectSingle(coverToken, coverType);
+            if (cover != null) {
+                Path realPath = Paths.get(ResourceUtil.classpath("static"), imageDir, cover.getFilepath());
+                try {
+                    Files.delete(realPath);
+                } catch (IOException e) {
+                    log.error("删除图片失败：" + realPath, e);
+                }
+            }
+        }
+    }
+
+    /**
      * 将图片路径转化成图片 url
      */
     public String toImageUrl(String imagePath) {

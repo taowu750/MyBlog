@@ -25,5 +25,5 @@ public interface BlogDao {
 
     int insert(Blog record);
 
-    int updateByIdSelective(Blog record);
+    int updateById(Blog record);
 }

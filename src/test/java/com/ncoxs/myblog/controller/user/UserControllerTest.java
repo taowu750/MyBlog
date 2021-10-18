@@ -255,6 +255,11 @@ public class UserControllerTest {
         assertEquals(UserStatus.NORMAL, savedUser.getStatus());
         assertTrue(savedUser.getId() != null && savedUser.getId() > 0);
 
+        // assert 用户基本信息
+        UserBasicInfo userBasicInfo = userBasicInfoDao.selectByUserId(savedUser.getId());
+        assertNotNull(userBasicInfo);
+        assertEquals(userBasicInfo.getName(), user.getName());
+
         // assert Redis 中的用户对象
         User cachedUser = redisUserDao.getUserByName(user.getName());
         assertEquals(user.getEmail(), cachedUser.getEmail());
@@ -269,7 +274,7 @@ public class UserControllerTest {
         System.out.println(userRegisterLog.getIpLocInfo());
 
         // assert 用户基本信息
-        UserBasicInfo userBasicInfo = userBasicInfoDao.selectByUserId(savedUser.getId());
+        userBasicInfo = userBasicInfoDao.selectByUserId(savedUser.getId());
         System.out.println(userBasicInfo.getProfilePicturePath());
         System.out.println(userBasicInfo.getDescription());
     }
@@ -696,6 +701,11 @@ public class UserControllerTest {
         assertNull(userDao.selectByName("test"));
         User user = userDao.selectByName("wutao");
         assertNotNull(user);
+
+        // assert 用户基本信息
+        UserBasicInfo userBasicInfo = userBasicInfoDao.selectByUserId(user.getId());
+        assertNotNull(userBasicInfo);
+        assertEquals(userBasicInfo.getName(), user.getName());
 
         // assert 用户日志
         UserLog userLog = userLogDao.selectByUserIdTypeLatest(user.getId(), UserLogType.MODIFY_NAME);

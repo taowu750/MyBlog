@@ -1,11 +1,17 @@
 package com.ncoxs.myblog.service.app;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ncoxs.myblog.constant.UploadImageTargetType;
+import com.ncoxs.myblog.constant.user.UserLogType;
 import com.ncoxs.myblog.dao.mysql.SavedImageTokenDao;
 import com.ncoxs.myblog.dao.mysql.UploadImageDao;
+import com.ncoxs.myblog.dao.mysql.UserLogDao;
+import com.ncoxs.myblog.model.bo.UserEditMarkdownLog;
 import com.ncoxs.myblog.model.dto.MarkdownObject;
 import com.ncoxs.myblog.model.pojo.UploadImage;
 import com.ncoxs.myblog.model.pojo.User;
+import com.ncoxs.myblog.model.pojo.UserLog;
 import com.ncoxs.myblog.service.user.UserService;
 import org.springframework.beans.factory.InitializingBean;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -62,6 +68,20 @@ public class MarkdownService implements InitializingBean {
     @Autowired
     public void setUploadImgDao(UploadImageDao uploadImageDao) {
         this.uploadImageDao = uploadImageDao;
+    }
+
+    private UserLogDao userLogDao;
+
+    @Autowired
+    public void setUserLogDao(UserLogDao userLogDao) {
+        this.userLogDao = userLogDao;
+    }
+
+    private ObjectMapper objectMapper;
+
+    @Autowired
+    public void setObjectMapper(ObjectMapper objectMapper) {
+        this.objectMapper = objectMapper;
     }
 
 
@@ -140,7 +160,7 @@ public class MarkdownService implements InitializingBean {
      */
     @Transactional(isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
     public Integer saveMarkdown(MarkdownObject params, int imageTokenType, Integer coverTokenType,
-                                SaveMarkdownCallback saveMarkdownCallback) {
+                                SaveMarkdownCallback saveMarkdownCallback) throws JsonProcessingException {
         // 检测文档长度是否在范围内
         if (params.getMarkdownBody() != null
                 && (params.getMarkdownBody().length() > saveMarkdownCallback.maxMarkdownLength()
@@ -170,6 +190,11 @@ public class MarkdownService implements InitializingBean {
                 imageService.saveSingleImageToken(params.getCoverToken(), coverTokenType, resultId);
             }
 
+            // 记录日志
+            UserLog userLog = new UserLog(user.getId(), UserLogType.EDIT_MARKDOWN, objectMapper.writeValueAsString(
+                    new UserEditMarkdownLog(imageTokenType, resultId, UserEditMarkdownLog.EDIT_TYPE_CREATE)));
+            userLogDao.insert(userLog);
+
             // 保存图片 token 和文档的映射关系，并删除没有用到的图片
             imageService.saveImageTokenWithTarget(params.getImageToken(), imageTokenType, resultId,
                     params.getMarkdownBody());
@@ -198,6 +223,11 @@ public class MarkdownService implements InitializingBean {
 
             // 更新文档数据
             saveMarkdownCallback.onUpdate(user, params, imageTokenType, coverTokenType, cover);
+
+            // 记录日志
+            UserLog userLog = new UserLog(user.getId(), UserLogType.EDIT_MARKDOWN, objectMapper.writeValueAsString(
+                    new UserEditMarkdownLog(imageTokenType, resultId, UserEditMarkdownLog.EDIT_TYPE_UPDATE)));
+            userLogDao.insert(userLog);
 
             // 如果文档中图片有修改，将文档中的图片数据加载到 session 中来，并删除其中没有用到的图像
             if (originImageToken != null && params.getImageToken() != null) {

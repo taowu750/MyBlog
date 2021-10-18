@@ -293,6 +293,7 @@ public class UserService {
         userBasicInfo.setUserId(user.getId());
         userBasicInfo.setProfilePicturePath(defaultProfilePicturePath);
         userBasicInfo.setDescription(defaultDescription);
+        userBasicInfo.setName(user.getName());
         userBasicInfoDao.insert(userBasicInfo);
 
         // 将已激活的用户缓存到 redis 中

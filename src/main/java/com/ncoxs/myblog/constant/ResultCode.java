@@ -59,7 +59,7 @@ public enum ResultCode {
     600-699：数据异常错误码
      */
     DATA_EXPIRED(600, "请求数据已过期"),
-    DATA_ACCESS_DENIED(601, "没有请求数据的访问权限"),
+    DATA_ACCESS_DENIED(601, "没有请求数据的访问权限，或数据不存在"),
     DATA_COUNT_OUT_RANGE(602, "数据量超过限制"),
     DATA_NOT_COMPLETE(603, "数据缺失"),
     /*

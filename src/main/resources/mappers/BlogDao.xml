@@ -133,7 +133,7 @@
         </trim>
     </insert>
 
-    <update id="updateByIdSelective" parameterType="com.ncoxs.myblog.model.pojo.Blog">
+    <update id="updateById" parameterType="com.ncoxs.myblog.model.pojo.Blog">
         update blog
         <set>
             <if test="userId != null">
