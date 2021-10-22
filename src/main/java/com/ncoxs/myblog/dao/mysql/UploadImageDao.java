@@ -3,20 +3,12 @@ package com.ncoxs.myblog.dao.mysql;
 import com.ncoxs.myblog.model.pojo.UploadImage;
 import org.apache.ibatis.annotations.Mapper;
 
-import java.util.List;
-
 @Mapper
 public interface UploadImageDao {
 
-    List<UploadImage> selectByToken(String token);
-
-    UploadImage selectSingle(String token, int targetType);
-
     int insert(UploadImage record);
 
-    int updateTargetTypeByToken(String token, int newTargetType);
+    int updateTargetTypeById(int id, int newTargetType);
 
     boolean deleteById(int id);
-
-    int deleteByToken(String token);
 }

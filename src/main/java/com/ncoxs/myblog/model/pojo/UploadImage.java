@@ -17,11 +17,6 @@ public class UploadImage implements Serializable {
     private Integer userId;
 
     /**
-     * 标识一组图片的 token
-     */
-    private String token;
-
-    /**
      * 图片的类型，参见 {@link com.ncoxs.myblog.constant.UploadImageTargetType}
      */
     private Integer targetType;

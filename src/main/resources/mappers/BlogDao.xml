@@ -6,7 +6,6 @@
         <id column="id" jdbcType="INTEGER" property="id"/>
         <result column="user_id" jdbcType="INTEGER" property="userId"/>
         <result column="title" jdbcType="VARCHAR" property="title"/>
-        <result column="html_body" jdbcType="VARCHAR" property="htmlBody"/>
         <result column="markdown_body" jdbcType="VARCHAR" property="markdownBody"/>
         <result column="cover_path" jdbcType="VARCHAR" property="coverPath"/>
         <result column="word_count" jdbcType="INTEGER" property="wordCount"/>
@@ -35,7 +34,7 @@
     </resultMap>
 
     <sql id="Base_Column_List">
-        id, user_id, title, html_body, markdown_body, cover_path, word_count, reading_count,
+        id, user_id, title, markdown_body, cover_path, word_count, reading_count,
     like_count, dislike_count, collect_count, comment_count, `status`, is_allow_reprint, 
     create_time, modify_time
     </sql>
@@ -72,7 +71,6 @@
         <trim prefix="(" suffix=")" suffixOverrides=",">
             user_id,
             title,
-            html_body,
             markdown_body,
             cover_path,
             word_count,
@@ -103,7 +101,6 @@
         <trim prefix="values (" suffix=")" suffixOverrides=",">
             #{userId,jdbcType=INTEGER},
             #{title,jdbcType=VARCHAR},
-            #{htmlBody,jdbcType=VARCHAR},
             #{markdownBody,jdbcType=VARCHAR},
             #{coverPath,jdbcType=VARCHAR},
             #{wordCount,jdbcType=INTEGER},
@@ -141,9 +138,6 @@
             </if>
             <if test="title != null">
                 title = #{title,jdbcType=VARCHAR},
-            </if>
-            <if test="htmlBody != null">
-                html_body = #{htmlBody,jdbcType=VARCHAR},
             </if>
             <if test="markdownBody != null">
                 markdown_body = #{markdownBody,jdbcType=VARCHAR},

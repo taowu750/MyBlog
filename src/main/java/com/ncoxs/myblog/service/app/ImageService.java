@@ -1,10 +1,10 @@
 package com.ncoxs.myblog.service.app;
 
 import com.ncoxs.myblog.constant.UploadImageTargetType;
-import com.ncoxs.myblog.dao.mysql.SavedImageTokenDao;
+import com.ncoxs.myblog.dao.mysql.UploadImageBindDao;
 import com.ncoxs.myblog.dao.mysql.UploadImageDao;
-import com.ncoxs.myblog.model.pojo.SavedImageToken;
 import com.ncoxs.myblog.model.pojo.UploadImage;
+import com.ncoxs.myblog.model.pojo.UploadImageBind;
 import com.ncoxs.myblog.model.pojo.User;
 import com.ncoxs.myblog.service.user.UserService;
 import com.ncoxs.myblog.util.general.FileUtil;
@@ -26,27 +26,22 @@ import java.nio.file.Paths;
 import java.util.*;
 
 /**
- * 处理客户端传过来的图片。
- *
- * 上传图片逻辑：
- * 0. 每个编辑对象（可以是博客、评论等可以包含图片的对象）都会生成一个唯一的图片 token
- * 1. 上传图片带上图片 token，用这个 token 标识属于编辑对象的一组图片。将图片存入文件，并记录在数据库中
- * 2. 在 session 中记录下用户的图片 token 列表，以及每个 token 所对应的 (图片路径名, 图片 id) 映射关系（方便以后删除）。
- *    当用户主动关闭网页，放弃编辑时，或 session 被动销毁，则需要将这些图片和数据库记录删除
- * 3. 当上传编辑对象时，带上图片 token，然后从 session 读取数据，并删除不存在于编辑对象的图片和数据库记录。
- *    session 中的图片 token 数据随后也被清理。最后记录图片 token 和编辑对象 id 的对应关系。
- * 4. 当更新编辑对象时，需要先将其数据库中保存的图片数据加载到 session 中。
- *
- * 当系统启动时，需要删除那些没有 targetId 的图片文件和数据库记录
- *
- *
- * 让封面图片单独成为一种类型。封面图片的 token 和博客的图片 token 是不一样的。
- * 每个博客最多有一个封面 token。
- *
- * 每次上传新的封面时，就删除旧的封面，保证只有一个封面。用户主动删除封面图片的请求应该作为一个接口。
- *
- * 当保存或修改博客时，需要传递封面图片的 token，根据这个 token 设置博客的封面路径。
- * 编辑博客时，还需要返回它的封面图片的 token 和 url（如果有的话）。
+ * 图片上传逻辑：
+ * 1. 客户端上传图片、所属类型 targetType（参见 {@link com.ncoxs.myblog.constant.UploadImageTargetType}）
+ * 2. 上传图片后，将图片保存到文件，并记录在数据库中。然后将 (图片路径, [id,targetType]) 缓存到 session 的一个 map 中。
+ * 3. 当上传博客等包含图片的对象时，从中解析出使用的图片，然后从 session 中删除用到的图片，
+ * 最后在数据库中记录每张用到的图片所属的对象 id（targetId）（用一个新的表）。
+ * 4. session 被销毁时删除仍然记录的图片数据。
+ * <p>
+ * 当修改博客等包含图片的对象时：
+ * 1. 客户端上传修改后的内容时，从中解析出使用的图片
+ * 2. 将包含图片的对象之前使用的图片数据加载到 session 中，然后从 session 中删除用到的图片，
+ * 最后在数据库中记录每张用到的图片的 targetId（用一个新的表）。
+ * 3. session 被销毁时删除仍然记录的图片数据。
+ * <p>
+ * 注意，博客封面、专栏图标之类的图片需要单独成为一种类型，不过它们的 targetId 还是博客或专栏。
+ * <p>
+ * 此外用户头像不保存在 session 中，不走上面的逻辑（为了防止恶意上传头像，可以限制修改头像的频率）。
  */
 @Service
 @Slf4j
@@ -61,18 +56,12 @@ public class ImageService {
     @Value("${myapp.image.origin-filename-max-length}")
     private int originFilenameMaxLength;
 
+
     private UserService userService;
 
     @Autowired
     public void setUserService(UserService userService) {
         this.userService = userService;
-    }
-
-    private MarkdownService markdownService;
-
-    @Autowired
-    public void setMarkdownService(MarkdownService markdownService) {
-        this.markdownService = markdownService;
     }
 
     private UploadImageDao uploadImageDao;
@@ -82,29 +71,35 @@ public class ImageService {
         this.uploadImageDao = uploadImageDao;
     }
 
-    private SavedImageTokenDao savedImageTokenDao;
+    private UploadImageBindDao uploadImageBindDao;
 
     @Autowired
-    public void setSavedImageTokenDao(SavedImageTokenDao savedImageTokenDao) {
-        this.savedImageTokenDao = savedImageTokenDao;
+    public void setUploadImageBindDao(UploadImageBindDao uploadImageBindDao) {
+        this.uploadImageBindDao = uploadImageBindDao;
     }
 
 
-    private static final String SESSION_KEY_UPLOAD_IMAGE_TOKEN = "uploadImageToken";
+    private static final String SESSION_KEY_UPLOAD_IMAGES = "uploadImages";
 
+
+    /**
+     * 将图片路径转化成图片 url
+     */
+    public String toImageUrl(String imagePath) {
+        return webSiteUrl + imageDir + "/" + imagePath;
+    }
 
     /**
      * 保存图片到服务器上，并返回图片 url。如果返回 url 为 null，表示图片文件为空或格式有问题。
      *
      * @param userLoginToken 用户登录 token
-     * @param imgFile 客户端传递的图片文件
-     * @param imageToken 一组图片的唯一标识
-     * @param targetType 包含图片的目标类型
+     * @param imgFile        客户端传递的图片文件
+     * @param targetType     包含图片的目标类型
      * @return 图片 url
      * @throws IOException 保存文件失败抛出此异常
      */
     @Transactional(isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
-    public String saveImage(String userLoginToken, MultipartFile imgFile, String imageToken, int targetType) throws IOException {
+    public String saveImage(String userLoginToken, MultipartFile imgFile, int targetType) throws IOException {
         User user = userService.accessByToken(userLoginToken);
         // 图片不存在或格式有问题
         if (imgFile.isEmpty() || !FileUtil.isImageFileName(imgFile.getOriginalFilename())) {
@@ -118,20 +113,9 @@ public class ImageService {
         String dateDir = FileUtil.dateHourDirName();
         String fileName = FileUtil.randomFilename(extension);
 
-        // 如果上传的是封面，则删除旧的封面
-        if (UploadImageTargetType.isCover(targetType)) {
-            UploadImage uploadImage = uploadImageDao.selectSingle(imageToken, targetType);
-            if (uploadImage != null) {
-                String coverPath = uploadImage.getFilepath();
-                uploadImageDao.deleteById(uploadImage.getId());
-                Files.delete(Paths.get(ResourceUtil.classpath("static"), imageDir, coverPath));
-            }
-        }
-
         // 插入图片上传记录
         UploadImage uploadImage = new UploadImage();
         uploadImage.setUserId(user.getId());
-        uploadImage.setToken(imageToken);
         uploadImage.setTargetType(targetType);
         uploadImage.setFilepath(type + "/" + user.getId() + "/" + dateDir + "/" + fileName);
         uploadImage.setOriginFileName(FileUtil.truncateFilename(originalFilename, originFilenameMaxLength));
@@ -144,204 +128,78 @@ public class ImageService {
         imgFile.transferTo(filePath.toFile());
 
         // 将图片数据记录在 session 中
-        loadImagesToSession(imageToken, Collections.singletonList(uploadImage));
+        loadImagesToSession(Collections.singletonList(uploadImage));
 
-        return webSiteUrl + imageDir +  "/" + uploadImage.getFilepath();
+        return toImageUrl(uploadImage.getFilepath());
     }
 
-    /**
-     * 当用户上传新博客、评论等可能包含图片的对象时，保存图片 token 和这些对象的关系，并且删除没有用到的图片。
-     */
-    @Transactional(isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
-    public void saveImageTokenWithTarget(String imageToken, int targetType, int targetId, String markdown) {
-        if (imageToken == null) {
+    private void loadImagesToSession(List<UploadImage> images) {
+        if (images.isEmpty()) {
             return;
         }
 
         HttpSession session = SpringUtil.currentSession();
-        //noinspection unchecked
-        Set<String> tokens = (Set<String>) session.getAttribute(SESSION_KEY_UPLOAD_IMAGE_TOKEN);
-        if (tokens == null || !tokens.contains(imageToken)) {
-            return;
-        }
-
-        // 插入新纪录
-        savedImageTokenDao.insert(new SavedImageToken(imageToken, targetType, targetId));
-
-        // 删除没有用到的图片
-        deleteSessionDiscardedImage(imageToken, markdown);
-    }
-
-    /**
-     * 保存博客封面、专栏封面这样单独一张的图片记录。
-     */
-    public void saveSingleImageToken(String imageToken, int targetType, int targetId) {
-        HttpSession session = SpringUtil.currentSession();
-        //noinspection unchecked
-        Set<String> tokens = (Set<String>) session.getAttribute(SESSION_KEY_UPLOAD_IMAGE_TOKEN);
-        if (tokens == null || !tokens.contains(imageToken)) {
-            return;
-        }
-
-        savedImageTokenDao.insert(new SavedImageToken(imageToken, targetType, targetId));
-        
-        tokens.remove(imageToken);
-        session.removeAttribute(SESSION_KEY_UPLOAD_IMAGE_TOKEN + imageToken);
-    }
-
-    /**
-     * 当需要修改博客、博客草稿等可能包含图片的对象时，需要先把已保存的图片数据加载到 session 中，
-     * 然后删除其中没有用到的图像。注意，博客等对象必须之前已经提交了。
-     */
-    @Transactional(isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
-    public void loadAndDeleteSessionImages(int targetType, int targetId, String markdown) {
-        if (markdown == null) {
-            return;
-        }
-        String imageToken = savedImageTokenDao.selectTokenByTarget(targetType, targetId);
-        if (imageToken == null) {
-            return;
-        }
-
-        List<UploadImage> savedImages = uploadImageDao.selectByToken(imageToken);
-        if (savedImages != null && !savedImages.isEmpty()) {
-            loadImagesToSession(imageToken, savedImages);
-            deleteSessionDiscardedImage(imageToken, markdown);
-        }
-    }
-
-    private void loadImagesToSession(String imageToken, List<UploadImage> images) {
-        HttpSession session = SpringUtil.currentSession();
 
         //noinspection unchecked
-        Set<String> tokens = (Set<String>) session.getAttribute(SESSION_KEY_UPLOAD_IMAGE_TOKEN);
-        if (tokens == null) {
-            tokens = new HashSet<>();
-            session.setAttribute(SESSION_KEY_UPLOAD_IMAGE_TOKEN, tokens);
-        }
-        tokens.add(imageToken);
-        //noinspection unchecked
-        Map<String, Integer> fp2id = (Map<String, Integer>) session.getAttribute(SESSION_KEY_UPLOAD_IMAGE_TOKEN + imageToken);
-        if (fp2id == null) {
-            fp2id = new HashMap<>(4);
-            session.setAttribute(SESSION_KEY_UPLOAD_IMAGE_TOKEN + imageToken, fp2id);
+        Map<String, Integer> cache = (Map<String, Integer>) session.getAttribute(SESSION_KEY_UPLOAD_IMAGES);
+        if (cache == null) {
+            cache = new HashMap<>();
+            session.setAttribute(SESSION_KEY_UPLOAD_IMAGES, cache);
         }
 
         for (UploadImage uploadImage : images) {
-            fp2id.put(uploadImage.getFilepath(), uploadImage.getId());
+            // 用户头像不保存在 session 中
+            if (uploadImage.getTargetType() != UploadImageTargetType.USER_PROFILE_PICTURE) {
+                cache.put(uploadImage.getFilepath(), uploadImage.getId());
+            }
         }
     }
 
     /**
-     * 当用户主动关闭网页、退出登录、或 session 被动销毁时，需要删除已上传的图片。
+     * 当上传或者修改包含图片的对象时（如博客、评论、博客封面等），保存图片和包含对象的映射关系，并更新 session。
+     *
+     * @param usedImagePaths 包含图片的对象中所使用的图片相对路径
+     * @param targetType 包含图片的对象的类型，参见 {@link UploadImageTargetType}
+     * @param targetId 包含图片的对象的 id
      */
     @Transactional(isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
-    public void deleteSessionImages(HttpSession session) {
-        //noinspection unchecked
-        Set<String> tokens = (Set<String>) session.getAttribute(SESSION_KEY_UPLOAD_IMAGE_TOKEN);
-        if (tokens == null) {
-            return;
-        }
-
-        for (String token : tokens) {
-            deleteSessionImage(session, token);
-        }
-
-        session.removeAttribute(SESSION_KEY_UPLOAD_IMAGE_TOKEN);
-    }
-
-    /**
-     * 当用户上传博客或评论等时，删除没有包含在内的图片。
-     *
-     * @param token 图片 token
-     * @param markdown 可能包含有图片的 markdown 文本
-     */
-    public void deleteSessionDiscardedImage(String token, String markdown) {
-        if (markdown == null) {
-            return;
-        }
-
+    public void bindImageTarget(Set<String> usedImagePaths, int targetType, int targetId) {
         HttpSession session = SpringUtil.currentSession();
         //noinspection unchecked
-        Map<String, Integer> fp2id = (Map<String, Integer>) session.getAttribute(SESSION_KEY_UPLOAD_IMAGE_TOKEN + token);
-        if (fp2id == null || fp2id.isEmpty()) {
+        Map<String, Integer> cache = (Map<String, Integer>) session.getAttribute(SESSION_KEY_UPLOAD_IMAGES);
+        if (cache == null) {
+            cache = new HashMap<>();
+            session.setAttribute(SESSION_KEY_UPLOAD_IMAGES, cache);
+        }
+
+        // 将 targetId、targetType 包含的图片加载到 session 中
+        loadImagesToSession(uploadImageBindDao.selectUploadImages(targetType, targetId));
+
+        // 保存新图片和 target 的映射关系
+        for (String usedImagePath : usedImagePaths) {
+            uploadImageBindDao.insert(new UploadImageBind(cache.get(usedImagePath), targetType, targetId, usedImagePath));
+        }
+
+        // 从 session 中删除使用到的图片
+        cache.keySet().removeIf(usedImagePaths::contains);
+    }
+
+    /**
+     * 删除 Session 中的所有未保存图片和记录，用在 session 销毁时。
+     */
+    public void deleteSessionImages(HttpSession session) {
+        //noinspection unchecked
+        Map<String, Integer> cache = (Map<String, Integer>) session.getAttribute(SESSION_KEY_UPLOAD_IMAGES);
+        if (cache == null) {
             return;
         }
 
-        Set<String> usedImages = markdownService.parseUsedImages(markdown);
-        fp2id.keySet().removeIf(usedImages::contains);
-        deleteSessionImage(session, token);
-
-        //noinspection unchecked
-        Set<String> tokens = (Set<String>) session.getAttribute(SESSION_KEY_UPLOAD_IMAGE_TOKEN);
-        tokens.remove(token);
-    }
-
-    /**
-     * 当用户放弃编辑博客或评论等时，需要删除对应的图片
-     */
-    public void deleteSessionImage(String token) {
-        deleteSessionImage(SpringUtil.currentSession(), token);
-    }
-
-    /**
-     * 删除指定对象的所有图片记录。
-     *
-     * @param targetType 对象类型，参见 {@link UploadImageTargetType}
-     * @param targetId 对象 id
-     * @param coverType 对象封面类型，参见 {@link UploadImageTargetType}。没有的话就传 null
-     */
-    @Transactional(isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
-    public void deleteImages(int targetType, int targetId, Integer coverType) {
-        // 删除文档中的图片
-        String imageToken = savedImageTokenDao.selectTokenByTarget(targetType, targetId);
-        if (imageToken != null) {
-            savedImageTokenDao.deleteByToken(imageToken);
-            List<UploadImage> uploadImages = uploadImageDao.selectByToken(imageToken);
-            for (UploadImage uploadImage : uploadImages) {
-                Path realPath = Paths.get(ResourceUtil.classpath("static"), imageDir, uploadImage.getFilepath());
-                try {
-                    Files.delete(realPath);
-                } catch (IOException e) {
-                    log.error("删除图片失败：" + realPath, e);
-                }
-            }
-            uploadImageDao.deleteByToken(imageToken);
-        }
-        // 删除封面图片
-        if (coverType != null) {
-            String coverToken = savedImageTokenDao.selectTokenByTarget(coverType, targetId);
-            savedImageTokenDao.deleteByToken(coverToken);
-            UploadImage cover = uploadImageDao.selectSingle(coverToken, coverType);
-            if (cover != null) {
-                Path realPath = Paths.get(ResourceUtil.classpath("static"), imageDir, cover.getFilepath());
-                try {
-                    Files.delete(realPath);
-                } catch (IOException e) {
-                    log.error("删除图片失败：" + realPath, e);
-                }
-            }
-        }
-    }
-
-    /**
-     * 将图片路径转化成图片 url
-     */
-    public String toImageUrl(String imagePath) {
-        return webSiteUrl + imageDir + "/" + imagePath;
-    }
-
-    private void deleteSessionImage(HttpSession session, String token) {
-        //noinspection unchecked
-        Map<String, Integer> fp2id = (Map<String, Integer>) session.getAttribute(SESSION_KEY_UPLOAD_IMAGE_TOKEN + token);
-        if (fp2id == null) {
-            return;
-        }
-        for (Map.Entry<String, Integer> en : fp2id.entrySet()) {
+        for (Map.Entry<String, Integer> en : cache.entrySet()) {
             String filepath = en.getKey();
             int imageId = en.getValue();
 
             uploadImageDao.deleteById(imageId);
+            uploadImageBindDao.deleteByImageId(imageId);
 
             Path realPath = Paths.get(ResourceUtil.classpath("static"), imageDir, filepath);
             try {
@@ -350,6 +208,27 @@ public class ImageService {
                 log.error("删除图片失败：" + realPath, e);
             }
         }
-        session.removeAttribute(SESSION_KEY_UPLOAD_IMAGE_TOKEN + token);
+    }
+
+    /**
+     * 删除指定对象的所有图片记录。
+     *
+     * @param targetType 对象类型，参见 {@link UploadImageTargetType}
+     * @param targetId 对象 id
+     */
+    @Transactional(isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
+    public void deleteImages(int targetType, int targetId) {
+        List<UploadImage> uploadImages = uploadImageBindDao.selectUploadImages(targetType, targetId);
+        for (UploadImage uploadImage : uploadImages) {
+            uploadImageDao.deleteById(uploadImage.getId());
+
+            Path realPath = Paths.get(ResourceUtil.classpath("static"), imageDir, uploadImage.getFilepath());
+            try {
+                Files.delete(realPath);
+            } catch (IOException e) {
+                log.error("删除图片失败：" + realPath, e);
+            }
+        }
+        uploadImageBindDao.deleteByTarget(targetType, targetId);
     }
 }

@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ncoxs.myblog.dao.mysql.UploadImageBindDao">
+
+    <resultMap id="BaseResultMap" type="com.ncoxs.myblog.model.pojo.UploadImageBind">
+        <id column="id" jdbcType="INTEGER" property="id"/>
+        <result column="image_id" jdbcType="INTEGER" property="imageId"/>
+        <result column="target_type" jdbcType="INTEGER" property="targetType"/>
+        <result column="target_id" jdbcType="INTEGER" property="targetId"/>
+        <result column="filepath" jdbcType="VARCHAR" property="filepath"/>
+        <result column="creation_time" jdbcType="VARCHAR" property="creationTime"/>
+    </resultMap>
+
+    <resultMap id="UploadImageResultMap" type="com.ncoxs.myblog.model.pojo.UploadImage">
+        <result column="image_id" jdbcType="INTEGER" property="id"/>
+        <result column="target_type" jdbcType="INTEGER" property="targetType"/>
+        <result column="filepath" jdbcType="VARCHAR" property="filepath"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        id, image_id, target_type, target_id, filepath, creation_time
+    </sql>
+
+    <select id="selectUploadImages" resultMap="UploadImageResultMap">
+        select image_id, target_type, filepath
+        from upload_image_bind
+        where target_id=#{targetId} and target_type=#{targetType}
+    </select>
+
+    <insert id="insert" keyColumn="id" keyProperty="id" parameterType="com.ncoxs.myblog.model.pojo.UploadImageBind"
+            useGeneratedKeys="true">
+        insert into upload_image_bind (image_id, target_type, target_id, filepath)
+        # 防止插入已存在的数据
+        select #{imageId,jdbcType=INTEGER}, #{targetType,jdbcType=INTEGER}, #{targetId,jdbcType=INTEGER},
+               #{filepath,jdbcType=VARCHAR}
+        from dual where not exists(select image_id from upload_image_bind where image_id=#{image_id})
+    </insert>
+
+    <update id="updateTarget" parameterType="com.ncoxs.myblog.model.pojo.UploadImageBind">
+        update upload_image_bind
+        set target_id = #{newTargetId}, target_type = #{newTargetType}
+        where target_id = #{oldTargetId} and target_type=#{oldTargetType}
+    </update>
+
+    <delete id="deleteByTarget">
+        delete from upload_image_bind
+        where target_id=#{targetId} and target_type=#{targetType}
+    </delete>
+
+    <delete id="deleteByImageId">
+        delete from upload_image_bind
+        where image_id=#{imageId}
+    </delete>
+</mapper>

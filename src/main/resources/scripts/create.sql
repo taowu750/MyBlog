@@ -87,7 +87,6 @@ create table if not exists `blog`
 
     # 内容信息
     `title`            varchar(50)  not null,
-    `html_body`        text         not null,
     `markdown_body`    text         not null,
     `cover_path`       varchar(150) not null comment '封面图片路径',
 
@@ -130,29 +129,26 @@ create table if not exists `upload_image`
 (
     `id`               int primary key auto_increment,
     `user_id`          int          not null,
-    `token`            varchar(36)  not null comment '标识一组图片的 token',
-    `target_type`      int          not null comment '图片所属的对象类别：1 博客，2 博客封面，3 博客草稿，4 专栏简介，5 专栏封面，6 评论，7 用户(头像、空间背景等)',
+    `target_type`      int          not null comment '图片所属的对象类别：1 博客，2 博客封面，3 博客草稿，4 博客草稿封面，5 专栏简介，6 专栏封面，7 评论，8 用户(头像、空间背景等)',
     `filepath`         varchar(60)  not null comment '图片在服务器上相对路径',
     `origin_file_name` varchar(150) not null comment '图片上传时的名称',
 
     `create_time`      timestamp    not null default current_timestamp,
 
-    key (user_id),
-    key (token)
+    key (user_id)
 );
 
-# 当图片所属的对象（博客等包含图片的文档）被上传时，记录图片 token 和图片所属的对象映射关系的表
-create table if not exists `saved_image_token`
+# 当图片所属的对象（博客等包含图片的文档）被上传时，记录图片和图片所属的对象映射关系的表
+create table if not exists `upload_image_bind`
 (
     `id`          int primary key auto_increment,
-    `token`       varchar(36) not null comment '标识一组图片的 token',
-    `target_type` int         not null comment '图片所属的对象类别：1 博客，2 博客封面，3 博客草稿，4 专栏简介，5 专栏封面，6 评论，7 用户(头像、空间背景等)',
-    `target_id`   int         not null comment '图片对应的对象 id',
+    `image_id`    int         not null,
+    `target_type` int         not null comment '图片所属的对象类别：1 博客，2 博客封面，3 博客草稿，4 博客草稿封面，5 专栏简介，6 专栏封面，7 评论，8 用户(头像、空间背景等)',
+    `target_id`   int         not null,
+    `filepath`    varchar(60) not null comment '图片在服务器上相对路径',
 
-    `create_time` timestamp   not null default current_timestamp,
-
-    key (`token`),
-    key (`target_id`, `target_type`)
+    key (image_id),
+    key (target_id, target_type)
 );
 
 # 标签

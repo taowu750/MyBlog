@@ -10,7 +10,6 @@ import com.ncoxs.myblog.constant.user.UserLogType;
 import com.ncoxs.myblog.controller.blog.BlogEditController;
 import com.ncoxs.myblog.dao.mysql.*;
 import com.ncoxs.myblog.model.bo.UserEditMarkdownLog;
-import com.ncoxs.myblog.model.dto.MarkdownObject;
 import com.ncoxs.myblog.model.pojo.*;
 import com.ncoxs.myblog.service.app.ImageService;
 import com.ncoxs.myblog.service.app.MarkdownService;
@@ -21,8 +20,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.*;
 
-// TODO: 增加用户日志记录
+
 @Service
 public class BlogEditService {
 
@@ -65,18 +65,18 @@ public class BlogEditService {
         this.blogDraftDao = blogDraftDao;
     }
 
-    private SavedImageTokenDao savedImageTokenDao;
-
-    @Autowired
-    public void setSavedImageTokenDao(SavedImageTokenDao savedImageTokenDao) {
-        this.savedImageTokenDao = savedImageTokenDao;
-    }
-
     private UploadImageDao uploadImageDao;
 
     @Autowired
     public void setUploadImageDao(UploadImageDao uploadImageDao) {
         this.uploadImageDao = uploadImageDao;
+    }
+
+    private UploadImageBindDao uploadImageBindDao;
+
+    @Autowired
+    public void setUploadImageBindDao(UploadImageBindDao uploadImageBindDao) {
+        this.uploadImageBindDao = uploadImageBindDao;
     }
 
     private UserLogDao userLogDao;
@@ -95,137 +95,175 @@ public class BlogEditService {
 
 
     /**
+     * 错误码：博客内容长度超过范围
+     */
+    public static final int BLOG_CONTENT_LENGTH_OUT_RANGE = -1;
+    /**
+     * 错误码：博客不属于当前用户
+     */
+    public static final int MARKDOWN_NOT_BELONG = -2;
+    /**
      * 错误码：参数都是 null
      */
-    public static final int PARAMS_ALL_BLANK = -10;
+    public static final int PARAMS_ALL_BLANK = -3;
     /**
      * 错误码：用户所具有的博客草稿数量超过最大值
      */
-    public static final int BLOG_DRAFT_COUNT_FULL = -11;
+    public static final int BLOG_DRAFT_COUNT_FULL = -4;
 
     public int saveBlogDraft(BlogEditController.BlogDraftParams params) throws JsonProcessingException {
-        return markdownService.saveMarkdown(params, UploadImageTargetType.BLOG_DRAFT, UploadImageTargetType.BLOG_DRAFT_COVER,
-                new MarkdownService.SaveMarkdownCallback() {
+        // 检测博客草稿长度是否在范围内
+        if (params.getMarkdownBody() != null
+                && (params.getMarkdownBody().length() > ParamValidateRule.BLOG_CONTENT_MAX_LEN
+                || params.getMarkdownBody().length() < ParamValidateRule.BLOG_CONTENT_MIN_LEN)) {
+            return BLOG_CONTENT_LENGTH_OUT_RANGE;
+        }
 
-                    @Override
-                    public int minMarkdownLength() {
-                        return ParamValidateRule.BLOG_CONTENT_MIN_LEN;
-                    }
+        User user = userService.accessByToken(params.getUserLoginToken());
+        String coverPath = !params.isDeleteCover ? markdownService.parseImagePathFromUrl(params.coverUrl) : null;
+        Integer resultId = params.getId();
+        // 首次上传文档
+        if (params.getId() == null) {
+            // 参数不能都是空
+            if (params.title == null && params.getMarkdownBody() == null && params.isAllowReprint == null
+                    && params.coverUrl == null) {
+                return PARAMS_ALL_BLANK;
+            }
 
-                    @Override
-                    public int maxMarkdownLength() {
-                        return ParamValidateRule.BLOG_CONTENT_MAX_LEN;
-                    }
+            // 如果用户保存的博客草稿已达最大上限
+            if (blogDraftDao.selectCountByUserId(user.getId()) >= maxBlogDraftUpperLimit) {
+                return BLOG_DRAFT_COUNT_FULL;
+            }
 
-                    @Override
-                    public int checkParams(User user, MarkdownObject params, int imageTokenType, Integer coverTokenType) {
-                        BlogEditController.BlogDraftParams blogDraftParams = (BlogEditController.BlogDraftParams) params;
-                        // 参数不能都是空
-                        if (blogDraftParams.title == null && blogDraftParams.getMarkdownBody() == null
-                                && blogDraftParams.getCoverToken() == null && blogDraftParams.isAllowReprint == null) {
-                            return PARAMS_ALL_BLANK;
-                        }
-                        // 如果用户保存的博客草稿已达最大上限
-                        if (blogDraftParams.getId() == null && blogDraftDao.selectCountByUserId(user.getId()) >= maxBlogDraftUpperLimit) {
-                            return BLOG_DRAFT_COUNT_FULL;
-                        }
+            // 插入博客草稿数据
+            BlogDraft blogDraft = new BlogDraft(user.getId(), params.title, params.getMarkdownBody(),
+                    coverPath, params.isAllowReprint);
+            blogDraftDao.insert(blogDraft);
 
-                        return 0;
-                    }
+            // 记录日志
+            UserLog userLog = new UserLog(user.getId(), UserLogType.EDIT_MARKDOWN, objectMapper.writeValueAsString(
+                    new UserEditMarkdownLog(UploadImageTargetType.BLOG_DRAFT, resultId, UserEditMarkdownLog.EDIT_TYPE_CREATE)));
+            userLogDao.insert(userLog);
+        } else if (blogDao.isMatchIdAndUserId(resultId, user.getId())) {  // 修改文档
+            // 参数不能都是空
+            boolean allNull = params.title == null && params.getMarkdownBody() == null && params.isAllowReprint == null
+                    && params.coverUrl == null;
+            if (allNull && !params.isDeleteCover) {
+                return PARAMS_ALL_BLANK;
+            }
 
-                    @Override
-                    public boolean checkUserAndMarkdownId(User user, int markdownId) {
-                        return blogDraftDao.isMatchIdAndUserId(markdownId, user.getId());
-                    }
+            // 更新博客草稿数据
+            if (!allNull) {
+                BlogDraft blogDraft = new BlogDraft();
+                blogDraft.setId(resultId);
+                blogDraft.setTitle(params.title);
+                blogDraft.setMarkdownBody(params.getMarkdownBody());
+                blogDraft.setCoverPath(coverPath);
+                blogDraft.setIsAllowReprint(params.isAllowReprint);
+                blogDraftDao.updateById(blogDraft);
+            }
 
-                    @Override
-                    public int onSave(User user, MarkdownObject params, int imageTokenType, Integer coverTokenType, UploadImage cover) {
-                        BlogEditController.BlogDraftParams blogDraftParams = (BlogEditController.BlogDraftParams) params;
-                        // 插入博客草稿数据
-                        BlogDraft blogDraft = new BlogDraft(user.getId(), blogDraftParams.title, blogDraftParams.getMarkdownBody(),
-                                cover != null ? cover.getFilepath() : null, blogDraftParams.isAllowReprint);
-                        blogDraftDao.insert(blogDraft);
+            // 如果需要删除封面
+            if (params.isDeleteCover) {
+                imageService.deleteImages(UploadImageTargetType.BLOG_DRAFT_COVER, resultId);
+            }
 
-                        return blogDraft.getId();
-                    }
+            // 记录日志
+            UserLog userLog = new UserLog(user.getId(), UserLogType.EDIT_MARKDOWN, objectMapper.writeValueAsString(
+                    new UserEditMarkdownLog(UploadImageTargetType.BLOG_DRAFT, resultId, UserEditMarkdownLog.EDIT_TYPE_UPDATE)));
+            userLogDao.insert(userLog);
+        } else {  // 此博客草稿不属于该用户
+            return MARKDOWN_NOT_BELONG;
+        }
 
-                    @Override
-                    public void onUpdate(User user, MarkdownObject params, int imageTokenType, Integer coverTokenType, UploadImage cover) {
-                        BlogEditController.BlogDraftParams blogDraftParams = (BlogEditController.BlogDraftParams) params;
-                        // 更新博客草稿数据
-                        BlogDraft blogDraft = new BlogDraft(blogDraftParams.getId(), user.getId(), blogDraftParams.title,
-                                blogDraftParams.getMarkdownBody(), cover != null ? cover.getFilepath() : null, blogDraftParams.isAllowReprint);
-                        blogDraftDao.updateById(blogDraft);
-                    }
-                });
+        // 保存图片和博客草稿的映射关系，并删除没有用到的图片
+        Set<String> usedImagePaths = markdownService.parseImagePathsFromMarkdown(params.getMarkdownBody());
+        imageService.bindImageTarget(usedImagePaths, UploadImageTargetType.BLOG_DRAFT, resultId);
+        // 保存封面和文档的映射关系
+        if (coverPath != null) {
+            imageService.bindImageTarget(Collections.singleton(coverPath), UploadImageTargetType.BLOG_DRAFT_COVER, resultId);
+        }
+
+        return resultId;
     }
 
 
     /**
      * 错误码：博客的一些关键参数是 null
      */
-    public static final int BLOG_PARAM_BLANK = -20;
+    public static final int PARAM_HAS_BLANK = -10;
 
-    public int publishBlog(BlogEditController.BlogParams blogParams) throws JsonProcessingException {
-        return markdownService.saveMarkdown(blogParams, UploadImageTargetType.BLOG, UploadImageTargetType.BLOG_COVER,
-                new MarkdownService.SaveMarkdownCallback() {
-                    @Override
-                    public int minMarkdownLength() {
-                        return ParamValidateRule.BLOG_CONTENT_MIN_LEN;
-                    }
+    public int publishBlog(BlogEditController.BlogParams params) throws JsonProcessingException {
+        // 检测博客长度是否在范围内
+        if (params.getMarkdownBody() != null
+                && (params.getMarkdownBody().length() > ParamValidateRule.BLOG_CONTENT_MAX_LEN
+                || params.getMarkdownBody().length() < ParamValidateRule.BLOG_CONTENT_MIN_LEN)) {
+            return BLOG_CONTENT_LENGTH_OUT_RANGE;
+        }
 
-                    @Override
-                    public int maxMarkdownLength() {
-                        return ParamValidateRule.BLOG_CONTENT_MAX_LEN;
-                    }
+        User user = userService.accessByToken(params.getUserLoginToken());
+        String coverPath = !params.isDeleteCover ? markdownService.parseImagePathFromUrl(params.coverUrl) : null;
+        Integer resultId = params.getId();
+        // 首次上传博客
+        if (params.getId() == null) {
+            // 上传新博客，关键参数不能为空
+            if (params.title == null || params.getMarkdownBody() == null || params.wordCount == null
+                    || params.isAllowReprint == null) {
+                return PARAM_HAS_BLANK;
+            }
 
-                    @Override
-                    public int checkParams(User user, MarkdownObject params, int imageTokenType, Integer coverTokenType) {
-                        // 上传新博客时，所有参数都不能缺少
-                        if (params.getId() == null) {
-                            if (blogParams.isAllowReprint == null || blogParams.title == null || blogParams.htmlBody == null
-                                    || blogParams.wordCount == null || params.getMarkdownBody() == null) {
-                                return BLOG_PARAM_BLANK;
-                            }
-                        } else if (blogParams.isAllowReprint == null && blogParams.title == null && blogParams.htmlBody == null
-                                && blogParams.wordCount == null && params.getMarkdownBody() == null) {
-                            // 修改博客时，不能所有参数都为空
-                            return PARAMS_ALL_BLANK;
-                        }
+            // 插入博客数据
+            Blog blog = new Blog(user.getId(), params.title, params.getMarkdownBody(),
+                    coverPath, params.wordCount, BlogStatus.UNDER_REVIEW, params.isAllowReprint);
+            blogDao.insert(blog);
 
-                        return 0;
-                    }
+            // 记录日志
+            UserLog userLog = new UserLog(user.getId(), UserLogType.EDIT_MARKDOWN, objectMapper.writeValueAsString(
+                    new UserEditMarkdownLog(UploadImageTargetType.BLOG, resultId, UserEditMarkdownLog.EDIT_TYPE_CREATE)));
+            userLogDao.insert(userLog);
+        } else if (blogDao.isMatchIdAndUserId(resultId, user.getId())) {  // 修改博客
+            // 修改博客，参数不能都是空
+            boolean allNull = params.title == null && params.getMarkdownBody() == null && params.isAllowReprint == null
+                    && params.coverUrl == null && params.wordCount == null;
+            if (allNull && !params.isDeleteCover) {
+                return PARAMS_ALL_BLANK;
+            }
 
-                    @Override
-                    public boolean checkUserAndMarkdownId(User user, int markdownId) {
-                        return blogDao.isMatchIdAndUserId(markdownId, user.getId());
-                    }
+            // 更新博客数据
+            if (!allNull) {
+                Blog blog = new Blog();
+                blog.setId(resultId);
+                blog.setTitle(params.title);
+                blog.setMarkdownBody(params.getMarkdownBody());
+                blog.setWordCount(params.wordCount);
+                blog.setCoverPath(coverPath);
+                blog.setIsAllowReprint(params.isAllowReprint);
+                blogDao.updateById(blog);
+            }
 
-                    @Override
-                    public int onSave(User user, MarkdownObject params, int imageTokenType, Integer coverTokenType, UploadImage cover) {
-                        Blog blog = new Blog(user.getId(), blogParams.title, blogParams.htmlBody, params.getMarkdownBody(),
-                                // cover 为空，则将使用默认封面，也就是博客中的第一张图片。如果没有则不使用封面
-                                cover != null ? cover.getFilepath() : "", blogParams.wordCount, BlogStatus.UNDER_REVIEW,
-                                blogParams.isAllowReprint);
-                        blogDao.insert(blog);
+            // 记录日志
+            UserLog userLog = new UserLog(user.getId(), UserLogType.EDIT_MARKDOWN, objectMapper.writeValueAsString(
+                    new UserEditMarkdownLog(UploadImageTargetType.BLOG, resultId, UserEditMarkdownLog.EDIT_TYPE_UPDATE)));
+            userLogDao.insert(userLog);
+        } else {  // 此博客不属于该用户
+            return MARKDOWN_NOT_BELONG;
+        }
 
-                        return blog.getId();
-                    }
+        // 保存图片和博客的映射关系，并删除没有用到的图片
+        Set<String> usedImagePaths = markdownService.parseImagePathsFromMarkdown(params.getMarkdownBody());
+        imageService.bindImageTarget(usedImagePaths, UploadImageTargetType.BLOG, resultId);
+        // 保存封面和博客的映射关系
+        if (coverPath != null) {
+            imageService.bindImageTarget(Collections.singleton(coverPath), UploadImageTargetType.BLOG_COVER, resultId);
+        }
 
-                    @Override
-                    public void onUpdate(User user, MarkdownObject params, int imageTokenType, Integer coverTokenType, UploadImage cover) {
-                        Blog blog = new Blog(params.getId(), user.getId(), blogParams.title, blogParams.htmlBody,
-                                params.getMarkdownBody(), cover != null ? cover.getFilepath() : null, blogParams.wordCount,
-                                blogParams.isAllowReprint);
-                        blogDao.updateById(blog);
-                    }
-                });
+        return resultId;
     }
 
     /**
      * 错误码：博客草稿的一些关键参数是 null
      */
-    public static final int BLOG_DRAFT_NOT_COMPLETE = -30;
+    public static final int BLOG_DRAFT_NOT_COMPLETE = -20;
 
     /**
      * 将博客草稿发表为博客。博客草稿必须内容完整，并且博客草稿必须已经保存过。
@@ -235,7 +273,7 @@ public class BlogEditService {
         User user = userService.accessByToken(params.getUserLoginToken());
         // 检测博客草稿是否属于这个用户
         if (!blogDraftDao.isMatchIdAndUserId(params.blogDraftId, user.getId())) {
-            return MarkdownService.MARKDOWN_NOT_BELONG;
+            return MARKDOWN_NOT_BELONG;
         }
 
         // 检测博客草稿关键参数是否为 null
@@ -245,22 +283,25 @@ public class BlogEditService {
         }
 
         // 插入博客记录
-        Blog blog = new Blog(user.getId(), blogDraft.getTitle(), params.htmlBody, blogDraft.getMarkdownBody(),
+        Blog blog = new Blog(user.getId(), blogDraft.getTitle(), blogDraft.getMarkdownBody(),
                 blogDraft.getCoverPath() != null ? blogDraft.getCoverPath() : "", params.wordCount, BlogStatus.UNDER_REVIEW,
                 blogDraft.getIsAllowReprint());
         blogDao.insert(blog);
 
-        // 将博客草稿的图片 token 和封面 token 变成博客的
-        String imageToken = savedImageTokenDao.selectTokenByTarget(UploadImageTargetType.BLOG_DRAFT, params.blogDraftId);
-        if (imageToken != null) {
-            savedImageTokenDao.updateTargetByToken(imageToken, blog.getId(), UploadImageTargetType.BLOG);
-            uploadImageDao.updateTargetTypeByToken(imageToken, UploadImageTargetType.BLOG);
+        // 将博客草稿的图片映射关系转移到博客下面
+        List<UploadImage> uploadImages = uploadImageBindDao.selectUploadImages(UploadImageTargetType.BLOG_DRAFT, params.blogDraftId);
+        for (UploadImage uploadImage : uploadImages) {
+            uploadImageDao.updateTargetTypeById(uploadImage.getId(), UploadImageTargetType.BLOG);
         }
-        String coverToken = savedImageTokenDao.selectTokenByTarget(UploadImageTargetType.BLOG_DRAFT_COVER, params.blogDraftId);
-        if (coverToken != null) {
-            savedImageTokenDao.updateTargetByToken(coverToken, blog.getId(), UploadImageTargetType.BLOG_COVER);
-            uploadImageDao.updateTargetTypeByToken(imageToken, UploadImageTargetType.BLOG_COVER);
+        uploadImageBindDao.updateTarget(UploadImageTargetType.BLOG_DRAFT, params.blogDraftId,
+                UploadImageTargetType.BLOG, blog.getId());
+        // 同时也更新封面
+        uploadImages = uploadImageBindDao.selectUploadImages(UploadImageTargetType.BLOG_DRAFT_COVER, params.blogDraftId);
+        for (UploadImage uploadImage : uploadImages) {
+            uploadImageDao.updateTargetTypeById(uploadImage.getId(), UploadImageTargetType.BLOG_COVER);
         }
+        uploadImageBindDao.updateTarget(UploadImageTargetType.BLOG_DRAFT_COVER, params.blogDraftId,
+                UploadImageTargetType.BLOG_COVER, blog.getId());
 
         // 删除博客草稿
         blogDraftDao.deleteById(params.blogDraftId);
@@ -274,12 +315,12 @@ public class BlogEditService {
                 new UserEditMarkdownLog(UploadImageTargetType.BLOG_DRAFT, params.blogDraftId, UserEditMarkdownLog.EDIT_TYPE_DELETE)));
         userLogDao.insert(userLog);
 
-        // 删除没有用到的图片并从 session 中移除数据。这一步是预防措施
-        imageService.deleteSessionDiscardedImage(imageToken, blogDraft.getMarkdownBody());
-
         return blog.getId();
     }
 
+    /**
+     * 获取博客草稿数据，用来编辑。
+     */
     public BlogEditController.EditResp getDraftData(BlogEditController.EditParams params) {
         User user = userService.accessByToken(params.getUserLoginToken());
         if (!blogDraftDao.isMatchIdAndUserId(params.id, user.getId())) {
@@ -287,22 +328,21 @@ public class BlogEditService {
         }
 
         BlogDraft blogDraft = blogDraftDao.selectById(params.id);
-        String imageToken = savedImageTokenDao.selectTokenByTarget(UploadImageTargetType.BLOG_DRAFT, params.id);
-        String coverToken = savedImageTokenDao.selectTokenByTarget(UploadImageTargetType.BLOG_DRAFT_COVER, params.id);
 
         BlogEditController.EditResp result = new BlogEditController.EditResp();
         result.setTitle(blogDraft.getTitle());
         result.setMarkdownBody(blogDraft.getMarkdownBody());
         result.setIsAllowReprint(blogDraft.getIsAllowReprint());
+        result.setCoverUrl(blogDraft.getCoverPath() != null ? imageService.toImageUrl(blogDraft.getCoverPath()) : null);
         result.setCreateTime(blogDraft.getCreateTime());
         result.setModifyTime(blogDraft.getModifyTime());
-        result.setImageToken(imageToken);
-        result.setCoverToken(coverToken);
-        result.setCoverUrl(blogDraft.getCoverPath() != null ? imageService.toImageUrl(blogDraft.getCoverPath()) : null);
 
         return result;
     }
 
+    /**
+     * 获取博客数据，用来编辑。
+     */
     public BlogEditController.EditResp getBlogData(BlogEditController.EditParams params) {
         User user = userService.accessByToken(params.getUserLoginToken());
         if (!blogDao.isMatchIdAndUserId(params.id, user.getId())) {
@@ -310,18 +350,14 @@ public class BlogEditService {
         }
 
         Blog blog = blogDao.selectById(params.id);
-        String imageToken = savedImageTokenDao.selectTokenByTarget(UploadImageTargetType.BLOG, params.id);
-        String coverToken = savedImageTokenDao.selectTokenByTarget(UploadImageTargetType.BLOG_COVER, params.id);
 
         BlogEditController.EditResp result = new BlogEditController.EditResp();
         result.setTitle(blog.getTitle());
         result.setMarkdownBody(blog.getMarkdownBody());
         result.setIsAllowReprint(blog.getIsAllowReprint());
+        result.setCoverUrl(blog.getCoverPath() != null ? imageService.toImageUrl(blog.getCoverPath()) : null);
         result.setCreateTime(blog.getCreateTime());
         result.setModifyTime(blog.getModifyTime());
-        result.setImageToken(imageToken);
-        result.setCoverToken(coverToken);
-        result.setCoverUrl(blog.getCoverPath() != null ? imageService.toImageUrl(blog.getCoverPath()) : null);
 
         return result;
     }
@@ -344,8 +380,10 @@ public class BlogEditService {
                 new UserEditMarkdownLog(UploadImageTargetType.BLOG_DRAFT, blogDraftId, UserEditMarkdownLog.EDIT_TYPE_DELETE)));
         userLogDao.insert(userLog);
 
-        // 删除图片
-        imageService.deleteImages(UploadImageTargetType.BLOG_DRAFT, blogDraftId, UploadImageTargetType.BLOG_DRAFT_COVER);
+        // 删除博客内图片
+        imageService.deleteImages(UploadImageTargetType.BLOG_DRAFT, blogDraftId);
+        // 删除博客封面
+        imageService.deleteImages(UploadImageTargetType.BLOG_DRAFT_COVER, blogDraftId);
 
         return ResultCode.SUCCESS;
     }

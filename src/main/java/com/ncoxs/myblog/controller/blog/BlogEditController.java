@@ -7,10 +7,9 @@ import com.ncoxs.myblog.constant.ResultCode;
 import com.ncoxs.myblog.handler.encryption.Encryption;
 import com.ncoxs.myblog.handler.validate.UserValidate;
 import com.ncoxs.myblog.model.dto.GenericResult;
-import com.ncoxs.myblog.model.dto.MarkdownEditObject;
-import com.ncoxs.myblog.model.dto.MarkdownObject;
+import com.ncoxs.myblog.model.dto.MarkdownEditResp;
+import com.ncoxs.myblog.model.dto.MarkdownParams;
 import com.ncoxs.myblog.model.dto.UserAccessParams;
-import com.ncoxs.myblog.service.app.MarkdownService;
 import com.ncoxs.myblog.service.blog.BlogEditService;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -40,7 +39,7 @@ public class BlogEditController {
 
     @EqualsAndHashCode(callSuper = true)
     @Data
-    public static class BlogDraftParams extends MarkdownObject {
+    public static class BlogDraftParams extends MarkdownParams {
 
         @Length(message = ParamValidateMsg.BLOG_TITLE_LEN,
                 min = ParamValidateRule.BLOG_TITLE_MIN_LEN,
@@ -48,6 +47,10 @@ public class BlogEditController {
         public String title;
 
         public Boolean isAllowReprint;
+
+        public String coverUrl;
+
+        public boolean isDeleteCover;
     }
 
     /**
@@ -62,11 +65,9 @@ public class BlogEditController {
             return GenericResult.error(ResultCode.PARAMS_ALL_BLANK);
         } else if (blogDraftId == BlogEditService.BLOG_DRAFT_COUNT_FULL) {
             return GenericResult.error(ResultCode.DATA_COUNT_OUT_RANGE);
-        }  else if (blogDraftId == MarkdownService.IMAGE_TOKEN_MISMATCH) {
-            return GenericResult.error(ResultCode.PARAMS_IMAGE_TOKEN_MISMATCH);
-        } else if (blogDraftId == MarkdownService.MARKDOWN_NOT_BELONG) {
+        } else if (blogDraftId == BlogEditService.MARKDOWN_NOT_BELONG) {
             return GenericResult.error(ResultCode.DATA_ACCESS_DENIED);
-        } else if (blogDraftId == MarkdownService.MARKDOWN_MAX_LENGTH_EXCEEDED) {
+        } else if (blogDraftId == BlogEditService.BLOG_CONTENT_LENGTH_OUT_RANGE) {
             return GenericResult.error(ResultCode.PARAM_IS_INVALID);
         } else {
             return GenericResult.success(blogDraftId);
@@ -75,22 +76,22 @@ public class BlogEditController {
 
     @EqualsAndHashCode(callSuper = true)
     @Data
-    public static class BlogParams extends MarkdownObject {
+    public static class BlogParams extends MarkdownParams {
 
         @Length(message = ParamValidateMsg.BLOG_TITLE_LEN,
                 min = ParamValidateRule.BLOG_TITLE_MIN_LEN,
                 max = ParamValidateRule.BLOG_TITLE_MAX_LEN)
         public String title;
 
-        @Length(min = ParamValidateRule.BLOG_CONTENT_MIN_LEN, max = ParamValidateRule.BLOG_CONTENT_MAX_LEN,
-                message = ParamValidateMsg.BLOG_CONTENT_LEN)
-        public String htmlBody;
-
         @Range(min = ParamValidateRule.BLOG_WORD_COUNT_MIN, max = ParamValidateRule.BLOG_WORD_COUNT_MAX,
                 message = ParamValidateMsg.BLOG_WORD_COUNT_RANGE)
         public Integer wordCount;
 
         public Boolean isAllowReprint;
+
+        public String coverUrl;
+
+        public boolean isDeleteCover;
     }
 
     /**
@@ -106,13 +107,11 @@ public class BlogEditController {
         int blogId = blogEditService.publishBlog(params);
         if (blogId == BlogEditService.PARAMS_ALL_BLANK) {
             return GenericResult.error(ResultCode.PARAMS_ALL_BLANK);
-        } else if (blogId == BlogEditService.BLOG_PARAM_BLANK) {
+        } else if (blogId == BlogEditService.PARAM_HAS_BLANK) {
             return GenericResult.error(ResultCode.PARAM_NOT_COMPLETE);
-        } else if (blogId == MarkdownService.IMAGE_TOKEN_MISMATCH) {
-            return GenericResult.error(ResultCode.PARAMS_IMAGE_TOKEN_MISMATCH);
-        } else if (blogId == MarkdownService.MARKDOWN_NOT_BELONG) {
+        } else if (blogId == BlogEditService.MARKDOWN_NOT_BELONG) {
             return GenericResult.error(ResultCode.DATA_ACCESS_DENIED);
-        } else if (blogId == MarkdownService.MARKDOWN_MAX_LENGTH_EXCEEDED) {
+        } else if (blogId == BlogEditService.BLOG_CONTENT_LENGTH_OUT_RANGE) {
             return GenericResult.error(ResultCode.PARAM_IS_INVALID);
         } else {
             return GenericResult.success(blogId);
@@ -145,7 +144,7 @@ public class BlogEditController {
     @UserValidate
     public GenericResult<Integer> publishBlog(@RequestBody PublishDraftParams params) throws JsonProcessingException {
         int blogId = blogEditService.publishBlog(params);
-        if (blogId == MarkdownService.MARKDOWN_NOT_BELONG) {
+        if (blogId == BlogEditService.MARKDOWN_NOT_BELONG) {
             return GenericResult.error(ResultCode.DATA_ACCESS_DENIED);
         } else if (blogId == BlogEditService.BLOG_DRAFT_NOT_COMPLETE) {
             return GenericResult.error(ResultCode.DATA_NOT_COMPLETE);
@@ -163,7 +162,10 @@ public class BlogEditController {
 
     @EqualsAndHashCode(callSuper = true)
     @Data
-    public static class EditResp extends MarkdownEditObject {
+    public static class EditResp extends MarkdownEditResp {
+
+        private String coverUrl;
+
         public Boolean isAllowReprint;
     }
 
