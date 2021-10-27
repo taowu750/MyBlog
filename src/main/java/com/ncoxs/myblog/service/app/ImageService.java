@@ -28,7 +28,7 @@ import java.util.*;
 /**
  * 图片上传逻辑：
  * 1. 客户端上传图片、所属类型 targetType（参见 {@link com.ncoxs.myblog.constant.UploadImageTargetType}）
- * 2. 上传图片后，将图片保存到文件，并记录在数据库中。然后将 (图片路径, [id,targetType]) 缓存到 session 的一个 map 中。
+ * 2. 上传图片后，将图片保存到文件，并记录在数据库中。然后将 (图片路径, id) 缓存到 session 的一个 map 中。
  * 3. 当上传博客等包含图片的对象时，从中解析出使用的图片，然后从 session 中删除用到的图片，
  * 最后在数据库中记录每张用到的图片所属的对象 id（targetId）（用一个新的表）。
  * 4. session 被销毁时删除仍然记录的图片数据。
@@ -163,7 +163,7 @@ public class ImageService {
      * @param targetId 包含图片的对象的 id
      */
     @Transactional(isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
-    public void bindImageTarget(Set<String> usedImagePaths, int targetType, int targetId) {
+    public void bindImageTarget(Set<String> usedImagePaths, int targetType, int targetId, boolean updateTargetType) {
         HttpSession session = SpringUtil.currentSession();
         //noinspection unchecked
         Map<String, Integer> cache = (Map<String, Integer>) session.getAttribute(SESSION_KEY_UPLOAD_IMAGES);
@@ -177,7 +177,12 @@ public class ImageService {
 
         // 保存新图片和 target 的映射关系
         for (String usedImagePath : usedImagePaths) {
-            uploadImageBindDao.insert(new UploadImageBind(cache.get(usedImagePath), targetType, targetId, usedImagePath));
+            int imageId = cache.get(usedImagePath);
+            uploadImageBindDao.insert(new UploadImageBind(imageId, targetType, targetId, usedImagePath));
+            // 某些情况下（例如博客草稿->博客），还需要修改 upload_image 的 targetType
+            if (updateTargetType) {
+                uploadImageDao.updateTargetTypeById(imageId, targetType);
+            }
         }
 
         // 从 session 中删除使用到的图片
@@ -211,7 +216,7 @@ public class ImageService {
     }
 
     /**
-     * 删除指定对象的所有图片记录。
+     * 删除指定对象在数据库中的所有图片记录。
      *
      * @param targetType 对象类型，参见 {@link UploadImageTargetType}
      * @param targetId 对象 id
@@ -219,6 +224,7 @@ public class ImageService {
     @Transactional(isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
     public void deleteImages(int targetType, int targetId) {
         List<UploadImage> uploadImages = uploadImageBindDao.selectUploadImages(targetType, targetId);
+        uploadImageBindDao.deleteByTarget(targetType, targetId);
         for (UploadImage uploadImage : uploadImages) {
             uploadImageDao.deleteById(uploadImage.getId());
 
@@ -229,6 +235,16 @@ public class ImageService {
                 log.error("删除图片失败：" + realPath, e);
             }
         }
-        uploadImageBindDao.deleteByTarget(targetType, targetId);
+    }
+
+    /**
+     * 更改图片的 target 类型和 targetId。
+     */
+    public void updateImageTarget(int oldTargetType, int oldTargetId, int newTargetType, int newTargetId) {
+        List<UploadImage> uploadImages = uploadImageBindDao.selectUploadImages(oldTargetType, oldTargetId);
+        for (UploadImage uploadImage : uploadImages) {
+            uploadImageDao.updateTargetTypeById(uploadImage.getId(), newTargetType);
+        }
+        uploadImageBindDao.updateTarget(oldTargetType, oldTargetId, newTargetType, newTargetId);
     }
 }

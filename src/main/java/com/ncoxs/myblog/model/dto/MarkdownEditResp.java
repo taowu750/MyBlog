@@ -10,8 +10,6 @@ import java.util.Date;
 @Data
 public class MarkdownEditResp {
 
-    private String title;
-
     private String markdownBody;
 
     private Date createTime;

@@ -22,7 +22,7 @@ public class MarkdownServiceTest extends BaseTester {
     @Test
     public void testParseUsedImages() {
         String testMd = ResourceUtil.loadString("markdown/test.md");
-        Set<String> images = markdownService.parseUsedImages(testMd);
+        Set<String> images = markdownService.parseImagePathsFromMarkdown(testMd);
         log.info(images.toString());
     }
 }

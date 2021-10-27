@@ -37,19 +37,17 @@ public class ImageController {
      *
      * @param userLoginToken 用户登录 token
      * @param imageFile      图片文件
-     * @param imageToken     一组图片的唯一标识
      * @param targetType     图片所属对象的类型
      */
     @PostMapping("/upload")
     @UserValidate
     public GenericResult<String> uploadImage(@UserLoginToken String userLoginToken, MultipartFile imageFile,
-                                             String imageToken,
                                              @Range(min = UploadImageTargetType.BLOG,
                                                      max = UploadImageTargetType.USER_PROFILE_PICTURE,
                                                      message = ParamValidateMsg.UPLOAD_IMAGE_TARGET_TYPE_INVALID)
                                                      int targetType) {
         try {
-            String url = imageService.saveImage(userLoginToken, imageFile, imageToken, targetType);
+            String url = imageService.saveImage(userLoginToken, imageFile, targetType);
             if (url == null) {
                 return GenericResult.error(ResultCode.FILE_UPLOAD_IMAGE_ERROR);
             } else {

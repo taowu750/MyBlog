@@ -14,16 +14,35 @@
         id, user_id, target_type, filepath, origin_file_name, create_time
     </sql>
 
+    <select id="selectById" resultType="com.ncoxs.myblog.model.pojo.UploadImage">
+        select <include refid="Base_Column_List"/>
+        from upload_image
+        where id=#{id}
+    </select>
+
     <update id="updateTargetTypeById">
         update upload_image
         set target_type = #{newTargetType}
         where id=#{id};
     </update>
 
+    <!--<select id="containsImagePath" resultType="java.lang.Boolean">
+        <choose>
+            <when test="filepath != null and filepath != ''">
+                select count(*)
+                from upload_image
+                where filepath=#{filepath}
+            </when>
+            <otherwise>
+                select false
+            </otherwise>
+        </choose>
+    </select>-->
+
     <insert id="insert" keyColumn="id" keyProperty="id" parameterType="com.ncoxs.myblog.model.pojo.UploadImage"
             useGeneratedKeys="true">
-        insert into upload_image (user_id, token, target_type, filepath, origin_file_name)
-        values (#{userId}, #{token}, #{targetType}, #{filepath}, #{originFileName,jdbcType=VARCHAR})
+        insert into upload_image (user_id, target_type, filepath, origin_file_name)
+        values (#{userId}, #{targetType}, #{filepath}, #{originFileName,jdbcType=VARCHAR})
     </insert>
 
     <delete id="deleteById">

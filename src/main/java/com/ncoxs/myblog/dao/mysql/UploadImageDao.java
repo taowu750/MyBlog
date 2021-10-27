@@ -6,6 +6,8 @@ import org.apache.ibatis.annotations.Mapper;
 @Mapper
 public interface UploadImageDao {
 
+    UploadImage selectById(int id);
+
     int insert(UploadImage record);
 
     int updateTargetTypeById(int id, int newTargetType);

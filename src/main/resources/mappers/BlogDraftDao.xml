@@ -36,6 +36,12 @@
         where user_id=#{userId}
     </select>
 
+    <select id="selectCoverPathById" resultType="java.lang.String">
+        select cover_path
+        from blog_draft
+        where id=#{id}
+    </select>
+
     <insert id="insert" keyColumn="id" keyProperty="id" parameterType="com.ncoxs.myblog.model.pojo.BlogDraft"
             useGeneratedKeys="true">
         insert into blog_draft

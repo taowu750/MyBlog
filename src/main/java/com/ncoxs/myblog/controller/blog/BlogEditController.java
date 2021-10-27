@@ -19,8 +19,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
-import javax.validation.constraints.NotBlank;
-
 /**
  * 博客编辑控制器
  */
@@ -49,8 +47,6 @@ public class BlogEditController {
         public Boolean isAllowReprint;
 
         public String coverUrl;
-
-        public boolean isDeleteCover;
     }
 
     /**
@@ -90,8 +86,6 @@ public class BlogEditController {
         public Boolean isAllowReprint;
 
         public String coverUrl;
-
-        public boolean isDeleteCover;
     }
 
     /**
@@ -124,11 +118,6 @@ public class BlogEditController {
 
         public int blogDraftId;
 
-        @NotBlank(message = ParamValidateMsg.BLOG_CONTENT_BLANK)
-        @Length(min = ParamValidateRule.BLOG_CONTENT_MIN_LEN, max = ParamValidateRule.BLOG_CONTENT_MAX_LEN,
-                message = ParamValidateMsg.BLOG_CONTENT_LEN)
-        public String htmlBody;
-
         @Range(min = ParamValidateRule.BLOG_WORD_COUNT_MIN, max = ParamValidateRule.BLOG_WORD_COUNT_MAX,
                 message = ParamValidateMsg.BLOG_WORD_COUNT_RANGE)
         public int wordCount;
@@ -155,7 +144,7 @@ public class BlogEditController {
 
     @EqualsAndHashCode(callSuper = true)
     @Data
-    public static class EditParams extends UserAccessParams {
+    public static class GetParams extends UserAccessParams {
 
         public int id;
     }
@@ -164,7 +153,9 @@ public class BlogEditController {
     @Data
     public static class EditResp extends MarkdownEditResp {
 
-        private String coverUrl;
+        public String title;
+
+        public String coverUrl;
 
         public Boolean isAllowReprint;
     }
@@ -175,7 +166,7 @@ public class BlogEditController {
     @PostMapping("/draft/get-for-edit")
     @Encryption
     @UserValidate
-    public GenericResult<EditResp> getDraftForEdit(@RequestBody EditParams params) {
+    public GenericResult<EditResp> getDraftForEdit(@RequestBody GetParams params) {
         return GenericResult.ofNullable(blogEditService.getDraftData(params), ResultCode.DATA_ACCESS_DENIED);
     }
 
@@ -185,7 +176,7 @@ public class BlogEditController {
     @PostMapping("/get-for-edit")
     @Encryption
     @UserValidate
-    public GenericResult<EditResp> getBlogForEdit(@RequestBody EditParams params) {
+    public GenericResult<EditResp> getBlogForEdit(@RequestBody GetParams params) {
         return GenericResult.ofNullable(blogEditService.getBlogData(params), ResultCode.DATA_ACCESS_DENIED);
     }
 
@@ -194,7 +185,7 @@ public class BlogEditController {
      */
     @DeleteMapping("/draft/delete")
     @UserValidate
-    public GenericResult<?> deleteBlogDraft(@RequestBody EditParams params) throws JsonProcessingException {
+    public GenericResult<?> deleteBlogDraft(@RequestBody GetParams params) throws JsonProcessingException {
         return GenericResult.byCode(blogEditService.deleteBlogDraft(params.getUserLoginToken(), params.id));
     }
 
@@ -203,7 +194,7 @@ public class BlogEditController {
      */
     @DeleteMapping("/delete")
     @UserValidate
-    public GenericResult<?> deleteBlog(@RequestBody EditParams params) throws JsonProcessingException {
+    public GenericResult<?> deleteBlog(@RequestBody GetParams params) throws JsonProcessingException {
         return GenericResult.byCode(blogEditService.deleteBlog(params.getUserLoginToken(), params.id));
     }
 }

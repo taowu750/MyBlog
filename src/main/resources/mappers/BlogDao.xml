@@ -65,6 +65,12 @@
         where id=#{id} and status=${@com.ncoxs.myblog.constant.blog.BlogStatus@NORMAL}
     </select>
 
+    <select id="selectCoverPathById" resultType="java.lang.String">
+        select cover_path
+        from blog
+        where id=#{id}
+    </select>
+
     <insert id="insert" keyColumn="id" keyProperty="id" parameterType="com.ncoxs.myblog.model.pojo.Blog"
             useGeneratedKeys="true">
         insert into blog

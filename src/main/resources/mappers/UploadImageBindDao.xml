@@ -33,7 +33,7 @@
         # 防止插入已存在的数据
         select #{imageId,jdbcType=INTEGER}, #{targetType,jdbcType=INTEGER}, #{targetId,jdbcType=INTEGER},
                #{filepath,jdbcType=VARCHAR}
-        from dual where not exists(select image_id from upload_image_bind where image_id=#{image_id})
+        from dual where not exists(select image_id from upload_image_bind where image_id=#{imageId})
     </insert>
 
     <update id="updateTarget" parameterType="com.ncoxs.myblog.model.pojo.UploadImageBind">

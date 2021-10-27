@@ -18,6 +18,8 @@ public interface BlogDao {
      */
     BlogThumbnail selectThumbnail(int id, int abbrLength);
 
+    String selectCoverPathById(int id);
+
     /**
      * 检测博客的状态是否可以展示
      */

@@ -12,6 +12,8 @@ public interface BlogDraftDao {
 
     int selectCountByUserId(int userId);
 
+    String selectCoverPathById(int id);
+
     int insert(BlogDraft record);
 
     int updateById(BlogDraft record);

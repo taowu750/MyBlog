@@ -11,6 +11,9 @@ public interface UploadImageBindDao {
 
     List<UploadImage> selectUploadImages(int targetType, int targetId);
 
+    /**
+     * 只有当 imageId 不存在时才会插入
+     */
     int insert(UploadImageBind record);
 
     int updateTarget(int oldTargetType, int oldTargetId, int newTargetType, int newTargetId);

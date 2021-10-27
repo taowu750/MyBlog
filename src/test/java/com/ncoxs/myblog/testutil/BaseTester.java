@@ -133,11 +133,11 @@ public class BaseTester {
      * 上传图片。图片从 test/resources/img 下面读取。
      */
     protected String uploadImage(Tuple2<UserLoginResp, MockHttpSession> tuple, int targetType,
-                                 String imageToken, String testImageName) throws Exception {
+                                 String testImageName) throws Exception {
         byte[] data = new EncryptionMockMvcBuilder(mockMvc, objectMapper)
                 .multipart("/app/image/upload")
                 .formParams(mp(kv("userLoginToken", tuple.t1.getToken()),
-                        kv("imageToken", imageToken), kv("targetType", targetType),
+                        kv("targetType", targetType),
                         kv("imageFile", Paths.get(ResourceUtil.classpath(), "img", testImageName).toFile())))
                 .session(tuple.t2)
                 .sendRequest()

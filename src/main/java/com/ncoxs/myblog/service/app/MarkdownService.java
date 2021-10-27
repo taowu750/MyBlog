@@ -85,7 +85,7 @@ public class MarkdownService implements InitializingBean {
      */
     public String parseImagePathFromUrl(String imageUrl) {
         if (imageUrl == null) {
-            return null;
+            return "";
         }
 
         Matcher matcher = imageUrlPattern.matcher(imageUrl);
@@ -93,6 +93,6 @@ public class MarkdownService implements InitializingBean {
             return matcher.group(1);
         }
 
-        return null;
+        return "";
     }
 }
