@@ -144,7 +144,7 @@ public class BlogEditController {
 
     @EqualsAndHashCode(callSuper = true)
     @Data
-    public static class GetParams extends UserAccessParams {
+    public static class IdParams extends UserAccessParams {
 
         public int id;
     }
@@ -166,7 +166,7 @@ public class BlogEditController {
     @PostMapping("/draft/get-for-edit")
     @Encryption
     @UserValidate
-    public GenericResult<EditResp> getDraftForEdit(@RequestBody GetParams params) {
+    public GenericResult<EditResp> getDraftForEdit(@RequestBody IdParams params) {
         return GenericResult.ofNullable(blogEditService.getDraftData(params), ResultCode.DATA_ACCESS_DENIED);
     }
 
@@ -176,7 +176,7 @@ public class BlogEditController {
     @PostMapping("/get-for-edit")
     @Encryption
     @UserValidate
-    public GenericResult<EditResp> getBlogForEdit(@RequestBody GetParams params) {
+    public GenericResult<EditResp> getBlogForEdit(@RequestBody IdParams params) {
         return GenericResult.ofNullable(blogEditService.getBlogData(params), ResultCode.DATA_ACCESS_DENIED);
     }
 
@@ -185,7 +185,7 @@ public class BlogEditController {
      */
     @DeleteMapping("/draft/delete")
     @UserValidate
-    public GenericResult<?> deleteBlogDraft(@RequestBody GetParams params) throws JsonProcessingException {
+    public GenericResult<?> deleteBlogDraft(@RequestBody IdParams params) throws JsonProcessingException {
         return GenericResult.byCode(blogEditService.deleteBlogDraft(params.getUserLoginToken(), params.id));
     }
 
@@ -194,7 +194,7 @@ public class BlogEditController {
      */
     @DeleteMapping("/delete")
     @UserValidate
-    public GenericResult<?> deleteBlog(@RequestBody GetParams params) throws JsonProcessingException {
+    public GenericResult<?> deleteBlog(@RequestBody IdParams params) throws JsonProcessingException {
         return GenericResult.byCode(blogEditService.deleteBlog(params.getUserLoginToken(), params.id));
     }
 }

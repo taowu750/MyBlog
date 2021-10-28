@@ -1,7 +1,9 @@
 package com.ncoxs.myblog.controller.blog;
 
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.ncoxs.myblog.constant.ResultCode;
 import com.ncoxs.myblog.constant.UploadImageTargetType;
+import com.ncoxs.myblog.constant.blog.BlogStatus;
 import com.ncoxs.myblog.dao.mysql.BlogDao;
 import com.ncoxs.myblog.dao.mysql.BlogDraftDao;
 import com.ncoxs.myblog.dao.mysql.UploadImageBindDao;
@@ -563,5 +565,127 @@ public class BlogEditControllerTest extends BaseTester implements InitializingBe
         assertEquals(blogDraft.getCreateTime(), editResp.getCreateTime());
         assertEquals(blogDraft.getModifyTime(), editResp.getModifyTime());
         assertEquals(coverUrl, editResp.getCoverUrl());
+    }
+
+    /**
+     * 测试删除博客草稿
+     */
+    @Test
+    @Transactional
+    public void testDeleteDraft() throws Exception {
+        Tuple2<UserLoginResp, MockHttpSession> tuple = prepareUser();
+
+        // 上传图片 test1.gif
+        String imageUrl1 = uploadImage(tuple, UploadImageTargetType.BLOG_DRAFT, "test1.gif");
+        // 上传图片 test2.jpeg
+        String imageUrl2 = uploadImage(tuple, UploadImageTargetType.BLOG_DRAFT, "test2.jpeg");
+        // 上传封面 test3.jpeg
+        String coverUrl = uploadImage(tuple, UploadImageTargetType.BLOG_DRAFT_COVER, "test3.jpeg");
+
+        // 读取博客草稿正文并替换图片 url
+        String blogBody = ResourceUtil.loadString("markdown/test-blog-new.md");
+        blogBody = blogBody.replace("url-placeholder1", imageUrl1);
+        blogBody = blogBody.replace("url-placeholder2", imageUrl2);
+
+        // 上传新的博客草稿
+        BlogEditController.BlogDraftParams params = new BlogEditController.BlogDraftParams();
+        params.title = "标题1";
+        params.setMarkdownBody(blogBody);
+        params.setCoverUrl(coverUrl);
+        params.isAllowReprint = true;
+        params.setUserLoginToken(tuple.t1.getToken());
+
+        byte[] data = new EncryptionMockMvcBuilder(mockMvc, objectMapper)
+                .post("/blog/draft/upload")
+                .jsonParams(params)
+                .session(tuple.t2)
+                .sendRequest()
+                .expectStatusOk()
+                .print()
+                .buildByte();
+        GenericResult<Integer> result2 = objectMapper.readValue(data,
+                new TypeReference<GenericResult<Integer>>() {
+                });
+        assertNotNull(result2.getData());
+        int blogDraftId = result2.getData();
+
+
+        // 发送删除博客草稿请求
+        BlogEditController.IdParams idParams = new BlogEditController.IdParams();
+        idParams.setId(blogDraftId);
+        idParams.setUserLoginToken(tuple.t1.getToken());
+        GenericResult<Map<String, Object>> result = new EncryptionMockMvcBuilder(mockMvc, objectMapper)
+                .delete("/blog/draft/delete")
+                .jsonParams(idParams)
+                .session(tuple.t2)
+                .sendRequest()
+                .expectStatusOk()
+                .print()
+                .buildGR();
+        assertEquals(ResultCode.SUCCESS.getCode(), result.getCode());
+
+        // assert 博客草稿删除
+        assertNull(blogDraftDao.selectById(blogDraftId));
+        assertTrue(uploadImageBindDao.selectUploadImages(UploadImageTargetType.BLOG_DRAFT, blogDraftId).isEmpty());
+        assertThrows(IllegalArgumentException.class, () -> ResourceUtil.classpath("static/img/" + imageUrl1.substring(imagePrefixLen)));
+        assertThrows(IllegalArgumentException.class, () -> ResourceUtil.classpath("static/img/" + imageUrl2.substring(imagePrefixLen)));
+        assertThrows(IllegalArgumentException.class, () -> ResourceUtil.classpath("static/img/" + coverUrl.substring(imagePrefixLen)));
+    }
+
+    @Test
+    @Transactional
+    public void testDeleteBlog() throws Exception {
+        Tuple2<UserLoginResp, MockHttpSession> tuple = prepareUser();
+
+        // 一般是先上传博客草稿的图片
+        // 上传图片 test1.gif
+        String imageUrl1 = uploadImage(tuple, UploadImageTargetType.BLOG_DRAFT, "test1.gif");
+        // 上传图片 test2.jpeg
+        String imageUrl2 = uploadImage(tuple, UploadImageTargetType.BLOG_DRAFT, "test2.jpeg");
+
+        // 读取博客正文并替换图片 url
+        String markdownBody = ResourceUtil.loadString("markdown/test-blog-new.md");
+        markdownBody = markdownBody.replace("url-placeholder1", imageUrl1);
+        markdownBody = markdownBody.replace("url-placeholder2", imageUrl2);
+
+        // 上传新的博客
+        BlogEditController.BlogParams params = new BlogEditController.BlogParams();
+        params.title = "标题1";
+        params.wordCount = 1000;
+        params.setMarkdownBody(markdownBody);
+        params.isAllowReprint = true;
+        params.setUserLoginToken(tuple.t1.getToken());
+
+        byte[] data = new EncryptionMockMvcBuilder(mockMvc, objectMapper)
+                .post("/blog/publish")
+                .jsonParams(params)
+                .session(tuple.t2)
+                .sendRequest()
+                .expectStatusOk()
+                .print()
+                .buildByte();
+        GenericResult<Integer> result2 = objectMapper.readValue(data,
+                new TypeReference<GenericResult<Integer>>() {
+                });
+        assertNotNull(result2.getData());
+        int blogId = result2.getData();
+
+
+        // 发送删除博客请求
+        BlogEditController.IdParams idParams = new BlogEditController.IdParams();
+        idParams.setId(blogId);
+        idParams.setUserLoginToken(tuple.t1.getToken());
+        GenericResult<Map<String, Object>> result = new EncryptionMockMvcBuilder(mockMvc, objectMapper)
+                .delete("/blog/delete")
+                .jsonParams(idParams)
+                .session(tuple.t2)
+                .sendRequest()
+                .expectStatusOk()
+                .print()
+                .buildGR();
+        assertEquals(ResultCode.SUCCESS.getCode(), result.getCode());
+
+        // assert 博客草稿删除
+        assertEquals(BlogStatus.DELETED, blogDao.selectById(blogId).getStatus());
     }
 }

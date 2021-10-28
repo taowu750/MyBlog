@@ -291,7 +291,7 @@ public class BlogEditService {
     /**
      * 获取博客草稿数据，用来编辑。
      */
-    public BlogEditController.EditResp getDraftData(BlogEditController.GetParams params) {
+    public BlogEditController.EditResp getDraftData(BlogEditController.IdParams params) {
         User user = userService.accessByToken(params.getUserLoginToken());
         if (!blogDraftDao.isMatchIdAndUserId(params.id, user.getId())) {
             return null;
@@ -313,7 +313,7 @@ public class BlogEditService {
     /**
      * 获取博客数据，用来编辑。
      */
-    public BlogEditController.EditResp getBlogData(BlogEditController.GetParams params) {
+    public BlogEditController.EditResp getBlogData(BlogEditController.IdParams params) {
         User user = userService.accessByToken(params.getUserLoginToken());
         if (!blogDao.isMatchIdAndUserId(params.id, user.getId())) {
             return null;
