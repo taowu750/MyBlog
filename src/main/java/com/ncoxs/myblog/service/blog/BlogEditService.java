@@ -24,6 +24,10 @@ import org.springframework.util.StringUtils;
 import java.util.*;
 
 
+// TODO: 上传的博客封面可能是外链
+// TODO: 必须先校验博客封面，确定它没有被其他博客使用
+// TODO: 删除博客封面需不需要记录日志
+
 @Service
 public class BlogEditService {
 
@@ -378,6 +382,48 @@ public class BlogEditService {
         UserLog userLog = new UserLog(user.getId(), UserLogType.EDIT_MARKDOWN, objectMapper.writeValueAsString(
                 new UserEditMarkdownLog(UploadImageTargetType.BLOG, blogId, UserEditMarkdownLog.EDIT_TYPE_DELETE)));
         userLogDao.insert(userLog);
+
+        return ResultCode.SUCCESS;
+    }
+
+    /**
+     * 删除博客草稿封面
+     */
+    public ResultCode deleteBlogDraftCover(String userLoginToken, int blogDraftId) {
+        User user = userService.accessByToken(userLoginToken);
+        if (!blogDraftDao.isMatchIdAndUserId(blogDraftId, user.getId())) {
+            return ResultCode.DATA_ACCESS_DENIED;
+        }
+
+        // 设置博客草稿封面为空
+        BlogDraft update = new BlogDraft();
+        update.setId(blogDraftId);
+        update.setCoverPath("");
+        blogDraftDao.updateById(update);
+
+        // 删除博客草稿封面
+        imageService.deleteImages(UploadImageTargetType.BLOG_DRAFT_COVER, blogDraftId);
+
+        return ResultCode.SUCCESS;
+    }
+
+    /**
+     * 删除博客封面
+     */
+    public ResultCode deleteBlogCover(String userLoginToken, int blogId) {
+        User user = userService.accessByToken(userLoginToken);
+        if (!blogDao.isMatchIdAndUserId(blogId, user.getId())) {
+            return ResultCode.DATA_ACCESS_DENIED;
+        }
+
+        // 设置博客封面为空
+        Blog update = new Blog();
+        update.setId(blogId);
+        update.setCoverPath("");
+        blogDao.updateById(update);
+
+        // 删除博客封面
+        imageService.deleteImages(UploadImageTargetType.BLOG_COVER, blogId);
 
         return ResultCode.SUCCESS;
     }

@@ -688,4 +688,117 @@ public class BlogEditControllerTest extends BaseTester implements InitializingBe
         // assert 博客草稿删除
         assertEquals(BlogStatus.DELETED, blogDao.selectById(blogId).getStatus());
     }
+
+    /**
+     * 测试删除博客封面
+     */
+    @Test
+    @Transactional
+    public void testDeleteBlogDraftCover() throws Exception {
+        Tuple2<UserLoginResp, MockHttpSession> tuple = prepareUser();
+
+        // 上传图片 test1.gif 作为博客封面
+        String coverUrl1 = uploadImage(tuple, UploadImageTargetType.BLOG_DRAFT_COVER, "test1.gif");
+
+        // 上传新的博客草稿
+        String blogBody = ResourceUtil.loadString("markdown/test-blog-new.md");
+        BlogEditController.BlogDraftParams params = new BlogEditController.BlogDraftParams();
+        params.title = "标题1";
+        params.setMarkdownBody(blogBody);
+        params.isAllowReprint = true;
+        // 将 coverUrl1 作为博客封面
+        params.setCoverUrl(coverUrl1);
+        params.setUserLoginToken(tuple.t1.getToken());
+
+        byte[] data = new EncryptionMockMvcBuilder(mockMvc, objectMapper)
+                .post("/blog/draft/upload")
+                .jsonParams(params)
+                .session(tuple.t2)
+                .sendRequest()
+                .expectStatusOk()
+                .print()
+                .buildByte();
+        GenericResult<Integer> result2 = objectMapper.readValue(data,
+                new TypeReference<GenericResult<Integer>>() {
+                });
+        assertNotNull(result2.getData());
+        int blogDraftId = result2.getData();
+
+
+        // 发送删除博客草稿封面请求
+        BlogEditController.IdParams idParams = new BlogEditController.IdParams();
+        idParams.setId(blogDraftId);
+        idParams.setUserLoginToken(tuple.t1.getToken());
+        GenericResult<Map<String, Object>> result = new EncryptionMockMvcBuilder(mockMvc, objectMapper)
+                .delete("/blog/draft/cover/delete")
+                .jsonParams(idParams)
+                .session(tuple.t2)
+                .sendRequest()
+                .expectStatusOk()
+                .print()
+                .buildGR();
+        assertEquals(ResultCode.SUCCESS.getCode(), result.getCode());
+
+        // assert 删除博客封面
+        assertEquals("", blogDraftDao.selectById(blogDraftId).getCoverPath());
+        assertTrue(uploadImageBindDao.selectUploadImages(UploadImageTargetType.BLOG_DRAFT_COVER, blogDraftId).isEmpty());
+        assertThrows(IllegalArgumentException.class, () -> ResourceUtil.classpath("static/img/" + coverUrl1.substring(imagePrefixLen)));
+    }
+
+    @Test
+    @Transactional
+    public void testDeleteBlogCover() throws Exception {
+        Tuple2<UserLoginResp, MockHttpSession> tuple = prepareUser();
+
+        // 一般是先上传博客草稿的图片
+        // 上传封面图片 test2.jpeg
+        String coverUrl1 = uploadImage(tuple, UploadImageTargetType.BLOG_DRAFT_COVER, "test2.jpeg");
+
+        // 读取博客正文并替换图片 url
+        String markdownBody = ResourceUtil.loadString("markdown/test-blog-new.md");
+
+        // 上传新的博客
+        BlogEditController.BlogParams params = new BlogEditController.BlogParams();
+        params.title = "标题1";
+        params.wordCount = 1000;
+        params.setMarkdownBody(markdownBody);
+        // 设置封面 url
+        params.setCoverUrl(coverUrl1);
+        params.isAllowReprint = true;
+        params.setUserLoginToken(tuple.t1.getToken());
+
+        byte[] data = new EncryptionMockMvcBuilder(mockMvc, objectMapper)
+                .post("/blog/publish")
+                .jsonParams(params)
+                .session(tuple.t2)
+                .sendRequest()
+                .expectStatusOk()
+                .print()
+                .buildByte();
+        GenericResult<Integer> result2 = objectMapper.readValue(data,
+                new TypeReference<GenericResult<Integer>>() {
+                });
+        assertNotNull(result2.getData());
+        int blogId = result2.getData();
+
+
+        // 发送删除博客封面请求
+        BlogEditController.IdParams idParams = new BlogEditController.IdParams();
+        idParams.setId(blogId);
+        idParams.setUserLoginToken(tuple.t1.getToken());
+        GenericResult<Map<String, Object>> result = new EncryptionMockMvcBuilder(mockMvc, objectMapper)
+                .delete("/blog/cover/delete")
+                .jsonParams(idParams)
+                .session(tuple.t2)
+                .sendRequest()
+                .expectStatusOk()
+                .print()
+                .buildGR();
+        assertEquals(ResultCode.SUCCESS.getCode(), result.getCode());
+
+        // assert 删除博客封面
+        assertEquals("", blogDao.selectById(blogId).getCoverPath());
+        assertTrue(uploadImageBindDao.selectUploadImages(UploadImageTargetType.BLOG_COVER, blogId).isEmpty());
+        assertThrows(IllegalArgumentException.class, () -> ResourceUtil.classpath("static/img/" + coverUrl1.substring(imagePrefixLen)));
+    }
 }

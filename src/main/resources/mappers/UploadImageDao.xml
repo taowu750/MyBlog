@@ -20,6 +20,12 @@
         where id=#{id}
     </select>
 
+    <select id="selectByUserIdAndFilepath" resultType="com.ncoxs.myblog.model.pojo.UploadImage">
+        select <include refid="Base_Column_List"/>
+        from upload_image
+        where user_id=#{userId} and filepath=#{filepath}
+    </select>
+
     <update id="updateTargetTypeById">
         update upload_image
         set target_type = #{newTargetType}

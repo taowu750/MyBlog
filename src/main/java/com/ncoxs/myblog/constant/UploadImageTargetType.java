@@ -28,7 +28,7 @@ public interface UploadImageTargetType {
     int SPECIAL_COLUMN = 5;
 
     /**
-     * 专栏草稿
+     * 专栏封面
      */
     int SPECIAL_COLUMN_COVER = 6;
 

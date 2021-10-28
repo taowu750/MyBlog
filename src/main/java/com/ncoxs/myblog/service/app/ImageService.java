@@ -240,6 +240,7 @@ public class ImageService {
     /**
      * 更改图片的 target 类型和 targetId。
      */
+    @Transactional(isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
     public void updateImageTarget(int oldTargetType, int oldTargetId, int newTargetType, int newTargetId) {
         List<UploadImage> uploadImages = uploadImageBindDao.selectUploadImages(oldTargetType, oldTargetId);
         for (UploadImage uploadImage : uploadImages) {

@@ -8,6 +8,8 @@ public interface UploadImageDao {
 
     UploadImage selectById(int id);
 
+    UploadImage selectByUserIdAndFilepath(int userId, String filepath);
+
     int insert(UploadImage record);
 
     int updateTargetTypeById(int id, int newTargetType);

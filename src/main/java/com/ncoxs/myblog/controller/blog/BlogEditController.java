@@ -197,4 +197,22 @@ public class BlogEditController {
     public GenericResult<?> deleteBlog(@RequestBody IdParams params) throws JsonProcessingException {
         return GenericResult.byCode(blogEditService.deleteBlog(params.getUserLoginToken(), params.id));
     }
+
+    /**
+     * 删除博客草稿封面
+     */
+    @DeleteMapping("/draft/cover/delete")
+    @UserValidate
+    public GenericResult<?> deleteBlogDraftCover(@RequestBody IdParams params) {
+        return GenericResult.byCode(blogEditService.deleteBlogDraftCover(params.getUserLoginToken(), params.id));
+    }
+
+    /**
+     * 删除博客封面
+     */
+    @DeleteMapping("/cover/delete")
+    @UserValidate
+    public GenericResult<?> deleteBlogCover(@RequestBody IdParams params) {
+        return GenericResult.byCode(blogEditService.deleteBlogCover(params.getUserLoginToken(), params.id));
+    }
 }
