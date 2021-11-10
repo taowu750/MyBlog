@@ -15,7 +15,7 @@ import com.ncoxs.myblog.model.pojo.BlogDraft;
 import com.ncoxs.myblog.model.pojo.UploadImage;
 import com.ncoxs.myblog.testutil.BaseTester;
 import com.ncoxs.myblog.testutil.EncryptionMockMvcBuilder;
-import com.ncoxs.myblog.util.general.ResourceUtil;
+import com.ncoxs.myblog.util.data.ResourceUtil;
 import com.ncoxs.myblog.util.model.Tuple2;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.InitializingBean;
@@ -27,8 +27,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.io.File;
 import java.util.*;
 
-import static com.ncoxs.myblog.util.general.MapUtil.kv;
-import static com.ncoxs.myblog.util.general.MapUtil.mp;
+import static com.ncoxs.myblog.util.model.MapUtil.kv;
+import static com.ncoxs.myblog.util.model.MapUtil.mp;
 import static org.junit.jupiter.api.Assertions.*;
 
 public class BlogEditControllerTest extends BaseTester implements InitializingBean {
@@ -272,6 +272,58 @@ public class BlogEditControllerTest extends BaseTester implements InitializingBe
         assertEquals(1, imageCache.size());
         assertEquals(new HashSet<>(Collections.singletonList(deleteCoverPath1)),
                 imageCache.keySet());
+
+
+        // 上传新的博客草稿，并使用之前的博客草稿的封面，测试是否会出现预期的错误
+        blogBody = ResourceUtil.loadString("markdown/test-blog-new.md");
+        params = new BlogEditController.BlogDraftParams();
+        params.title = "标题222";
+        params.setMarkdownBody(blogBody);
+        params.isAllowReprint = true;
+        // 将 coverUrl1 作为博客封面
+        params.setCoverUrl(coverUrl2);
+        params.setUserLoginToken(tuple.t1.getToken());
+
+        data = new EncryptionMockMvcBuilder(mockMvc, objectMapper)
+                .post("/blog/draft/upload")
+                .jsonParams(params)
+                .session(tuple.t2)
+                .sendRequest()
+                .print()
+                .buildByte();
+        result2 = objectMapper.readValue(data,
+                new TypeReference<GenericResult<Integer>>() {
+                });
+        // assert 出现返回错误
+        assertNull(result2.getData());
+        assertEquals(ResultCode.DATA_ACCESS_DENIED.getCode(), result2.getCode());
+
+
+        // 使用外链作为新的博客封面
+        String outerUrl = "https://cn.bing.com/images/cat.png";
+        // 修改博客封面
+        params = new BlogEditController.BlogDraftParams();
+        params.setId(result2.getData());
+        params.setCoverUrl(outerUrl);
+        params.setUserLoginToken(tuple.t1.getToken());
+
+        data = new EncryptionMockMvcBuilder(mockMvc, objectMapper)
+                .post("/blog/draft/upload")
+                .jsonParams(params)
+                .session(tuple.t2)
+                .sendRequest()
+                .expectStatusOk()
+                .print()
+                .buildByte();
+        result2 = objectMapper.readValue(data,
+                new TypeReference<GenericResult<Integer>>() {
+                });
+        assertNotNull(result2.getData());
+
+        // assert 博客草稿修改
+        blogDraft = blogDraftDao.selectById(result2.getData());
+        assertNotNull(blogDraft);
+        assertEquals(outerUrl, blogDraft.getCoverPath());
     }
 
     /**

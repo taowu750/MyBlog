@@ -1,7 +1,7 @@
 package com.ncoxs.myblog.handler.log;
 
 import com.ncoxs.myblog.constant.RequestAttributeKey;
-import com.ncoxs.myblog.util.general.ResourceUtil;
+import com.ncoxs.myblog.util.data.ResourceUtil;
 import org.springframework.beans.factory.DisposableBean;
 import org.springframework.beans.factory.InitializingBean;
 import org.springframework.beans.factory.annotation.Autowired;

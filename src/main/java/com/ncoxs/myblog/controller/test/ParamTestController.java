@@ -8,8 +8,8 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.util.Map;
 
-import static com.ncoxs.myblog.util.general.MapUtil.kv;
-import static com.ncoxs.myblog.util.general.MapUtil.mp;
+import static com.ncoxs.myblog.util.model.MapUtil.kv;
+import static com.ncoxs.myblog.util.model.MapUtil.mp;
 
 /**
  * 用来做一些参数测试工作。

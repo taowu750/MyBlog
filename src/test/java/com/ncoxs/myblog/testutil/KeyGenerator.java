@@ -1,6 +1,6 @@
 package com.ncoxs.myblog.testutil;
 
-import com.ncoxs.myblog.util.general.AESUtil;
+import com.ncoxs.myblog.util.codec.AESUtil;
 import org.junit.jupiter.api.Test;
 
 import java.util.Base64;

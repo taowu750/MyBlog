@@ -14,8 +14,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Map;
 
-import static com.ncoxs.myblog.util.general.MapUtil.kv;
-import static com.ncoxs.myblog.util.general.MapUtil.mp;
+import static com.ncoxs.myblog.util.model.MapUtil.kv;
+import static com.ncoxs.myblog.util.model.MapUtil.mp;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**

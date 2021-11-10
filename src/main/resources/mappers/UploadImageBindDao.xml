@@ -24,31 +24,58 @@
     <select id="selectUploadImages" resultMap="UploadImageResultMap">
         select image_id, target_type, filepath
         from upload_image_bind
-        where target_id=#{targetId} and target_type=#{targetType}
+        where target_id = #{targetId}
+          and target_type = #{targetType}
+    </select>
+
+    <select id="isImageIdMatchTarget" resultType="java.lang.Boolean">
+        # 满足 from 中的任意一个条件，则为 true
+        select t1.cnt + t2.cnt
+        from
+            # 查找 imageId 是否不存在
+            (select 1 connect, if(count(*) = 0, 1, 0) cnt
+             from upload_image_bind
+             where image_id = #{imageId}) t2
+                join
+            # 如果 imageId 存在，是否和 target 匹配
+                (select 1 connect, count(*) cnt
+                 from upload_image_bind
+                 where image_id = #{imageId}
+                   and target_id = #{targetId}
+                   and target_type = #{targetType}) t1
+            on t1.connect = t2.connect
     </select>
 
     <insert id="insert" keyColumn="id" keyProperty="id" parameterType="com.ncoxs.myblog.model.pojo.UploadImageBind"
             useGeneratedKeys="true">
         insert into upload_image_bind (image_id, target_type, target_id, filepath)
-        # 防止插入已存在的数据
-        select #{imageId,jdbcType=INTEGER}, #{targetType,jdbcType=INTEGER}, #{targetId,jdbcType=INTEGER},
+            # 防止插入已存在的数据
+        select #{imageId,jdbcType=INTEGER},
+               #{targetType,jdbcType=INTEGER},
+               #{targetId,jdbcType=INTEGER},
                #{filepath,jdbcType=VARCHAR}
-        from dual where not exists(select image_id from upload_image_bind where image_id=#{imageId})
+        from dual
+        where not exists(select image_id from upload_image_bind where image_id = #{imageId})
     </insert>
 
     <update id="updateTarget" parameterType="com.ncoxs.myblog.model.pojo.UploadImageBind">
         update upload_image_bind
-        set target_id = #{newTargetId}, target_type = #{newTargetType}
-        where target_id = #{oldTargetId} and target_type=#{oldTargetType}
+        set target_id   = #{newTargetId},
+            target_type = #{newTargetType}
+        where target_id = #{oldTargetId}
+          and target_type = #{oldTargetType}
     </update>
 
     <delete id="deleteByTarget">
-        delete from upload_image_bind
-        where target_id=#{targetId} and target_type=#{targetType}
+        delete
+        from upload_image_bind
+        where target_id = #{targetId}
+          and target_type = #{targetType}
     </delete>
 
     <delete id="deleteByImageId">
-        delete from upload_image_bind
-        where image_id=#{imageId}
+        delete
+        from upload_image_bind
+        where image_id = #{imageId}
     </delete>
 </mapper>

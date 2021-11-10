@@ -1,4 +1,4 @@
-package com.ncoxs.myblog.util.general;
+package com.ncoxs.myblog.util.data;
 
 import org.springframework.util.FastByteArrayOutputStream;
 

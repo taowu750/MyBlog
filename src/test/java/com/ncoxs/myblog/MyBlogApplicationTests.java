@@ -1,6 +1,6 @@
 package com.ncoxs.myblog;
 
-import com.ncoxs.myblog.util.general.ResourceUtil;
+import com.ncoxs.myblog.util.data.ResourceUtil;
 import org.junit.jupiter.api.Test;
 
 import java.io.*;

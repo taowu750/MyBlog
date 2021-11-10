@@ -1,4 +1,4 @@
-package com.ncoxs.myblog.util.model;
+package com.ncoxs.myblog.util.codec;
 
 import com.ncoxs.myblog.exception.ImpossibleError;
 import org.springframework.util.FastByteArrayOutputStream;

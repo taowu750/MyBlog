@@ -12,8 +12,8 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
 
-import static com.ncoxs.myblog.util.general.MapUtil.kv;
-import static com.ncoxs.myblog.util.general.MapUtil.mp;
+import static com.ncoxs.myblog.util.model.MapUtil.kv;
+import static com.ncoxs.myblog.util.model.MapUtil.mp;
 
 /**
  * 用来测试一些系统级别功能的控制器。

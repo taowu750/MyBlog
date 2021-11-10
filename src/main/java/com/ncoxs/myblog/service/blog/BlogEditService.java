@@ -2,15 +2,19 @@ package com.ncoxs.myblog.service.blog;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.ncoxs.myblog.constant.ParamValidateRule;
 import com.ncoxs.myblog.constant.ResultCode;
 import com.ncoxs.myblog.constant.UploadImageTargetType;
 import com.ncoxs.myblog.constant.blog.BlogStatus;
 import com.ncoxs.myblog.constant.user.UserLogType;
 import com.ncoxs.myblog.controller.blog.BlogEditController;
-import com.ncoxs.myblog.dao.mysql.*;
+import com.ncoxs.myblog.dao.mysql.BlogDao;
+import com.ncoxs.myblog.dao.mysql.BlogDraftDao;
+import com.ncoxs.myblog.dao.mysql.UserLogDao;
 import com.ncoxs.myblog.model.bo.UserEditMarkdownLog;
-import com.ncoxs.myblog.model.pojo.*;
+import com.ncoxs.myblog.model.pojo.Blog;
+import com.ncoxs.myblog.model.pojo.BlogDraft;
+import com.ncoxs.myblog.model.pojo.User;
+import com.ncoxs.myblog.model.pojo.UserLog;
 import com.ncoxs.myblog.service.app.ImageService;
 import com.ncoxs.myblog.service.app.MarkdownService;
 import com.ncoxs.myblog.service.user.UserService;
@@ -21,11 +25,10 @@ import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
-import java.util.*;
+import java.util.Collections;
+import java.util.Set;
 
 
-// TODO: 上传的博客封面可能是外链
-// TODO: 必须先校验博客封面，确定它没有被其他博客使用
 // TODO: 删除博客封面需不需要记录日志
 
 @Service
@@ -86,21 +89,17 @@ public class BlogEditService {
 
 
     /**
-     * 错误码：博客内容长度超过范围
-     */
-    public static final int BLOG_CONTENT_LENGTH_OUT_RANGE = -1;
-    /**
      * 错误码：博客不属于当前用户
      */
-    public static final int MARKDOWN_NOT_BELONG = -2;
+    public static final int MARKDOWN_NOT_BELONG = -1;
     /**
      * 错误码：参数都是 null
      */
-    public static final int PARAMS_ALL_BLANK = -3;
+    public static final int PARAMS_ALL_BLANK = -2;
     /**
      * 错误码：用户所具有的博客草稿数量超过最大值
      */
-    public static final int BLOG_DRAFT_COUNT_FULL = -4;
+    public static final int BLOG_DRAFT_COUNT_FULL = -3;
 
     @Transactional(isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
     public int saveBlogDraft(BlogEditController.BlogDraftParams params) throws JsonProcessingException {
@@ -109,19 +108,12 @@ public class BlogEditService {
                 && params.coverUrl == null) {
             return PARAMS_ALL_BLANK;
         }
-        // 检测博客草稿长度是否在范围内
-        if (params.getMarkdownBody() != null
-                && (params.getMarkdownBody().length() > ParamValidateRule.BLOG_CONTENT_MAX_LEN
-                || params.getMarkdownBody().length() < ParamValidateRule.BLOG_CONTENT_MIN_LEN)) {
-            return BLOG_CONTENT_LENGTH_OUT_RANGE;
-        }
 
         User user = userService.accessByToken(params.getUserLoginToken());
         String coverPath = markdownService.parseImagePathFromUrl(params.coverUrl);
         Integer resultId = params.getId();
         // 首次上传文档
         if (params.getId() == null) {
-
             // 如果用户保存的博客草稿已达最大上限
             if (blogDraftDao.selectCountByUserId(user.getId()) >= maxBlogDraftUpperLimit) {
                 return BLOG_DRAFT_COUNT_FULL;
@@ -129,7 +121,7 @@ public class BlogEditService {
 
             // 插入博客草稿数据
             BlogDraft blogDraft = new BlogDraft(user.getId(), params.title, params.getMarkdownBody(),
-                    coverPath, params.isAllowReprint);
+                    imageService.parseImagePath(coverPath, params.coverUrl), params.isAllowReprint);
             blogDraftDao.insert(blogDraft);
             resultId = blogDraft.getId();
 
@@ -143,7 +135,7 @@ public class BlogEditService {
             blogDraft.setId(resultId);
             blogDraft.setTitle(params.title);
             blogDraft.setMarkdownBody(params.getMarkdownBody());
-            blogDraft.setCoverPath(coverPath);
+            blogDraft.setCoverPath(imageService.parseImagePath(coverPath, params.coverUrl));
             blogDraft.setIsAllowReprint(params.isAllowReprint);
             blogDraftDao.updateById(blogDraft);
 
@@ -178,13 +170,6 @@ public class BlogEditService {
      */
     @Transactional(isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
     public int publishBlog(BlogEditController.BlogParams params) throws JsonProcessingException {
-        // 检测博客长度是否在范围内
-        if (params.getMarkdownBody() != null
-                && (params.getMarkdownBody().length() > ParamValidateRule.BLOG_CONTENT_MAX_LEN
-                || params.getMarkdownBody().length() < ParamValidateRule.BLOG_CONTENT_MIN_LEN)) {
-            return BLOG_CONTENT_LENGTH_OUT_RANGE;
-        }
-
         User user = userService.accessByToken(params.getUserLoginToken());
         String coverPath = markdownService.parseImagePathFromUrl(params.coverUrl);
         Integer resultId = params.getId();
@@ -198,7 +183,7 @@ public class BlogEditService {
 
             // 插入博客数据
             Blog blog = new Blog(user.getId(), params.title, params.getMarkdownBody(),
-                    coverPath, params.wordCount, BlogStatus.UNDER_REVIEW, params.isAllowReprint);
+                    imageService.parseImagePath(coverPath, params.coverUrl), params.wordCount, BlogStatus.UNDER_REVIEW, params.isAllowReprint);
             blogDao.insert(blog);
             resultId = blog.getId();
 
@@ -219,7 +204,7 @@ public class BlogEditService {
             blog.setTitle(params.title);
             blog.setMarkdownBody(params.getMarkdownBody());
             blog.setWordCount(params.wordCount);
-            blog.setCoverPath(coverPath);
+            blog.setCoverPath(imageService.parseImagePath(coverPath, params.coverUrl));
             blog.setIsAllowReprint(params.isAllowReprint);
             blogDao.updateById(blog);
 
@@ -307,7 +292,7 @@ public class BlogEditService {
         result.setTitle(blogDraft.getTitle());
         result.setMarkdownBody(blogDraft.getMarkdownBody());
         result.setIsAllowReprint(blogDraft.getIsAllowReprint());
-        result.setCoverUrl(blogDraft.getCoverPath() != null ? imageService.toImageUrl(blogDraft.getCoverPath()) : null);
+        result.setCoverUrl(imageService.toImageUrl(blogDraft.getCoverPath()));
         result.setCreateTime(blogDraft.getCreateTime());
         result.setModifyTime(blogDraft.getModifyTime());
 
@@ -329,7 +314,7 @@ public class BlogEditService {
         result.setTitle(blog.getTitle());
         result.setMarkdownBody(blog.getMarkdownBody());
         result.setIsAllowReprint(blog.getIsAllowReprint());
-        result.setCoverUrl(blog.getCoverPath() != null ? imageService.toImageUrl(blog.getCoverPath()) : null);
+        result.setCoverUrl(imageService.toImageUrl(blog.getCoverPath()));
         result.setCreateTime(blog.getCreateTime());
         result.setModifyTime(blog.getModifyTime());
 
@@ -389,7 +374,8 @@ public class BlogEditService {
     /**
      * 删除博客草稿封面
      */
-    public ResultCode deleteBlogDraftCover(String userLoginToken, int blogDraftId) {
+    @Transactional(isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
+    public ResultCode deleteBlogDraftCover(String userLoginToken, int blogDraftId) throws JsonProcessingException {
         User user = userService.accessByToken(userLoginToken);
         if (!blogDraftDao.isMatchIdAndUserId(blogDraftId, user.getId())) {
             return ResultCode.DATA_ACCESS_DENIED;
@@ -401,6 +387,11 @@ public class BlogEditService {
         update.setCoverPath("");
         blogDraftDao.updateById(update);
 
+        // 记录日志
+        UserLog userLog = new UserLog(user.getId(), UserLogType.EDIT_MARKDOWN, objectMapper.writeValueAsString(
+                new UserEditMarkdownLog(UploadImageTargetType.BLOG_DRAFT_COVER, blogDraftId, UserEditMarkdownLog.EDIT_TYPE_DELETE)));
+        userLogDao.insert(userLog);
+
         // 删除博客草稿封面
         imageService.deleteImages(UploadImageTargetType.BLOG_DRAFT_COVER, blogDraftId);
 
@@ -410,7 +401,8 @@ public class BlogEditService {
     /**
      * 删除博客封面
      */
-    public ResultCode deleteBlogCover(String userLoginToken, int blogId) {
+    @Transactional(isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
+    public ResultCode deleteBlogCover(String userLoginToken, int blogId) throws JsonProcessingException {
         User user = userService.accessByToken(userLoginToken);
         if (!blogDao.isMatchIdAndUserId(blogId, user.getId())) {
             return ResultCode.DATA_ACCESS_DENIED;
@@ -421,6 +413,11 @@ public class BlogEditService {
         update.setId(blogId);
         update.setCoverPath("");
         blogDao.updateById(update);
+
+        // 记录日志
+        UserLog userLog = new UserLog(user.getId(), UserLogType.EDIT_MARKDOWN, objectMapper.writeValueAsString(
+                new UserEditMarkdownLog(UploadImageTargetType.BLOG_COVER, blogId, UserEditMarkdownLog.EDIT_TYPE_DELETE)));
+        userLogDao.insert(userLog);
 
         // 删除博客封面
         imageService.deleteImages(UploadImageTargetType.BLOG_COVER, blogId);

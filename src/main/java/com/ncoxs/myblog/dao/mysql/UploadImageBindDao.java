@@ -12,6 +12,11 @@ public interface UploadImageBindDao {
     List<UploadImage> selectUploadImages(int targetType, int targetId);
 
     /**
+     * 如果 imageId 不存在返回 true；而当 imageId 已经存在，看看 imageId 是否匹配 target。
+     */
+    boolean isImageIdMatchTarget(int imageId, int targetType, int targetId);
+
+    /**
      * 只有当 imageId 不存在时才会插入
      */
     int insert(UploadImageBind record);

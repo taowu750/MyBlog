@@ -1,7 +1,7 @@
 package com.ncoxs.myblog.service.app;
 
 import com.ncoxs.myblog.testutil.BaseTester;
-import com.ncoxs.myblog.util.general.ResourceUtil;
+import com.ncoxs.myblog.util.data.ResourceUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;

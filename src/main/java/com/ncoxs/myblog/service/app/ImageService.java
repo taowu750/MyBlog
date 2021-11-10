@@ -1,21 +1,25 @@
 package com.ncoxs.myblog.service.app;
 
+import com.ncoxs.myblog.constant.ResultCode;
 import com.ncoxs.myblog.constant.UploadImageTargetType;
 import com.ncoxs.myblog.dao.mysql.UploadImageBindDao;
 import com.ncoxs.myblog.dao.mysql.UploadImageDao;
+import com.ncoxs.myblog.exception.ResultCodeException;
 import com.ncoxs.myblog.model.pojo.UploadImage;
 import com.ncoxs.myblog.model.pojo.UploadImageBind;
 import com.ncoxs.myblog.model.pojo.User;
 import com.ncoxs.myblog.service.user.UserService;
-import com.ncoxs.myblog.util.general.FileUtil;
-import com.ncoxs.myblog.util.general.ResourceUtil;
+import com.ncoxs.myblog.util.data.FileUtil;
+import com.ncoxs.myblog.util.data.ResourceUtil;
 import com.ncoxs.myblog.util.general.SpringUtil;
+import com.ncoxs.myblog.util.general.URLUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
 import javax.servlet.http.HttpSession;
@@ -83,10 +87,23 @@ public class ImageService {
 
 
     /**
-     * 将图片路径转化成图片 url
+     * 将图片路径转化成图片 url。如果是外链则原样返回
      */
     public String toImageUrl(String imagePath) {
-        return webSiteUrl + imageDir + "/" + imagePath;
+        return StringUtils.hasText(imagePath)
+                ? (URLUtil.isImageURL(imagePath) ? imagePath : webSiteUrl + imageDir + "/" + imagePath)
+                : null;
+    }
+
+    /**
+     * coverUrl 可能是外链，此时数据库中的 coverPath 需要存这条外链
+     *
+     * @param coverPath 之前解析出来的图片路径
+     * @param coverUrl  上传图片的 url
+     * @return 最终的图片路径
+     */
+    public String parseImagePath(String coverPath, String coverUrl) {
+        return StringUtils.hasText(coverPath) ? coverPath : (URLUtil.isImageURL(coverUrl) ? coverUrl : null);
     }
 
     /**
@@ -159,8 +176,8 @@ public class ImageService {
      * 当上传或者修改包含图片的对象时（如博客、评论、博客封面等），保存图片和包含对象的映射关系，并更新 session。
      *
      * @param usedImagePaths 包含图片的对象中所使用的图片相对路径
-     * @param targetType 包含图片的对象的类型，参见 {@link UploadImageTargetType}
-     * @param targetId 包含图片的对象的 id
+     * @param targetType     包含图片的对象的类型，参见 {@link UploadImageTargetType}
+     * @param targetId       包含图片的对象的 id
      */
     @Transactional(isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
     public void bindImageTarget(Set<String> usedImagePaths, int targetType, int targetId, boolean updateTargetType) {
@@ -177,7 +194,11 @@ public class ImageService {
 
         // 保存新图片和 target 的映射关系
         for (String usedImagePath : usedImagePaths) {
-            int imageId = cache.get(usedImagePath);
+            int imageId = cache.getOrDefault(usedImagePath, -1);
+            // 当图片根本不存在时，抛出异常
+            if (imageId == -1) {
+                throw new ResultCodeException(ResultCode.DATA_ACCESS_DENIED);
+            }
             uploadImageBindDao.insert(new UploadImageBind(imageId, targetType, targetId, usedImagePath));
             // 某些情况下（例如博客草稿->博客），还需要修改 upload_image 的 targetType
             if (updateTargetType) {
@@ -219,7 +240,7 @@ public class ImageService {
      * 删除指定对象在数据库中的所有图片记录。
      *
      * @param targetType 对象类型，参见 {@link UploadImageTargetType}
-     * @param targetId 对象 id
+     * @param targetId   对象 id
      */
     @Transactional(isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
     public void deleteImages(int targetType, int targetId) {

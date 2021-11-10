@@ -1,4 +1,4 @@
-package com.ncoxs.myblog.util.general;
+package com.ncoxs.myblog.util.model;
 
 import java.util.HashMap;
 import java.util.List;

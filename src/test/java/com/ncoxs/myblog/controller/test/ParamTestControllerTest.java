@@ -3,15 +3,15 @@ package com.ncoxs.myblog.controller.test;
 import com.ncoxs.myblog.model.dto.GenericResult;
 import com.ncoxs.myblog.testutil.BaseTester;
 import com.ncoxs.myblog.testutil.EncryptionMockMvcBuilder;
-import com.ncoxs.myblog.util.general.ResourceUtil;
+import com.ncoxs.myblog.util.data.ResourceUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.Test;
 
 import java.nio.file.Paths;
 import java.util.Map;
 
-import static com.ncoxs.myblog.util.general.MapUtil.kv;
-import static com.ncoxs.myblog.util.general.MapUtil.mp;
+import static com.ncoxs.myblog.util.model.MapUtil.kv;
+import static com.ncoxs.myblog.util.model.MapUtil.mp;
 
 @Slf4j
 public class ParamTestControllerTest extends BaseTester {

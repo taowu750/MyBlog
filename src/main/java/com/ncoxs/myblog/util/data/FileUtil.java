@@ -1,4 +1,4 @@
-package com.ncoxs.myblog.util.general;
+package com.ncoxs.myblog.util.data;
 
 import java.io.File;
 import java.util.Calendar;

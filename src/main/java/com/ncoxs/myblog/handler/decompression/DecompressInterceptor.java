@@ -4,7 +4,7 @@ import com.ncoxs.myblog.constant.HttpHeaderConst;
 import com.ncoxs.myblog.constant.HttpHeaderKey;
 import com.ncoxs.myblog.exception.DecompressException;
 import com.ncoxs.myblog.handler.filter.CustomServletRequest;
-import com.ncoxs.myblog.util.general.CompressUtil;
+import com.ncoxs.myblog.util.codec.CompressUtil;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.HandlerInterceptor;
 

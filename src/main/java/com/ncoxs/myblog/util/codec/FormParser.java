@@ -1,9 +1,10 @@
-package com.ncoxs.myblog.util.model;
+package com.ncoxs.myblog.util.codec;
 
 import com.ncoxs.myblog.exception.ImpossibleError;
-import com.ncoxs.myblog.util.general.MapUtil;
-import com.ncoxs.myblog.util.general.ResourceUtil;
+import com.ncoxs.myblog.util.data.ResourceUtil;
 import com.ncoxs.myblog.util.general.UnitUtil;
+import com.ncoxs.myblog.util.model.CollectionUtil;
+import com.ncoxs.myblog.util.model.MapUtil;
 import org.apache.commons.fileupload.FileItem;
 import org.apache.commons.fileupload.FileUploadException;
 import org.apache.commons.fileupload.disk.DiskFileItemFactory;

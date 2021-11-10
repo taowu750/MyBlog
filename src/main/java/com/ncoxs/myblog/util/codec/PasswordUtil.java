@@ -1,4 +1,4 @@
-package com.ncoxs.myblog.util.general;
+package com.ncoxs.myblog.util.codec;
 
 import com.ncoxs.myblog.exception.ImpossibleError;
 

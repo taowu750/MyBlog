@@ -8,7 +8,6 @@ import com.ncoxs.myblog.handler.encryption.Encryption;
 import com.ncoxs.myblog.handler.validate.UserValidate;
 import com.ncoxs.myblog.model.dto.GenericResult;
 import com.ncoxs.myblog.model.dto.MarkdownEditResp;
-import com.ncoxs.myblog.model.dto.MarkdownParams;
 import com.ncoxs.myblog.model.dto.UserAccessParams;
 import com.ncoxs.myblog.service.blog.BlogEditService;
 import lombok.Data;
@@ -37,7 +36,17 @@ public class BlogEditController {
 
     @EqualsAndHashCode(callSuper = true)
     @Data
-    public static class BlogDraftParams extends MarkdownParams {
+    public static class BlogDraftParams extends UserAccessParams {
+
+        /**
+         * 此 markdown 对象的 id，如果是第一次上传则为 null。
+         */
+        public Integer id;
+
+        @Length(message = ParamValidateMsg.BLOG_CONTENT_LEN,
+                min = ParamValidateRule.BLOG_CONTENT_MIN_LEN,
+                max = ParamValidateRule.BLOG_CONTENT_MAX_LEN)
+        public String markdownBody;
 
         @Length(message = ParamValidateMsg.BLOG_TITLE_LEN,
                 min = ParamValidateRule.BLOG_TITLE_MIN_LEN,
@@ -63,8 +72,6 @@ public class BlogEditController {
             return GenericResult.error(ResultCode.DATA_COUNT_OUT_RANGE);
         } else if (blogDraftId == BlogEditService.MARKDOWN_NOT_BELONG) {
             return GenericResult.error(ResultCode.DATA_ACCESS_DENIED);
-        } else if (blogDraftId == BlogEditService.BLOG_CONTENT_LENGTH_OUT_RANGE) {
-            return GenericResult.error(ResultCode.PARAM_IS_INVALID);
         } else {
             return GenericResult.success(blogDraftId);
         }
@@ -72,7 +79,17 @@ public class BlogEditController {
 
     @EqualsAndHashCode(callSuper = true)
     @Data
-    public static class BlogParams extends MarkdownParams {
+    public static class BlogParams extends UserAccessParams {
+
+        /**
+         * 此 markdown 对象的 id，如果是第一次上传则为 null。
+         */
+        public Integer id;
+
+        @Length(message = ParamValidateMsg.BLOG_CONTENT_LEN,
+                min = ParamValidateRule.BLOG_CONTENT_MIN_LEN,
+                max = ParamValidateRule.BLOG_CONTENT_MAX_LEN)
+        public String markdownBody;
 
         @Length(message = ParamValidateMsg.BLOG_TITLE_LEN,
                 min = ParamValidateRule.BLOG_TITLE_MIN_LEN,
@@ -105,8 +122,6 @@ public class BlogEditController {
             return GenericResult.error(ResultCode.PARAM_NOT_COMPLETE);
         } else if (blogId == BlogEditService.MARKDOWN_NOT_BELONG) {
             return GenericResult.error(ResultCode.DATA_ACCESS_DENIED);
-        } else if (blogId == BlogEditService.BLOG_CONTENT_LENGTH_OUT_RANGE) {
-            return GenericResult.error(ResultCode.PARAM_IS_INVALID);
         } else {
             return GenericResult.success(blogId);
         }
@@ -203,7 +218,7 @@ public class BlogEditController {
      */
     @DeleteMapping("/draft/cover/delete")
     @UserValidate
-    public GenericResult<?> deleteBlogDraftCover(@RequestBody IdParams params) {
+    public GenericResult<?> deleteBlogDraftCover(@RequestBody IdParams params) throws JsonProcessingException {
         return GenericResult.byCode(blogEditService.deleteBlogDraftCover(params.getUserLoginToken(), params.id));
     }
 
@@ -212,7 +227,7 @@ public class BlogEditController {
      */
     @DeleteMapping("/cover/delete")
     @UserValidate
-    public GenericResult<?> deleteBlogCover(@RequestBody IdParams params) {
+    public GenericResult<?> deleteBlogCover(@RequestBody IdParams params) throws JsonProcessingException {
         return GenericResult.byCode(blogEditService.deleteBlogCover(params.getUserLoginToken(), params.id));
     }
 }

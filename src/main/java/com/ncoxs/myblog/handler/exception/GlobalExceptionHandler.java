@@ -3,6 +3,7 @@ package com.ncoxs.myblog.handler.exception;
 import com.ncoxs.myblog.constant.ResultCode;
 import com.ncoxs.myblog.exception.FilterBlankException;
 import com.ncoxs.myblog.exception.ImpossibleError;
+import com.ncoxs.myblog.exception.ResultCodeException;
 import com.ncoxs.myblog.model.dto.GenericResult;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -31,6 +32,12 @@ public class GlobalExceptionHandler {
     public GenericResult<Object> filterExceptionHandler(FilterBlankException exception) {
         log.error("filter blank exception", exception);
         return GenericResult.error(ResultCode.SERVER_UNKNOWN_ERROR);
+    }
+
+    @ExceptionHandler(ResultCodeException.class)
+    public GenericResult<Object> resultCodeExceptionHandler(ResultCodeException exception) {
+        log.error("result code exception", exception);
+        return GenericResult.error(exception.getResultCode());
     }
 
     @ExceptionHandler(Throwable.class)

@@ -22,6 +22,8 @@ import com.ncoxs.myblog.model.pojo.UserIdentity;
 import com.ncoxs.myblog.model.pojo.UserLog;
 import com.ncoxs.myblog.service.app.MailService;
 import com.ncoxs.myblog.service.app.VerificationCodeService;
+import com.ncoxs.myblog.util.codec.PasswordUtil;
+import com.ncoxs.myblog.util.data.DeviceUtil;
 import com.ncoxs.myblog.util.general.*;
 import com.ncoxs.myblog.util.singleton.ExpiringMapSingleton;
 import net.jodah.expiringmap.ExpiringMap;

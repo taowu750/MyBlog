@@ -2,8 +2,8 @@ package com.ncoxs.myblog.handler.encryption;
 
 import com.ncoxs.myblog.constant.RequestAttributeKey;
 import com.ncoxs.myblog.exception.ImpossibleError;
-import com.ncoxs.myblog.util.general.AESUtil;
-import com.ncoxs.myblog.util.general.ResourceUtil;
+import com.ncoxs.myblog.util.codec.AESUtil;
+import com.ncoxs.myblog.util.data.ResourceUtil;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpOutputMessage;

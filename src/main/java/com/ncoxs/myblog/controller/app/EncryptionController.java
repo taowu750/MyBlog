@@ -2,7 +2,7 @@ package com.ncoxs.myblog.controller.app;
 
 import com.ncoxs.myblog.handler.encryption.DecryptionInterceptor;
 import com.ncoxs.myblog.model.dto.GenericResult;
-import com.ncoxs.myblog.util.general.RSAUtil;
+import com.ncoxs.myblog.util.codec.RSAUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -12,8 +12,8 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.Base64;
 import java.util.Map;
 
-import static com.ncoxs.myblog.util.general.MapUtil.kv;
-import static com.ncoxs.myblog.util.general.MapUtil.mp;
+import static com.ncoxs.myblog.util.model.MapUtil.kv;
+import static com.ncoxs.myblog.util.model.MapUtil.mp;
 
 /**
  * 加解密相关功能控制器。
