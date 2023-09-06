@@ -1,6 +1,8 @@
 package com.ncoxs.myblog.handler.filter;
 
+import com.ncoxs.myblog.conf.entity.MultipartConf;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import javax.servlet.*;
@@ -17,8 +19,15 @@ import java.io.IOException;
 @Slf4j
 public class CustomRequestFilter implements Filter {
 
+    private MultipartConf conf;
+
+    @Autowired
+    public void setConf(MultipartConf conf) {
+        this.conf = conf;
+    }
+
     @Override
     public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain) throws IOException, ServletException {
-        chain.doFilter(new CustomServletRequest((HttpServletRequest) request), response);
+        chain.doFilter(new CustomServletRequest((HttpServletRequest) request, conf), response);
     }
 }

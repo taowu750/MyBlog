@@ -10,7 +10,7 @@ import com.ncoxs.myblog.controller.blog.BlogEditController;
 import com.ncoxs.myblog.dao.mysql.BlogDao;
 import com.ncoxs.myblog.dao.mysql.BlogDraftDao;
 import com.ncoxs.myblog.dao.mysql.UserLogDao;
-import com.ncoxs.myblog.model.bo.UserEditMarkdownLog;
+import com.ncoxs.myblog.model.pojo.UserEditMarkdownLog;
 import com.ncoxs.myblog.model.pojo.Blog;
 import com.ncoxs.myblog.model.pojo.BlogDraft;
 import com.ncoxs.myblog.model.pojo.User;

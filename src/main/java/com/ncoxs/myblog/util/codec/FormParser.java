@@ -1,10 +1,11 @@
 package com.ncoxs.myblog.util.codec;
 
+import com.ncoxs.myblog.conf.entity.MultipartConf;
 import com.ncoxs.myblog.exception.ImpossibleError;
 import com.ncoxs.myblog.util.data.ResourceUtil;
-import com.ncoxs.myblog.util.general.UnitUtil;
 import com.ncoxs.myblog.util.model.CollectionUtil;
 import com.ncoxs.myblog.util.model.MapUtil;
+import lombok.NonNull;
 import org.apache.commons.fileupload.FileItem;
 import org.apache.commons.fileupload.FileUploadException;
 import org.apache.commons.fileupload.disk.DiskFileItemFactory;
@@ -14,7 +15,6 @@ import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.util.MultiValueMapAdapter;
 import org.springframework.web.multipart.MultipartFile;
-import org.yaml.snakeyaml.Yaml;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.Part;
@@ -35,49 +35,49 @@ public class FormParser {
 
     private static final List<String> ONE_NULL_VALUES = Collections.singletonList(null);
 
-    /**
-     * 请求的最大大小
-     */
-    private static long maxRequestSize;
-    /**
-     * 上传文件的最大大小
-     */
-    private static long maxFileSize;
-    /**
-     * 上传文件占用的最大内存
-     */
-    private static long fileSizeThreshold;
-    /**
-     * 上传文件临时存储目录
-     */
-    private static String tmpFileLocation;
-    static {
-        try {
-            Properties properties = new Properties();
-            properties.load(ResourceUtil.load("application.properties"));
-
-            String env = (String) properties.get("spring.profiles.active");
-            Yaml yaml = new Yaml();
-            Map<String, Map<String, Map<String, Map<String, Object>>>> props;
-            if (env.equals("dev")) {
-                //noinspection unchecked
-                props = yaml.loadAs(ResourceUtil.load("application-dev-main.yml"), HashMap.class);
-            } else {
-                //noinspection unchecked
-                props = yaml.loadAs(ResourceUtil.load("application-prod-main.yml"), HashMap.class);
-            }
-
-            maxRequestSize = UnitUtil.size2byte((String) props.get("spring").get("servlet").get("multipart").get("max-request-size"));
-            maxFileSize = UnitUtil.size2byte((String) props.get("spring").get("servlet").get("multipart").get("max-file-size"));
-            fileSizeThreshold = UnitUtil.size2byte((String) props.get("spring").get("servlet").get("multipart").get("file-size-threshold"));
-            tmpFileLocation = (String) props.get("spring").get("servlet").get("multipart").get("location");
-            if (tmpFileLocation.startsWith("classpath:")) {
-                tmpFileLocation = tmpFileLocation.substring(10);
-            }
-        } catch (IOException e) {
-            throw new ImpossibleError(e);
-        }
-    }
+//    /**
+//     * 请求的最大大小
+//     */
+//    private static long maxRequestSize;
+//    /**
+//     * 上传文件的最大大小
+//     */
+//    private static long maxFileSize;
+//    /**
+//     * 上传文件占用的最大内存
+//     */
+//    private static long fileSizeThreshold;
+//    /**
+//     * 上传文件临时存储目录
+//     */
+//    private static String tmpFileLocation;
+//    static {
+//        try {
+//            Properties properties = new Properties();
+//            properties.load(ResourceUtil.load("application.properties"));
+//
+//            String env = (String) properties.get("spring.profiles.active");
+//            Yaml yaml = new Yaml();
+//            Map<String, Map<String, Map<String, Map<String, Object>>>> props;
+//            if (env.equals("dev")) {
+//                //noinspection unchecked
+//                props = yaml.loadAs(ResourceUtil.load("application-dev-sys.yml"), HashMap.class);
+//            } else {
+//                //noinspection unchecked
+//                props = yaml.loadAs(ResourceUtil.load("application-prod-sys.yml"), HashMap.class);
+//            }
+//
+//            maxRequestSize = UnitUtil.size2byte((String) props.get("spring").get("servlet").get("multipart").get("max-request-size"));
+//            maxFileSize = UnitUtil.size2byte((String) props.get("spring").get("servlet").get("multipart").get("max-file-size"));
+//            fileSizeThreshold = UnitUtil.size2byte((String) props.get("spring").get("servlet").get("multipart").get("file-size-threshold"));
+//            tmpFileLocation = (String) props.get("spring").get("servlet").get("multipart").get("location");
+//            if (tmpFileLocation.startsWith("classpath:")) {
+//                tmpFileLocation = tmpFileLocation.substring(10);
+//            }
+//        } catch (IOException e) {
+//            throw new ImpossibleError(e);
+//        }
+//    }
 
     private Map<String, List<String>> params;
     private MultiValueMap<String, MultipartFile> multipartFiles;
@@ -85,10 +85,8 @@ public class FormParser {
     /**
      * 解析 application/x-www-form-urlencoded 数据
      */
+    @NonNull
     public FormParser(String formData, String encode) {
-        Objects.requireNonNull(formData);
-        Objects.requireNonNull(encode);
-
         String[] kvs = formData.split("&");
         params = MapUtil.ofCap(kvs.length);
 
@@ -106,14 +104,15 @@ public class FormParser {
     /**
      * 解析 multipart/form-data 数据
      */
-    public FormParser(HttpServletRequest request, String encode) throws FileUploadException, UnsupportedEncodingException {
+    @NonNull
+    public FormParser(MultipartConf conf, HttpServletRequest request, String encode) throws FileUploadException, UnsupportedEncodingException {
         DiskFileItemFactory factory = new DiskFileItemFactory();
-        factory.setSizeThreshold((int) fileSizeThreshold);
-        factory.setRepository(Paths.get(ResourceUtil.classpath(), tmpFileLocation).toFile());
+        factory.setSizeThreshold((int) conf.getFileSizeThreshold());
+        factory.setRepository(Paths.get(ResourceUtil.classpath(), conf.getTmpFileLocation()).toFile());
 
         ServletFileUpload fileUpload = new ServletFileUpload(factory);
-        fileUpload.setSizeMax(maxRequestSize);
-        fileUpload.setFileSizeMax(maxFileSize);
+        fileUpload.setSizeMax(conf.getMaxRequestSize());
+        fileUpload.setFileSizeMax(conf.getMaxFileSize());
 
         Map<String, List<FileItem>> fileMap = fileUpload.parseParameterMap(request);
         params = new HashMap<>();

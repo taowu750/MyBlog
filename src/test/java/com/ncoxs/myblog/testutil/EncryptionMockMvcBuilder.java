@@ -86,7 +86,7 @@ public class EncryptionMockMvcBuilder {
 
         Yaml yaml = new Yaml();
         //noinspection unchecked
-        Map<String, Map<String, Map<String, Object>>> properties = yaml.loadAs(ResourceUtil.load("application-dev-extend.yml"), HashMap.class);
+        Map<String, Map<String, Map<String, Object>>> properties = yaml.loadAs(ResourceUtil.load("application-dev-usr.yml"), HashMap.class);
         enable = (boolean) properties.get("myapp").get("encryption").get("enable");
         if (enable) {
             // 获取 RSA 公钥

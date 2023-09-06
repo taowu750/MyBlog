@@ -1,8 +1,10 @@
 package com.ncoxs.myblog.handler.filter;
 
+import com.ncoxs.myblog.conf.entity.MultipartConf;
 import com.ncoxs.myblog.constant.HttpHeaderKey;
-import com.ncoxs.myblog.util.data.IOUtil;
 import com.ncoxs.myblog.util.codec.FormParser;
+import com.ncoxs.myblog.util.data.IOUtil;
+import lombok.NonNull;
 import org.apache.commons.fileupload.FileUploadException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -28,23 +30,24 @@ import java.util.*;
  */
 public class CustomServletRequest extends HttpServletRequestWrapper implements MultipartHttpServletRequest {
 
-    private HttpServletRequest request;
+    private final HttpServletRequest request;
     private byte[] requestBody;
     private FormParser formParser;
     private String contentType;
     private String charset;
+    private final MultipartConf conf;
 
-    public CustomServletRequest(HttpServletRequest request) {
+    public CustomServletRequest(HttpServletRequest request, MultipartConf conf) {
         super(request);
         this.request = request;
+        this.conf = conf;
     }
 
     /**
      * 设置 {@link FormParser}，使用它获取参数和文件。
      */
+    @NonNull
     public void setFormParser(FormParser formParser) {
-        Objects.requireNonNull(formParser);
-
         this.formParser = formParser;
     }
 
@@ -128,7 +131,7 @@ public class CustomServletRequest extends HttpServletRequestWrapper implements M
                 if (getContentType().endsWith("urlencoded")) {
                     setFormParser(new FormParser(new String(requestBody, StandardCharsets.US_ASCII), charsetEncoding));
                 } else {
-                    setFormParser(new FormParser(this, charsetEncoding));
+                    setFormParser(new FormParser(conf, this, charsetEncoding));
                 }
             } else if (getContentType().equals("application/x-preprocess-json")) {
                 contentType = "application/json";

@@ -1,4 +1,4 @@
-package com.ncoxs.myblog.model.bo;
+package com.ncoxs.myblog.model.pojo;
 
 import com.ncoxs.myblog.constant.user.UserStatus;
 import com.ncoxs.myblog.model.dto.IpLocInfo;

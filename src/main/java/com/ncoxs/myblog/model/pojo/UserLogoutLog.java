@@ -1,4 +1,4 @@
-package com.ncoxs.myblog.model.bo;
+package com.ncoxs.myblog.model.pojo;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
